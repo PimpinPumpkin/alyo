@@ -1,5 +1,7 @@
 package app.alyo.ui.screens
 
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.activity.compose.BackHandler
 import app.alyo.data.Feature
@@ -117,84 +119,90 @@ fun SetupScreen(app: AlyoApp, onDone: (finishInVoiceTyping: Boolean) -> Unit) {
     BackHandler(chosen) { chosen = false }
     BoxWithConstraints(Modifier.fillMaxSize().background(colors.surface).statusBarsPadding().navigationBarsPadding(), contentAlignment = Alignment.TopCenter) {
         val screen = maxHeight
-        // Tall screens get the mark stacked over the name; short ones get the two side by side,
-        // which costs a fraction of the height. The page is as tall as the screen whenever its
-        // contents fit, so it only scrolls where there is truly no room (a phone on its side).
         val tall = screen >= 660.dp
-        Column(
-            Modifier.widthIn(max = 560.dp).verticalScroll(rememberScrollState()).heightIn(min = screen).padding(horizontal = 24.dp),
-            verticalArrangement = LogoThenRest,
-        ) {
-            if (tall) {
-                val mark = (screen * 0.2f).coerceIn(120.dp, 176.dp)
-                Column(Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    AlyoMark(mark)
-                    Text("Alyo", style = MaterialTheme.typography.displayLarge.copy(fontSize = 64.sp, lineHeight = 72.sp))
-                }
-            } else {
-                Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                    AlyoMark(56.dp)
-                    Spacer(Modifier.width(4.dp))
-                    Text("Alyo", style = MaterialTheme.typography.displaySmall.copy(fontSize = 40.sp, lineHeight = 48.sp))
-                }
-            }
-            val heading = if (tall) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineSmall
-            val body = if (tall) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium
-            if (!chosen) {
+        // The choices are what the page is for, so they are measured first and get the room they
+        // need. The logo and name take whatever is left above them, at a size that fits it, and
+        // go without when nothing is left. The page only scrolls if the choices alone are taller
+        // than the screen.
+        SubcomposeLayout(Modifier.widthIn(max = 560.dp).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) { constraints ->
+            val height = screen.roundToPx()
+            val rest = subcompose("rest") {
                 Column {
-                    Text("What would you like it for?", style = heading)
-                    Spacer(Modifier.height(if (tall) 8.dp else 4.dp))
-                    Text("Pick any or all. You can change this at any time, and what you leave off stays out of your way.", style = body, color = colors.onSurfaceVariant)
-                    Spacer(Modifier.height(if (tall) 20.dp else 12.dp))
-                    SheetGroup(
-                        Feature.entries.map { feature ->
-                            SheetRow(
-                                feature.icon,
-                                feature.title,
-                                detail = feature.summary,
-                                trailing = { Switch(checked = feature in features, onCheckedChange = null) },
-                                onClick = { app.settings.setFeature(feature, feature !in features) },
-                            )
-                        },
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Button(onClick = { chosen = true }, enabled = features.isNotEmpty(), modifier = Modifier.fillMaxWidth().height(60.dp)) {
-                        Text("Continue", style = MaterialTheme.typography.titleMedium)
+                val heading = if (tall) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineSmall
+                val body = if (tall) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium
+                if (!chosen) {
+                    Column {
+                        Text("What would you like it for?", style = heading)
+                        Spacer(Modifier.height(if (tall) 8.dp else 4.dp))
+                        Text("Pick any or all. You can change this at any time, and what you leave off stays out of your way.", style = body, color = colors.onSurfaceVariant)
+                        Spacer(Modifier.height(if (tall) 20.dp else 12.dp))
+                        SheetGroup(
+                            Feature.entries.map { feature ->
+                                SheetRow(
+                                    feature.icon,
+                                    feature.title,
+                                    detail = feature.summary,
+                                    trailing = { Switch(checked = feature in features, onCheckedChange = null) },
+                                    onClick = { app.settings.setFeature(feature, feature !in features) },
+                                )
+                            },
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Button(onClick = { chosen = true }, enabled = features.isNotEmpty(), modifier = Modifier.fillMaxWidth().height(60.dp)) {
+                            Text("Continue", style = MaterialTheme.typography.titleMedium)
+                        }
+                        Spacer(Modifier.height(12.dp))
                     }
-                    Spacer(Modifier.height(12.dp))
-                }
-            } else {
-                // Voice typing has two more steps of its own (the microphone, the keyboard list),
-                // so that is where its setup carries on.
-                val finish = { onDone(Feature.VOICE_TYPING in features) }
-                Column {
-                    Text("One download", style = heading)
-                    Spacer(Modifier.height(if (tall) 8.dp else 4.dp))
-                    Text(
-                        if (app.settings.hearing) "Speech is turned into text on this phone, never sent anywhere. It needs a speech model first."
-                        else "The voice is made on this phone, and nothing you have read to you is sent anywhere. It needs a voice first.",
-                        style = body,
-                        color = colors.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(if (tall) 20.dp else 12.dp))
-                    if (app.settings.hearing) ModelChooser(app, onReady = finish, readyLabel = "Done") else VoiceDownload(app, onReady = finish)
-                    TextButton(onClick = finish, modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 4.dp)) {
-                        Text(if (downloading) "Carry on while it downloads" else "Not now")
+                } else {
+                    // Voice typing has two more steps of its own (the microphone, the keyboard list),
+                    // so that is where its setup carries on.
+                    val finish = { onDone(Feature.VOICE_TYPING in features) }
+                    Column {
+                        Text("One download", style = heading)
+                        Spacer(Modifier.height(if (tall) 8.dp else 4.dp))
+                        Text(
+                            if (app.settings.hearing) "Speech is turned into text on this phone, never sent anywhere. It needs a speech model first."
+                            else "The voice is made on this phone, and nothing you have read to you is sent anywhere. It needs a voice first.",
+                            style = body,
+                            color = colors.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(if (tall) 20.dp else 12.dp))
+                        if (app.settings.hearing) ModelChooser(app, onReady = finish, readyLabel = "Done") else VoiceDownload(app, onReady = finish)
+                        TextButton(onClick = finish, modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 4.dp)) {
+                            Text(if (downloading) "Carry on while it downloads" else "Not now")
+                        }
                     }
                 }
+                }
+            }.first().measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+            val free = (height - rest.height).coerceAtLeast(0)
+            val logo = subcompose("logo") { Lockup(free.toDp()) }.firstOrNull()
+                ?.measure(Constraints(minWidth = constraints.maxWidth, maxWidth = constraints.maxWidth, maxHeight = free))
+            val total = maxOf(height, rest.height)
+            layout(constraints.maxWidth, total) {
+                logo?.place(0, (free - logo.height) / 2)
+                rest.place(0, total - rest.height)
             }
         }
     }
 }
 
-/** Centers the first child in whatever height is left over and stacks the rest at the bottom. */
-private object LogoThenRest : Arrangement.Vertical {
-    override fun Density.arrange(totalSize: Int, sizes: IntArray, outPositions: IntArray) {
-        val free = (totalSize - sizes.sum()).coerceAtLeast(0)
-        var y = free
-        for (i in sizes.indices) {
-            outPositions[i] = if (i == 0) free / 2 else y
-            y += sizes[i]
+/** The mark and the name, at the largest of three sizes that fits in [room]. Nothing at all if even the smallest does not. */
+@Composable
+private fun Lockup(room: Dp) {
+    when {
+        room >= 300.dp -> Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            AlyoMark((room * 0.42f).coerceIn(104.dp, 176.dp))
+            Text("Alyo", style = MaterialTheme.typography.displayLarge.copy(fontSize = 64.sp, lineHeight = 72.sp))
+        }
+        room >= 176.dp -> Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            AlyoMark(84.dp)
+            Text("Alyo", style = MaterialTheme.typography.displayMedium.copy(fontSize = 44.sp, lineHeight = 52.sp))
+        }
+        room >= 72.dp -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+            AlyoMark(52.dp)
+            Spacer(Modifier.width(4.dp))
+            Text("Alyo", style = MaterialTheme.typography.displaySmall.copy(fontSize = 38.sp, lineHeight = 46.sp))
         }
     }
 }
