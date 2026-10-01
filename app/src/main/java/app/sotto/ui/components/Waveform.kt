@@ -1,5 +1,8 @@
 package app.sotto.ui.components
 
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.foundation.Canvas
 import kotlinx.coroutines.withTimeoutOrNull
 import app.sotto.ui.formatClockFine
@@ -202,7 +205,7 @@ fun SeekBar(
     var zoom by remember { mutableStateOf<Pair<Long, Long>?>(null) }
     val magnify by animateFloatAsState(if (zoom != null) 1f else 0f, label = "zoom")
 
-    Canvas(
+    Spacer(
         modifier
             .fillMaxWidth()
             .height(if (selection != null) 92.dp else 48.dp)
@@ -264,42 +267,48 @@ fun SeekBar(
                         zoom = null
                     }
                 }
+            }
+            // Finding where there is speech means reading the whole waveform, and the playhead
+            // moves every frame. So the track is worked out once and kept; a frame only draws it.
+            .drawWithCache {
+                val inset = 12.dp.toPx()
+                val trackY = size.height - 24.dp.toPx()
+                val (from, to) = zoom ?: (0L to durationMs)
+                val thickness = (4f + 4f * magnify).dp.toPx()
+                val track = if (durationMs > 0) speechRuns(peaks, inset, size.width - inset, from, to, durationMs) else FloatArray(0)
+                fun x(ms: Long) = inset + ((ms - from).toFloat() / (to - from)).coerceIn(0f, 1f) * (size.width - inset * 2)
+                onDrawBehind {
+                    if (durationMs <= 0) return@onDrawBehind
+                    drawSpeechTrack(track, inset, size.width - inset, trackY, palette.speech, colors.outlineVariant, from, to, durationMs, thickness, sounds, palette::sound)
+
+            selection?.invoke()?.let { (start, end) ->
+                drawSelectionFrame(x(start), x(end), trackY - 20.dp.toPx(), trackY + 20.dp.toPx(), colors.inverseSurface, colors.inverseOnSurface, handle = 10.dp.toPx())
+            }
+
+            val now = positionMs()
+            if (now in from..to) {
+                val thumbX = x(now)
+                val thumbHeight = 34.dp.toPx()
+                val thumbWidth = 6.dp.toPx()
+                drawRoundRect(colors.onSurface, Offset(thumbX - thumbWidth / 2f, trackY - thumbHeight / 2f), Size(thumbWidth, thumbHeight), CornerRadius(thumbWidth / 2f))
+            }
+
+            // The bubble rides over the middle of the selection and says how long it is. Zoomed in,
+            // tenths of a second matter, so it shows them.
+            selection?.invoke()?.let { (start, end) ->
+                val label = measurer.measure(if (zoom != null) formatClockFine(end - start) else formatStamp(end - start), bubbleStyle)
+                val padX = 12.dp.toPx()
+                val padY = 6.dp.toPx()
+                val boxWidth = label.size.width + padX * 2
+                val boxHeight = label.size.height + padY * 2
+                val middle = (x(start) + x(end)) / 2f
+                val left = (middle - boxWidth / 2f).coerceIn(0f, size.width - boxWidth)
+                drawRoundRect(colors.inverseSurface, Offset(left, 0f), Size(boxWidth, boxHeight), CornerRadius(boxHeight / 2f))
+                drawText(label, colors.inverseOnSurface, Offset(left + padX, padY))
+            }
+                }
             },
-    ) {
-        if (durationMs <= 0) return@Canvas
-        val inset = 12.dp.toPx()
-        val trackY = size.height - 24.dp.toPx()
-        val (from, to) = zoom ?: (0L to durationMs)
-        fun x(ms: Long) = inset + ((ms - from).toFloat() / (to - from)).coerceIn(0f, 1f) * (size.width - inset * 2)
-
-        drawSpeechTrack(peaks, inset, size.width - inset, trackY, palette.speech, colors.outlineVariant, from, to, durationMs, thickness = (4f + 4f * magnify).dp.toPx(), sounds = sounds, sound = palette::sound)
-
-        selection?.invoke()?.let { (start, end) ->
-            drawSelectionFrame(x(start), x(end), trackY - 20.dp.toPx(), trackY + 20.dp.toPx(), colors.inverseSurface, colors.inverseOnSurface, handle = 10.dp.toPx())
-        }
-
-        val now = positionMs()
-        if (now in from..to) {
-            val thumbX = x(now)
-            val thumbHeight = 34.dp.toPx()
-            val thumbWidth = 6.dp.toPx()
-            drawRoundRect(colors.onSurface, Offset(thumbX - thumbWidth / 2f, trackY - thumbHeight / 2f), Size(thumbWidth, thumbHeight), CornerRadius(thumbWidth / 2f))
-        }
-
-        // The bubble rides over the middle of the selection and says how long it is. Zoomed in,
-        // tenths of a second matter, so it shows them.
-        selection?.invoke()?.let { (start, end) ->
-            val label = measurer.measure(if (zoom != null) formatClockFine(end - start) else formatStamp(end - start), bubbleStyle)
-            val padX = 12.dp.toPx()
-            val padY = 6.dp.toPx()
-            val boxWidth = label.size.width + padX * 2
-            val boxHeight = label.size.height + padY * 2
-            val middle = (x(start) + x(end)) / 2f
-            val left = (middle - boxWidth / 2f).coerceIn(0f, size.width - boxWidth)
-            drawRoundRect(colors.inverseSurface, Offset(left, 0f), Size(boxWidth, boxHeight), CornerRadius(boxHeight / 2f))
-            drawText(label, colors.inverseOnSurface, Offset(left + padX, padY))
-        }
-    }
+    )
 }
 
 /** How long a handle must be held still before the seek bar zooms in, and how much it then shows. */
@@ -307,30 +316,17 @@ private const val HOLD_MS = 450L
 private const val ZOOM_SPAN_MS = 6_000L
 
 /**
- * A line from [left] to [right], bright over the stretches where someone is speaking and dim over
- * silence. It shows the recording between [fromMs] and [toMs] of [durationMs]; the defaults are
- * the whole of it.
+ * Where on a line from [left] to [right] someone is speaking, as pairs of start and end x. The
+ * line shows the recording between [fromMs] and [toMs] of [durationMs]. This reads every peak in
+ * that stretch, so it is not something to do per frame.
  */
-private fun DrawScope.drawSpeechTrack(
-    peaks: Peaks,
-    left: Float,
-    right: Float,
-    y: Float,
-    speech: Color,
-    silence: Color,
-    fromMs: Long = 0,
-    toMs: Long = 1,
-    durationMs: Long = 1,
-    thickness: Float = 4.dp.toPx(),
-    sounds: List<SoundSpan> = emptyList(),
-    sound: (String) -> Color = { speech },
-) {
-    drawLine(silence, Offset(left, y), Offset(right, y), strokeWidth = thickness, cap = StrokeCap.Round)
-    if (peaks.size == 0) return
+private fun Density.speechRuns(peaks: Peaks, left: Float, right: Float, fromMs: Long, toMs: Long, durationMs: Long): FloatArray {
+    if (peaks.size == 0) return FloatArray(0)
     val step = 3.dp.toPx()
     val runs = ((right - left) / step).toInt().coerceAtLeast(1)
     val firstPeak = peaks.size * (fromMs.toFloat() / durationMs)
     val perRun = peaks.size * ((toMs - fromMs).toFloat() / durationMs) / runs
+    val out = ArrayList<Float>()
     var runStart = -1
     for (run in 0..runs) {
         var level = 0f
@@ -341,9 +337,35 @@ private fun DrawScope.drawSpeechTrack(
         val speaking = run < runs && level >= SILENCE
         if (speaking && runStart < 0) runStart = run
         if (!speaking && runStart >= 0) {
-            drawLine(speech, Offset(left + runStart * step, y), Offset(minOf(right, left + run * step), y), strokeWidth = thickness, cap = StrokeCap.Butt)
+            out += left + runStart * step
+            out += minOf(right, left + run * step)
             runStart = -1
         }
+    }
+    return out.toFloatArray()
+}
+
+/**
+ * A line from [left] to [right], bright over the stretches in [track] (from [speechRuns]) and dim
+ * elsewhere, with [sounds] over the top in their own colors.
+ */
+private fun DrawScope.drawSpeechTrack(
+    track: FloatArray,
+    left: Float,
+    right: Float,
+    y: Float,
+    speech: Color,
+    silence: Color,
+    fromMs: Long,
+    toMs: Long,
+    durationMs: Long,
+    thickness: Float,
+    sounds: List<SoundSpan>,
+    sound: (String) -> Color,
+) {
+    drawLine(silence, Offset(left, y), Offset(right, y), strokeWidth = thickness, cap = StrokeCap.Round)
+    for (i in 0 until track.size / 2) {
+        drawLine(speech, Offset(track[i * 2], y), Offset(track[i * 2 + 1], y), strokeWidth = thickness, cap = StrokeCap.Butt)
     }
     // Music and the like, drawn over the top in its own color. These are in milliseconds, so they
     // need the real duration; the library cards pass it for exactly this.
@@ -361,12 +383,17 @@ fun SpeechBar(peaks: Peaks?, modifier: Modifier = Modifier, sounds: List<SoundSp
     val speech = palette.speech
     val silence = MaterialTheme.colorScheme.outlineVariant
     val sound = palette::sound
-    Canvas(modifier.fillMaxWidth().height(8.dp)) {
-        val inset = 2.dp.toPx()
-        if (peaks == null) {
-            drawLine(silence, Offset(inset, size.height / 2f), Offset(size.width - inset, size.height / 2f), strokeWidth = 4.dp.toPx(), cap = StrokeCap.Round)
-        } else {
-            drawSpeechTrack(peaks, inset, size.width - inset, size.height / 2f, speech, silence, 0, durationMs, durationMs, sounds = sounds, sound = sound)
-        }
-    }
+    Spacer(
+        modifier.fillMaxWidth().height(8.dp).drawWithCache {
+            val inset = 2.dp.toPx()
+            val track = peaks?.let { speechRuns(it, inset, size.width - inset, 0, durationMs, durationMs) }
+            onDrawBehind {
+                if (track == null) {
+                    drawLine(silence, Offset(inset, size.height / 2f), Offset(size.width - inset, size.height / 2f), strokeWidth = 4.dp.toPx(), cap = StrokeCap.Round)
+                } else {
+                    drawSpeechTrack(track, inset, size.width - inset, size.height / 2f, speech, silence, 0, durationMs, durationMs, 4.dp.toPx(), sounds, sound)
+                }
+            }
+        },
+    )
 }

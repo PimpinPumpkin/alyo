@@ -1,5 +1,6 @@
 package app.sotto.asr
 
+import android.os.Process
 import android.util.Log
 import app.sotto.audio.AudioSpec
 import app.sotto.data.Segment
@@ -124,6 +125,9 @@ class LiveTranscriber(
     }
 
     private suspend fun runLive() {
+        // Below the interface, above pass two. Set before the model is loaded: the threads the
+        // model starts for itself take on the priority of the thread that created it.
+        Process.setThreadPriority(LIVE_PRIORITY)
         val recognizer = engine.live(liveSpec)
         val stream = recognizer.createStream()
         val out = BufferedOutputStream(FileOutputStream(spool), 64 * 1024)
@@ -268,6 +272,8 @@ class LiveTranscriber(
 
     private suspend fun runRefine() {
         val spec = refinerSpec ?: return
+        // Pass two can always wait a moment; the screen and the live text cannot.
+        Process.setThreadPriority(REFINE_PRIORITY)
         for (job in refineQueue) {
             try {
                 if (cancelled) continue
@@ -344,6 +350,11 @@ class LiveTranscriber(
 
     private companion object {
         const val TAG = "LiveTranscriber"
+
+        // Android "nice" values: 0 is an ordinary thread, higher gives way more readily. Both stay
+        // under 10, where the system would confine the thread to the slow cores.
+        const val LIVE_PRIORITY = 2
+        const val REFINE_PRIORITY = 6
         // Generous on purpose. Pass one can miss a soft opening word entirely ("Okay", "I'll"), and
         // pass two can only recover it if the audio it is given starts before that word.
         const val PAD_BEFORE = AudioSpec.ASR_SAMPLE_RATE * 1L
