@@ -80,6 +80,7 @@ import app.sotto.ui.components.RecordButton
 import app.sotto.ui.components.RecordGlyph
 import app.sotto.ui.components.TapeWaveform
 import app.sotto.ui.components.TranscriptView
+import app.sotto.ui.components.SoundLabel
 import app.sotto.ui.components.ViewToggle
 import app.sotto.ui.components.paragraphsOf
 import app.sotto.ui.formatClock
@@ -303,16 +304,12 @@ private fun LiveWaveform(session: RecordingSession, paused: Boolean) {
     )
 }
 
-/** Names what is being heard this second, above the waveform and in the color the waveform is drawn in for it. */
+/** Names what is being heard this second, above the waveform. */
 @Composable
 private fun HearingLabel(session: RecordingSession, paused: Boolean, modifier: Modifier = Modifier) {
     val hearing by session.hearing.collectAsState()
-    val palette = LocalSottoColors.current
     val heard = hearing?.takeIf { !paused } ?: return
-    val tint = if (heard == SoundTagger.SPEECH) palette.speech else palette.sound(heard)
-    Surface(shape = CircleShape, color = tint.copy(alpha = 0.16f), contentColor = tint, modifier = modifier) {
-        Text(heard, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
-    }
+    SoundLabel(heard, modifier)
 }
 
 @Composable

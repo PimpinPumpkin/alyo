@@ -221,3 +221,18 @@ fun RecordButton(
 fun RecordingDot(modifier: Modifier = Modifier, color: Color = LocalSottoColors.current.record) {
     Box(modifier.size(10.dp).background(color, CircleShape))
 }
+
+/**
+ * Names what is being heard at this moment ("Speech", "Music"), in the color the waveform is drawn
+ * in for it. Shown above the waveform while recording and while playing back.
+ */
+@Composable
+fun SoundLabel(kind: String, modifier: Modifier = Modifier) {
+    val palette = LocalSottoColors.current
+    val tint = if (kind == SPEECH_LABEL) palette.speech else palette.sound(kind)
+    Surface(shape = CircleShape, color = tint.copy(alpha = 0.16f), contentColor = tint, modifier = modifier) {
+        Text(kind, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
+    }
+}
+
+const val SPEECH_LABEL = "Speech"

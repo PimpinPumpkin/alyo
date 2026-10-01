@@ -95,6 +95,8 @@ import app.sotto.playback.Player
 import app.sotto.ui.components.Paragraph
 import app.sotto.ui.components.SeekBar
 import app.sotto.ui.components.SheetRow
+import app.sotto.ui.components.SoundLabel
+import app.sotto.ui.components.SPEECH_LABEL
 import app.sotto.ui.components.TapeWaveform
 import app.sotto.ui.components.TranscriptView
 import app.sotto.ui.components.ViewToggle
@@ -222,14 +224,25 @@ fun PlayerScreen(
             ContentCard(Modifier.weight(1f)) {
                 AnimatedContent(showTranscript, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "tab") { showingTranscript ->
                     if (!showingTranscript) {
-                        TapeWaveform(
-                            peaks = peaks,
-                            peakCount = peaks.size,
-                            positionMs = { position },
-                            onScrub = { delta -> player.seekBy(delta) },
-                            sounds = sounds,
-                            modifier = Modifier.fillMaxSize(),
-                        )
+                        Box(Modifier.fillMaxSize()) {
+                            TapeWaveform(
+                                peaks = peaks,
+                                peakCount = peaks.size,
+                                positionMs = { position },
+                                onScrub = { delta -> player.seekBy(delta) },
+                                sounds = sounds,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                            // What is under the playhead: a marked sound, or speech where there are words.
+                            val heard by remember(sounds, paragraphs) {
+                                derivedStateOf {
+                                    val at = position
+                                    sounds.firstOrNull { at >= it.startMs && at < it.endMs }?.kind
+                                        ?: SPEECH_LABEL.takeIf { paragraphs.any { at >= it.startMs && at < it.endMs } }
+                                }
+                            }
+                            heard?.let { SoundLabel(it, Modifier.align(Alignment.TopCenter).padding(top = 28.dp)) }
+                        }
                     } else if (paragraphs.isEmpty() && sounds.isEmpty()) {
                         Column(Modifier.fillMaxSize().padding(horizontal = 40.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("No transcript", style = MaterialTheme.typography.titleLarge)
