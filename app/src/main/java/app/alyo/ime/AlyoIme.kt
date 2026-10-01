@@ -4,6 +4,7 @@ import android.content.Intent
 import android.inputmethodservice.InputMethodService
 import android.os.Handler
 import android.os.Looper
+import android.view.HapticFeedbackConstants
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -206,12 +207,24 @@ class AlyoIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner, V
         canUndo.value = composer?.canUndo == true
     }
 
+    /** A short tick, felt when listening starts and when a button on the panel is used. */
+    private fun tick() {
+        window.window?.decorView?.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+    }
+
+    override fun onWindowShown() {
+        super.onWindowShown()
+        if (dictation != null) tick()
+    }
+
     private fun done() {
+        tick()
         val running = dictation
         if (running == null) leave() else running.finish()
     }
 
     private fun undo() {
+        tick()
         if (composer?.undo() == true) dictation?.discardTail()
         refresh()
     }
