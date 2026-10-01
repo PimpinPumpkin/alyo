@@ -46,7 +46,7 @@ class RecordingService : LifecycleService() {
                 ServiceCompat.startForeground(this, NOTIFICATION_ID, build("Recording", null, paused = false, recording = true), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
             } catch (e: SecurityException) {
                 // The system refuses a microphone service without the permission, or when started
-                // from the background. The UI asks first, so this is a last line of defence.
+                // from the background. The UI asks first, so this is a last line of defense.
                 Log.e(TAG, "Not allowed to record", e)
                 lifecycleScope.launch { recorder.discard() }
                 stopSelf()
