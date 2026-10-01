@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    One voice subtype. "voice" is what makes the microphone key on other keyboards come here, and
+    auxiliary keeps Alyo out of the ordinary keyboard rotation: it has no keys to type with.
+-->
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="app.alyo.MainActivity"
+    android:supportsSwitchingToNextInputMethod="true">
+    <subtype
+        android:imeSubtypeLocale="en_US"
+        android:imeSubtypeMode="voice"
+        android:isAuxiliary="true"
+        android:label="@string/subtype_voice"
+        android:languageTag="en-US"
+        android:overridesImplicitlyEnabledSubtype="true" />
+</input-method>

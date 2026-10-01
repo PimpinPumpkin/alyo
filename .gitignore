@@ -1,0 +1,15 @@
+*.iml
+.gradle/
+.kotlin/
+local.properties
+.idea/
+.DS_Store
+build/
+captures/
+*.apk
+*.aab
+keystore.properties
+*.jks
+# 50 MB prebuilt speech runtime; app/build.gradle.kts downloads it on first build.
+app/libs/*.aar
+app/libs/onnxruntime/

@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">Alyo</string>
+    <!-- The name shown in the phone's keyboard list. -->
+    <string name="ime_name">Alyo voice typing</string>
+    <string name="subtype_voice">Voice (English)</string>
+</resources>

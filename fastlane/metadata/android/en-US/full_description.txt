@@ -1,0 +1,17 @@
+Alyo is voice typing that keeps up with you. Tap the microphone key on your keyboard, talk, and the words appear in the text field as you say them. When you pause, the sentence is rewritten with punctuation and capitals.
+
+Everything happens on the phone. There is no account and no cloud, and nothing you say leaves the device. The only time Alyo goes online is to download its speech model, once.
+
+<b>Features</b>
+
+• Words appear as you speak, not after you stop
+• Punctuation and capitals added for you
+• Say "comma", "period", "question mark" or "new line" when you want control
+• Undo the last sentence with one tap
+• Stops by itself after a few seconds of silence
+• Works with any keyboard that has a microphone key
+• Also serves as the system speech recognizer for other apps
+
+Alyo is a keyboard with no keys: your own keyboard stays the default, and Alyo takes over only while you dictate.
+
+English only for now. The speech models are NVIDIA FastConformer and Parakeet, run by sherpa-onnx.

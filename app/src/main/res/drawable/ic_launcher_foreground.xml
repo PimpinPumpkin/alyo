@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A voice turning into text: four bars of sound, then the cursor they are typing at. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#4285F4" android:pathData="M36,48m-2.5,0a2.5,2.5 0,1 1,5 0v12a2.5,2.5 0,1 1,-5 0z" />
+    <path android:fillColor="#EA4335" android:pathData="M45,40m-2.5,0a2.5,2.5 0,1 1,5 0v28a2.5,2.5 0,1 1,-5 0z" />
+    <path android:fillColor="#FBBC04" android:pathData="M54,45m-2.5,0a2.5,2.5 0,1 1,5 0v18a2.5,2.5 0,1 1,-5 0z" />
+    <path android:fillColor="#34A853" android:pathData="M63,49m-2.5,0a2.5,2.5 0,1 1,5 0v10a2.5,2.5 0,1 1,-5 0z" />
+    <path android:fillColor="#202124" android:pathData="M72,38h2.5v32h-2.5z" />
+    <path android:fillColor="#202124" android:pathData="M68.5,36.5h9.5v2.5h-9.5z" />
+    <path android:fillColor="#202124" android:pathData="M68.5,69h9.5v2.5h-9.5z" />
+</vector>

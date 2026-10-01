@@ -1,0 +1,29 @@
+# F-Droid
+
+What stands between Alyo and F-Droid's main repository.
+
+## Fine already
+
+- GPL-3.0, and every dependency is under a free license.
+- No Google Play Services, analytics, ads or tracking.
+- No self-updater.
+- No native code of its own to build.
+- Models are freely licensed (CC BY 4.0), downloaded at run time, and can be imported from files
+  instead.
+- Store text is in `fastlane/metadata/android/`.
+
+## Blockers
+
+**sherpa-onnx is a prebuilt AAR.** `app/build.gradle.kts` downloads it from the project's GitHub
+release, along with a trimmed ONNX Runtime. F-Droid does not accept prebuilt binaries, so its
+recipe has to build sherpa-onnx and ONNX Runtime with the NDK. Other F-Droid apps do this, but
+ONNX Runtime's Android build is long.
+
+**The build uses the network** for those two downloads. F-Droid builds have no network after
+checkout, so both need to become submodules or srclibs.
+
+**The repository has to be public.**
+
+## Until then
+
+The releases here work with Obtainium.
