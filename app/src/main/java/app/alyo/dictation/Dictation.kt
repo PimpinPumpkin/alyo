@@ -117,6 +117,9 @@ class Dictation(
 
     @Volatile private var cancelled = false
 
+    /** Samples taken from the microphone so far. */
+    private val captured = java.util.concurrent.atomic.AtomicLong()
+
     private fun runCapture() {
         val mic = try {
             source().also { it.start() }
@@ -143,6 +146,7 @@ class Dictation(
                 // Speech sits around 0.02 to 0.2 RMS; the square root spreads that over the meter.
                 level = sqrt(sqrt(energy / n) * 4f).coerceIn(0f, 1f)
                 audio.trySend(chunk)
+                captured.addAndGet(n.toLong())
             }
         } finally {
             level = 0f
@@ -156,6 +160,10 @@ class Dictation(
     private fun runLive() = runBlocking {
         try {
             val recognizer = engine.live(liveSpec, AsrEngine.DICTATION_PAUSE)
+            // The microphone has been open the whole time the model was loading, and whoever is
+            // dictating was told to wait. That wait is not them falling silent: the clock for
+            // "stopped talking" starts now, with what was captured up to this point.
+            val listeningFrom = captured.get()
             if (!stopped.get()) listener.onState(State.LISTENING)
             val stream = recognizer.createStream()
             val chunkSamples = liveSpec.chunkMs * SAMPLE_RATE / 1000L
@@ -319,7 +327,7 @@ class Dictation(
 
                     // Someone who has not started yet gets longer than someone who has stopped.
                     val limit = if (heardSpeech) stopAfterSilenceMs else stopAfterSilenceMs + FIRST_WORD_GRACE_MS
-                    if (stopAfterSilenceMs > 0 && sampleToMs(fed - lastSpeech) >= limit) finish()
+                    if (stopAfterSilenceMs > 0 && sampleToMs(fed - maxOf(lastSpeech, listeningFrom)) >= limit) finish()
                 }
                 if (!cancelled) {
                     // Flush: the model needs trailing context before it will commit to the final
