@@ -44,12 +44,12 @@ first launch.
 
 | Language | Standard (default) | Best |
 | --- | --- | --- |
-| English | 275 MB | 828 MB |
-| German, French | 101 MB | 771 MB |
-| Spanish | 186 MB | 856 MB |
+| English | 346 MB | 899 MB |
+| German, French | 172 MB | 842 MB |
+| Spanish | 257 MB | 927 MB |
 
-Best uses about 1.1 GB of memory while recording. The sizes include the 30 MB voice model behind
-speaker labels.
+Best uses about 1.1 GB of memory while recording. The sizes include the 97 MB voice model behind
+speaker labels, which is skipped if speaker labels are turned off.
 
 Summaries need a separate model: Quick (Qwen2.5 0.5B, 676 MB) or Thorough (Qwen2.5 1.5B, 1.1 GB).
 Any other GGUF chat model can be imported instead.
@@ -87,8 +87,10 @@ sentence is never cut at a fixed length.
 Other pieces:
 
 - **Sounds**: CED tiny (6 MB, inside the APK) tags music, applause and laughter.
-- **Speakers**: pyannote segmentation finds where the voice changes, and 3D-Speaker CAM++ groups
-  the voices. Runs once when a recording is saved. Skipped for recordings over 45 minutes.
+- **Speakers**: pyannote segmentation finds where the voice changes, and NVIDIA TitaNet groups
+  the voices. Runs once when a recording is saved, at low priority. Skipped for recordings over
+  45 minutes. Labels can be corrected by hand: for a paragraph, from a chosen word onward, or by
+  merging two speakers into one.
 - **Summaries**: Qwen2.5 through [llama.cpp](https://github.com/ggml-org/llama.cpp), with the
   output held to a title and one to five sentences by a grammar. Long transcripts are read in
   pieces. Not offered for recordings under 80 words. Small models get facts wrong, so this is
@@ -138,7 +140,7 @@ adb shell am start -n app.sotto/.MainActivity --es wav /data/user/0/app.sotto/fi
   [`ModelCatalog.kt`](app/src/main/java/app/sotto/asr/ModelCatalog.kt), but it needs a streaming
   model, and few languages have a good open one.
 - The app's own text is English only.
-- A sentence shared by two people is labeled with whoever spoke most of it.
+- A sentence shared by two people is labeled with whoever spoke most of it, until you split it.
 - The Bluetooth microphone option and pausing for phone calls have not been tested on real
   hardware.
 - Not on F-Droid yet. See [docs/FDROID.md](docs/FDROID.md).
@@ -152,7 +154,8 @@ GPL-3.0. See [LICENSE](LICENSE).
 | [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), llama.cpp, ONNX Runtime | Apache 2.0, MIT |
 | NVIDIA FastConformer and Parakeet TDT | CC BY 4.0 |
 | Banafo Kroko ASR | CC BY-SA 4.0 |
-| CED tiny, 3D-Speaker CAM++, Qwen2.5 | Apache 2.0 |
+| NVIDIA TitaNet | CC BY 4.0 |
+| CED tiny, Qwen2.5 | Apache 2.0 |
 | pyannote segmentation 3.0 | MIT |
 | [Google Sans Flex](https://fonts.google.com/specimen/Google+Sans+Flex) | OFL 1.1, see [licenses/](licenses/GoogleSansFlex-OFL.txt) |
 | AndroidX, Compose, Media3, Commons Compress | Apache 2.0 |
