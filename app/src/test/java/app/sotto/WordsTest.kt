@@ -105,16 +105,22 @@ class SummaryTitleTest {
 
 class SoundSpansTest {
     private val m = app.sotto.data.SoundSpan.MUSIC
-    private fun spans(vararg kinds: String?) = app.sotto.asr.SoundTagger.spansOf(kinds.toList()).map { Triple(it.kind, it.startMs, it.endMs) }
+    private fun spans(vararg kinds: String?, live: Boolean = false) =
+        app.sotto.asr.SoundTagger.spansOf(kinds.toList(), provisional = live).map { Triple(it.kind, it.startMs, it.endMs) }
 
     @Test
     fun `a run of music becomes one span and a dropout inside it is absorbed`() {
-        assertEquals(listOf(Triple(m, 2000, 12000)), spans(null, m, m, null, m, m, null))
+        assertEquals(listOf(Triple(m, 1000, 7000)), spans(null, m, m, null, m, m, null))
     }
 
     @Test
-    fun `one tonal window is not music`() {
-        assertTrue(spans(null, m, null, null).isEmpty())
+    fun `a moment of something tonal is not music`() {
+        assertTrue(spans(null, m, m, null, null).isEmpty())
+    }
+
+    @Test
+    fun `while recording, music shows as soon as it starts`() {
+        assertEquals(listOf(Triple(m, 2000, 4000)), spans(null, null, m, live = true))
     }
 
     @Test

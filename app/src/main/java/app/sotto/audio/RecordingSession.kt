@@ -75,6 +75,9 @@ class RecordingSession(
     /** Music and the like heard so far. */
     val soundSpans: StateFlow<List<SoundSpan>> = sounds?.spans ?: MutableStateFlow(emptyList())
 
+    /** What is being heard right now: "Speech", "Music" and so on, or null when it is quiet. */
+    val hearing: StateFlow<String?> = sounds?.hearing ?: MutableStateFlow(null)
+
     val hasTranscript: Boolean get() = transcriber != null
     val segments: StateFlow<List<Segment>> = transcriber?.segments ?: MutableStateFlow(emptyList())
     val partial: StateFlow<List<Word>> = transcriber?.partial ?: MutableStateFlow(emptyList())

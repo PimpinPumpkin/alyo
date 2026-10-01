@@ -72,6 +72,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.sotto.SottoApp
+import app.sotto.asr.SoundTagger
 import app.sotto.audio.RecordingSession
 import app.sotto.data.Segment
 import app.sotto.data.Word
@@ -135,6 +136,7 @@ fun RecordScreen(app: SottoApp, session: RecordingSession, onMinimize: () -> Uni
 
         }, controls = {
         ViewToggle(showTranscript, { showTranscript = it }, Modifier.align(Alignment.CenterHorizontally).padding(top = 16.dp, bottom = 8.dp))
+        HearingLabel(session, paused)
         Timer(session, paused)
         val interrupted by session.interruption.collectAsState()
         if (interrupted) {
@@ -292,6 +294,22 @@ private fun LiveWaveform(session: RecordingSession, paused: Boolean) {
         barColor = if (paused) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
         playheadColor = LocalSottoColors.current.record,
         modifier = Modifier.fillMaxSize(),
+    )
+}
+
+/** Names what is being heard this second, in the color the waveform is drawn in for it. */
+@Composable
+private fun HearingLabel(session: RecordingSession, paused: Boolean, modifier: Modifier = Modifier) {
+    val hearing by session.hearing.collectAsState()
+    val colors = MaterialTheme.colorScheme
+    val speech = hearing == SoundTagger.SPEECH
+    Text(
+        if (paused) "" else hearing.orEmpty(),
+        style = MaterialTheme.typography.titleMedium,
+        color = if (speech) colors.primary else colors.tertiary,
+        textAlign = TextAlign.Center,
+        // Always takes its line, so the timer below does not jump as the label comes and goes.
+        modifier = modifier.fillMaxWidth(),
     )
 }
 

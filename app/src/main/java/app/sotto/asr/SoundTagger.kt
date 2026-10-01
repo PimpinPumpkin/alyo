@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 
 /**
- * Listens for what is not speech. The recording is classified two seconds at a time against the
+ * Listens for what is not speech. Once a second, the last two seconds are classified against the
  * AudioSet sound classes, and runs of music, applause or laughter become [SoundSpan]s, so the
  * waveform can show them and the transcript can say "Music" where there were no words to write.
  *
@@ -29,7 +29,12 @@ class SoundTagger(private val assets: AssetManager, scope: CoroutineScope) {
     private val done = CompletableDeferred<Unit>()
 
     private val _spans = MutableStateFlow<List<SoundSpan>>(emptyList())
+    /** Music and the like so far. While recording, the newest stretch is provisional and can still change. */
     val spans: StateFlow<List<SoundSpan>> = _spans
+
+    private val _hearing = MutableStateFlow<String?>(null)
+    /** What is being heard this second: [SPEECH], one of the [SoundSpan] kinds, or null for quiet. */
+    val hearing: StateFlow<String?> = _hearing
 
     init {
         scope.launch(thread.asCoroutineDispatcher()) {
@@ -64,6 +69,8 @@ class SoundTagger(private val assets: AssetManager, scope: CoroutineScope) {
             ),
         )
         try {
+            // Two seconds are judged at a time, but a judgment is made every second, on the two
+            // seconds just gone. That halves the wait before a change shows on screen.
             val window = FloatArray(WINDOW)
             var filled = 0
             val kinds = ArrayList<String?>()
@@ -75,12 +82,18 @@ class SoundTagger(private val assets: AssetManager, scope: CoroutineScope) {
                     filled += n
                     offset += n
                     if (filled == WINDOW) {
-                        kinds += classify(tagger, window)
-                        filled = 0
-                        _spans.value = spansOf(kinds)
+                        val heard = classify(tagger, window)
+                        _hearing.value = heard
+                        kinds += heard.takeIf { it != SPEECH }
+                        _spans.value = spansOf(kinds, provisional = true)
+                        // Keep the newer half as the start of the next window.
+                        window.copyInto(window, 0, HOP, WINDOW)
+                        filled = WINDOW - HOP
                     }
                 }
             }
+            _spans.value = spansOf(kinds, provisional = false)
+            _hearing.value = null
         } finally {
             tagger.release()
         }
@@ -102,22 +115,31 @@ class SoundTagger(private val assets: AssetManager, scope: CoroutineScope) {
             music >= THRESHOLD && music > speech -> SoundSpan.MUSIC
             score("Applause", "Clapping") >= THRESHOLD -> SoundSpan.APPLAUSE
             score("Laughter") >= THRESHOLD && score("Laughter") > speech -> SoundSpan.LAUGHTER
+            speech >= THRESHOLD -> SPEECH
             else -> null
         }
     }
 
     companion object {
         private const val TAG = "SoundTagger"
+        /** Reported by [hearing] only; speech is the default and is never stored as a span. */
+        const val SPEECH = "Speech"
+
         private const val WINDOW_MS = 2000
+        private const val HOP_MS = 1000
         private const val WINDOW = AudioSpec.ASR_SAMPLE_RATE * WINDOW_MS / 1000
+        private const val HOP = AudioSpec.ASR_SAMPLE_RATE * HOP_MS / 1000
         private const val THRESHOLD = 0.4f
 
+        /** Music has to last this many one-second steps to be kept: less is as likely a ringtone or a door chime as a song. */
+        private const val MIN_MUSIC = 3
+
         /**
-         * Joins per-window verdicts into spans. A single stray window in the middle of a run is
-         * absorbed, and music has to last two windows to count: one window of something tonal is
-         * as likely a ringtone or a door chime as a song.
+         * Joins the once-a-second verdicts into spans. A single stray verdict in the middle of a
+         * run is absorbed. Short music is dropped, except that while recording ([provisional])
+         * a run still in progress at the end is shown at once, since it may yet grow.
          */
-        fun spansOf(kinds: List<String?>): List<SoundSpan> {
+        fun spansOf(kinds: List<String?>, provisional: Boolean = false): List<SoundSpan> {
             val smooth = kinds.toMutableList()
             for (i in 1 until smooth.size - 1) {
                 if (smooth[i] != smooth[i - 1] && smooth[i - 1] != null && smooth[i - 1] == smooth[i + 1]) smooth[i] = smooth[i - 1]
@@ -127,8 +149,13 @@ class SoundTagger(private val assets: AssetManager, scope: CoroutineScope) {
             for (i in 1..smooth.size) {
                 if (i == smooth.size || smooth[i] != smooth[start]) {
                     val kind = smooth[start]
-                    val windows = i - start
-                    if (kind != null && (kind != SoundSpan.MUSIC || windows >= 2)) out += SoundSpan(kind, start * WINDOW_MS, i * WINDOW_MS)
+                    val steps = i - start
+                    val growing = provisional && i == smooth.size
+                    // Verdict n is about the two seconds ending at second n + 2, so a run of them
+                    // covers from its first second to one second past its last.
+                    if (kind != null && (kind != SoundSpan.MUSIC || steps >= MIN_MUSIC || growing)) {
+                        out += SoundSpan(kind, start * HOP_MS, i * HOP_MS + (WINDOW_MS - HOP_MS))
+                    }
                     start = i
                 }
             }
