@@ -15,6 +15,8 @@ no cloud.
 - **Search** across titles and every word of every transcript, and within one transcript with
   jump-to-match.
 - **Background playback** with lock screen and notification controls.
+- **Summaries.** A small language model on the phone writes a title and the key points. Optional.
+- **Names recordings by topic** once the transcript is in.
 - **Offline.** The only network request the app ever makes is the one-time speech model download.
 
 Requires Android 10 or later on a 64-bit ARM phone.
@@ -50,17 +52,43 @@ English only for now. A language is one entry in
 [`ModelCatalog.kt`](app/src/main/java/app/sotto/asr/ModelCatalog.kt): a streaming model plus one or
 more second-pass models. Nothing else in the app is language-specific.
 
+## Summaries
+
+Summaries are written by Qwen2.5 running through [llama.cpp](https://github.com/ggml-org/llama.cpp),
+which is built from source into the app. A transcript that fits the model's context is done in one
+pass; a longer one is read in pieces, each reduced to notes, and the summary is written from the
+notes. Measured on a Pixel 4a 5G:
+
+| Model | Download | Reads | Writes |
+| --- | --- | --- | --- |
+| Quick (Qwen2.5 0.5B) | 676 MB | about 49 tokens a second | about 16 |
+| Thorough (Qwen2.5 1.5B) | 1.1 GB | about 11 tokens a second | about 7 |
+
+A minute of speech is roughly 200 tokens, so on that phone Quick reads a ten-minute recording in
+well under a minute and Thorough takes about three. Any other chat model in GGUF form can be
+imported from Settings and used instead.
+
+## Two builds
+
+- **standard** downloads its models from inside the app.
+- **offline** does not request the internet permission. Models are imported from files: the same
+  `.tar.bz2` archives sherpa-onnx publishes, and a `.gguf` for summaries. The standard build can
+  import too.
+
+Both have the same application id and signing key, so either installs over the other.
+
 ## Building
 
 ```bash
-./gradlew assembleDebug
+./gradlew assembleStandardDebug
 ```
 
-Needs JDK 17 and Android SDK platform 37. The first build downloads the sherpa-onnx AAR (50 MB)
+Needs JDK 17, Android SDK platform 37, and the NDK and CMake (for llama.cpp, which is fetched at
+its pinned tag during the build; pass `-PllamaSrc=<checkout>` to use a local copy). The first build downloads the sherpa-onnx AAR (50 MB)
 from its GitHub release into `app/libs/`; it is not on Maven.
 
 ```bash
-./gradlew testDebugUnitTest
+./gradlew testStandardDebugUnitTest
 ```
 
 runs the unit tests for the parts with real logic in them: token-to-word timing, re-timing a
@@ -112,7 +140,6 @@ two are punctuated as one sentence.
 - Transcribing a recording after the fact (imported audio, or one made before the model was downloaded).
 - Languages other than English.
 - Speaker labels.
-- Summaries. That needs a second, general-purpose language model on the phone.
 - Model downloads do not run as a foreground service, so a very long download can be interrupted
   if the app is swiped away. It resumes where it stopped the next time the app opens.
 

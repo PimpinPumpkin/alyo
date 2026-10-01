@@ -40,6 +40,8 @@ private val CREDITS = listOf(
     Credit("Parakeet TDT 0.6B v2 and 110M", "NVIDIA", "CC BY 4.0", "The speech model that writes the finished transcript", "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2"),
     Credit("FastConformer streaming transducer", "NVIDIA", "CC BY 4.0", "The speech model behind the live text", "https://huggingface.co/nvidia/stt_en_fastconformer_hybrid_large_streaming_multi"),
     Credit("sherpa-onnx", "Xiaomi Corporation and the k2-fsa contributors", "Apache 2.0", "Runs the speech models, and converted them to the form used here", "https://github.com/k2-fsa/sherpa-onnx"),
+    Credit("Qwen2.5 0.5B and 1.5B Instruct", "Alibaba Cloud", "Apache 2.0", "The language models that write summaries", "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct"),
+    Credit("llama.cpp", "The ggml authors", "MIT", "Runs the summary model", "https://github.com/ggml-org/llama.cpp"),
     Credit("ONNX Runtime", "Microsoft", "MIT", "The engine underneath sherpa-onnx", "https://github.com/microsoft/onnxruntime"),
     Credit("Google Sans Flex", "Google", "SIL Open Font License 1.1", "The typeface", "https://github.com/google/fonts/tree/main/ofl/googlesansflex"),
     Credit("Jetpack Compose, Material 3, AndroidX", "The Android Open Source Project", "Apache 2.0", "The interface", "https://developer.android.com/jetpack/androidx"),

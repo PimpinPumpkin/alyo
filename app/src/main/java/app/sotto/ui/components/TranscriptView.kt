@@ -299,11 +299,30 @@ private fun ParagraphBlock(
                             part.endsHere && toEnd < reach -> false
                             else -> return@awaitEachGesture
                         }
+                        // A finger never lands exactly on the grip. Remember by how much it missed
+                        // and keep that offset for the whole drag, so the selection does not jump
+                        // the moment it is touched.
+                        val grip = if (startEdge) Offset(startBox.left, startBox.center.y) else Offset(endBox.right, endBox.center.y)
+                        val miss = down.position - gutter - grip
                         down.consume()
+                        var last = -1
                         drag(down.id) { change ->
                             change.consume()
-                            val index = paragraph.wordAtChar(result.getOffsetForPosition(change.position - gutter))
-                            if (index >= 0) dragSelection.value(startEdge, paragraph.words[index])
+                            val at = change.position - gutter - miss
+                            val index = paragraph.wordAtChar(result.getOffsetForPosition(at))
+                            if (index < 0) return@drag
+                            // The edge goes to whichever side of this word is nearer, so it only
+                            // moves once the finger is past the middle of a word, not on first contact.
+                            val left = result.getBoundingBox(paragraph.wordStart(index).coerceAtMost(length - 1)).left
+                            val right = result.getBoundingBox((paragraph.wordEnd(index) - 1).coerceIn(0, length - 1)).right
+                            val pastMiddle = at.x > (left + right) / 2f
+                            val target = when {
+                                startEdge -> if (pastMiddle) index + 1 else index
+                                else -> if (pastMiddle) index else index - 1
+                            }
+                            if (target == last || target !in paragraph.words.indices) return@drag
+                            last = target
+                            dragSelection.value(startEdge, paragraph.words[target])
                         }
                     }
                 }

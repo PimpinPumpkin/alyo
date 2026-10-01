@@ -50,4 +50,17 @@ data class RecordingMeta(
     /** Segments still waiting for the accurate second pass. Non-zero means the transcript will keep improving. */
     val pendingRefine: Int = 0,
     val starred: Boolean = false,
+    /** True while the title is one the app chose (the date, or a topic), so it may still be improved on. */
+    val autoTitled: Boolean = false,
 )
+
+/** What a recording was about, written by the on-device language model. */
+@Serializable
+data class Summary(
+    val title: String,
+    val points: List<String>,
+    /** Which model wrote it, shown so a rough summary can be blamed on the right thing. */
+    val model: String = "",
+) {
+    val text: String get() = (listOf(title) + points.map { "- $it" }).filter { it.isNotBlank() }.joinToString("\n")
+}

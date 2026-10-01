@@ -70,3 +70,35 @@ class PauseFinderTest {
         assertEquals(null, finder.quietest(0, 300L * 16))
     }
 }
+
+class SummaryParseTest {
+    private fun parse(reply: String) = app.sotto.llm.Summarizer.parse(reply, "test")
+
+    @Test
+    fun `reads a title and bullets`() {
+        val s = parse("**Launch Date and Budget Update**\n\n- The launch moved to November.\n- A spreadsheet will follow.")
+        assertEquals("Launch Date and Budget Update", s.title)
+        assertEquals(listOf("The launch moved to November.", "A spreadsheet will follow."), s.points)
+    }
+
+    @Test
+    fun `copes with a reply that skipped the title`() {
+        val s = parse("- First point\n* Second point\n1. Third point")
+        assertEquals("", s.title)
+        assertEquals(listOf("First point", "Second point", "Third point"), s.points)
+    }
+
+    @Test
+    fun `strips a Title label`() {
+        assertEquals("Weekly sync", parse("Title: Weekly sync\n- one").title)
+    }
+}
+
+class SummaryTitleTest {
+    @Test
+    fun `a run-on first line is not taken as a title`() {
+        val s = app.sotto.llm.Summarizer.parse("Title: The history of the printing press begins long before Gutenberg, with wood block printing in China\n- one", "test")
+        assertEquals("", s.title)
+        assertEquals(listOf("one"), s.points)
+    }
+}

@@ -118,6 +118,7 @@ fun PlayerScreen(
     autoplay: Boolean,
     onBack: () -> Unit,
     onCrop: () -> Unit,
+    onSettings: () -> Unit,
 ) {
     val context = LocalContext.current
     val colors = MaterialTheme.colorScheme
@@ -165,6 +166,7 @@ fun PlayerScreen(
     var renaming by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var sharing by remember { mutableStateOf(false) }
+    var summarizing by remember { mutableStateOf(false) }
     val busy = meta.pendingRefine > 0
     val listState = rememberLazyListState()
 
@@ -195,6 +197,18 @@ fun PlayerScreen(
                     Spacer(Modifier.width(8.dp))
                     Text("Polishing the transcript", style = MaterialTheme.typography.labelLarge, color = colors.primary)
                 }
+            }
+
+            if (!transcript.isEmpty && !busy) {
+                SummaryChip(
+                    app, id,
+                    onClick = {
+                        // With a model in place and nothing written yet, one tap starts it.
+                        if (app.store.summary(id).value == null && app.summarizer.running.value[id] == null && app.summarizer.model() != null) app.summarizer.start(id)
+                        summarizing = true
+                    },
+                    modifier = Modifier.padding(start = 16.dp, bottom = 10.dp),
+                )
             }
 
             ContentCard(Modifier.weight(1f)) {
@@ -327,6 +341,7 @@ fun PlayerScreen(
     }
     if (deleting) DeleteDialog(meta.title, onDismiss = { deleting = false }) { deleting = false; player.pause(); app.store.delete(id); onBack() }
     if (sharing) ShareSheet(app, meta, onDismiss = { sharing = false })
+    if (summarizing) SummarySheet(app, id, onDismiss = { summarizing = false }, onGetModel = { summarizing = false; player.pause(); onSettings() })
 }
 
 /** Find-in-transcript: a field, a "2 of 5" count, and arrows that jump playback to each match. */

@@ -1,15 +1,15 @@
 package app.sotto.ui.screens
 
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.BorderStroke
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,38 +18,40 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Download
-import androidx.compose.material.icons.rounded.GraphicEq
-import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.HighQuality
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.NewReleases
+import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearWavyProgressIndicator
-import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -57,121 +59,161 @@ import androidx.compose.ui.unit.dp
 import app.sotto.BuildConfig
 import app.sotto.SottoApp
 import app.sotto.asr.InstallState
+import app.sotto.asr.ModelCatalog
+import app.sotto.asr.ModelKind
+import app.sotto.asr.ModelSource
 import app.sotto.asr.ModelSpec
-import app.sotto.asr.Quality
 import app.sotto.ui.components.SheetGroup
 import app.sotto.ui.components.SheetRow
 import app.sotto.ui.formatBytes
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+/** First run: one screen, no scrolling. Pick a quality, get the model, go. */
+@Composable
+fun SetupScreen(app: SottoApp, onDone: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Column(Modifier.fillMaxSize().background(colors.surface).statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp)) {
+        Spacer(Modifier.weight(1f))
+        Text("Transcribe as you speak", style = MaterialTheme.typography.headlineLarge)
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "Speech is turned into text on this phone, never sent anywhere. It needs a speech model first.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = colors.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(24.dp))
+        ModelChooser(app, onReady = onDone, readyLabel = "Start recording")
+        TextButton(onClick = onDone, modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 8.dp)) {
+            Text("Not now, just record audio")
+        }
+    }
+}
+
+@Composable
+fun SettingsScreen(app: SottoApp, onDone: () -> Unit, onLicenses: () -> Unit, onWhatsNew: (() -> Unit)?) {
+    val colors = MaterialTheme.colorScheme
+    val context = LocalContext.current
+    val plainName by app.settings.plainName.collectAsState()
+    val autoTitle by app.settings.autoTitle.collectAsState()
+
+    Column(Modifier.fillMaxSize().background(colors.surface).statusBarsPadding().navigationBarsPadding()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onDone) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") }
+            Text("Settings", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 8.dp))
+        }
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
+            SectionTitle("Transcription")
+            ModelChooser(app, onReady = null, readyLabel = "")
+
+            SectionTitle("Summaries")
+            SummaryModelChooser(app)
+
+            SectionTitle("Recordings")
+            SheetGroup(
+                listOf(
+                    SheetRow(
+                        Icons.Rounded.AutoAwesome,
+                        "Name recordings by topic",
+                        detail = "Adds what was talked about to the title",
+                        trailing = { Switch(checked = autoTitle, onCheckedChange = null) },
+                        onClick = { app.settings.setAutoTitle(!autoTitle) },
+                    ),
+                ),
+            )
+
+            SectionTitle("App")
+            SheetGroup(
+                listOfNotNull(
+                    SheetRow(
+                        Icons.Rounded.Badge,
+                        "Show as \"Recorder\"",
+                        detail = "Use the plain name on the home screen",
+                        trailing = { Switch(checked = plainName, onCheckedChange = null) },
+                        onClick = { app.settings.setPlainName(!plainName) },
+                    ),
+                    onWhatsNew?.let { SheetRow(Icons.Rounded.NewReleases, "What's new", detail = "Version ${BuildConfig.VERSION_NAME}", onClick = it) },
+                    SheetRow(Icons.Rounded.Favorite, "Support Sotto Recorder", detail = "Free and ad-free. A donation is welcome, never needed.", onClick = { open(context, DONATE_URL) }),
+                    SheetRow(Icons.Rounded.Info, "Open-source licenses", onClick = onLicenses),
+                ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 8.dp, top = 20.dp, bottom = 10.dp))
+}
 
 /**
- * Speech model setup. Doubles as the first-run screen ([firstRun]) and as Settings afterwards.
+ * The quality choice as two thin rows, and under them whatever the chosen one still needs:
+ * a download button, progress, or nothing.
+ *
+ * @param onReady when given, a button with [readyLabel] appears once the models are in place
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun SettingsScreen(app: SottoApp, firstRun: Boolean, onDone: () -> Unit, onLicenses: () -> Unit = {}) {
+private fun ModelChooser(app: SottoApp, onReady: (() -> Unit)?, readyLabel: String) {
     val colors = MaterialTheme.colorScheme
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val states by app.models.states.collectAsState()
     val qualityId by app.settings.quality.collectAsState()
     val pack = app.settings.pack
     val quality = pack.qualities.firstOrNull { it.id == qualityId } ?: pack.qualities.first()
     val needed: List<ModelSpec> = listOf(pack.live, quality.refiner)
-
     fun state(spec: ModelSpec) = states[spec.id] ?: InstallState.Missing
     val missing = needed.filter { state(it) != InstallState.Installed }
-    val downloading = needed.mapNotNull { state(it) as? InstallState.Downloading }
+    val downloading = needed.any { state(it) is InstallState.Downloading }
     val failure = needed.firstNotNullOfOrNull { state(it) as? InstallState.Failed }
-    val ready = missing.isEmpty()
+    var importing by remember { mutableStateOf(false) }
+    var showSources by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxSize().background(colors.surface).statusBarsPadding().navigationBarsPadding()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp).height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (!firstRun) {
-                IconButton(onClick = onDone) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") }
-                Text("Settings", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 8.dp))
-            }
-        }
-
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
-            Box(
-                Modifier.size(96.dp).background(colors.primaryContainer, MaterialShapes.SoftBurst.toShape()),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Rounded.GraphicEq, null, tint = colors.onPrimaryContainer, modifier = Modifier.size(44.dp))
-            }
-            Spacer(Modifier.height(24.dp))
-            Text(if (firstRun) "Transcribe as you speak" else "Transcription", style = MaterialTheme.typography.headlineLarge)
-            Spacer(Modifier.height(12.dp))
-            Text(
-                "Sotto Recorder writes down what it hears while you record, and it does it on this phone. " +
-                    "That needs a speech model, downloaded once. After that nothing leaves the device and no connection is needed.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = colors.onSurfaceVariant,
-            )
-
-            Spacer(Modifier.height(28.dp))
-            Text("${pack.name} · quality", style = MaterialTheme.typography.titleSmall, color = colors.primary)
-            Spacer(Modifier.height(12.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                for (option in pack.qualities) {
-                    val bytes = pack.live.source.downloadBytes + option.refiner.source.downloadBytes
-                    QualityCard(
-                        quality = option,
-                        selected = option.id == quality.id,
-                        recommended = option.id == app.settings.recommendedQuality(),
-                        installed = state(pack.live) == InstallState.Installed && state(option.refiner) == InstallState.Installed,
-                        sizeLabel = formatBytes(bytes),
-                        enabled = downloading.isEmpty(),
-                        onSelect = { app.settings.setQuality(option.id) },
-                        // The big second-pass model is the part worth reclaiming; the live model is shared.
-                        onRemove = { app.models.delete(option.refiner) }.takeIf { state(option.refiner) == InstallState.Installed },
-                    )
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        importing = true
+        scope.launch {
+            val results = withContext(Dispatchers.IO) {
+                uris.map { uri ->
+                    runCatching { context.contentResolver.openInputStream(uri)!!.use(app.models::importArchive).title }
+                        .getOrElse { "Not imported: ${it.message}" }
                 }
             }
-
-            Spacer(Modifier.height(24.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.CloudOff, null, tint = colors.onSurfaceVariant, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    "Recordings and transcripts are stored only in this app. The download is the only time it goes online.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.onSurfaceVariant,
-                )
-            }
-            if (!firstRun) {
-                val plainName by app.settings.plainName.collectAsState()
-                val context = LocalContext.current
-                Spacer(Modifier.height(28.dp))
-                Text("App", style = MaterialTheme.typography.titleSmall, color = colors.primary)
-                Spacer(Modifier.height(12.dp))
-                SheetGroup(
-                    listOf(
-                        SheetRow(
-                            Icons.Rounded.Badge,
-                            "Show as \"Recorder\"",
-                            detail = "Use the plain name on the home screen",
-                            trailing = { Switch(checked = plainName, onCheckedChange = null) },
-                            onClick = { app.settings.setPlainName(!plainName) },
-                        ),
-                        SheetRow(
-                            Icons.Rounded.Favorite,
-                            "Support Sotto Recorder",
-                            detail = "Free and ad-free. A donation is welcome, never needed.",
-                            onClick = { open(context, DONATE_URL) },
-                        ),
-                        SheetRow(
-                            Icons.Rounded.Info,
-                            "Open-source licenses",
-                            detail = "Version ${BuildConfig.VERSION_NAME}, and what it is built from",
-                            onClick = onLicenses,
-                        ),
-                    ),
-                )
-            }
-            Spacer(Modifier.height(24.dp))
+            importing = false
+            Toast.makeText(context, results.joinToString("\n") { if (it.startsWith("Not")) it else "Imported $it" }, Toast.LENGTH_LONG).show()
         }
+    }
 
-        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp)) {
-            if (downloading.isNotEmpty()) {
+    Column {
+        SheetGroup(
+            pack.qualities.map { option ->
+                val installed = state(pack.live) == InstallState.Installed && state(option.refiner) == InstallState.Installed
+                val size = formatBytes(pack.live.source.downloadBytes + option.refiner.source.downloadBytes)
+                SheetRow(
+                    icon = if (option.id == "best") Icons.Rounded.HighQuality else Icons.Rounded.Speed,
+                    label = option.title + if (option.id == app.settings.recommendedQuality()) "  ·  suits this phone" else "",
+                    detail = (if (installed) "Ready" else size) + "  ·  " + option.summary,
+                    enabled = !downloading,
+                    trailing = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (state(option.refiner) == InstallState.Installed && onReady == null) {
+                                IconButton(onClick = { app.models.delete(option.refiner) }) {
+                                    Icon(Icons.Rounded.DeleteOutline, "Remove the ${option.title} download", tint = colors.onSurfaceVariant)
+                                }
+                            }
+                            RadioButton(selected = option.id == quality.id, onClick = null)
+                        }
+                    },
+                    onClick = { app.settings.setQuality(option.id) },
+                )
+            },
+        )
+        Spacer(Modifier.height(12.dp))
+
+        when {
+            downloading || importing -> {
                 val done = needed.sumOf { spec ->
                     when (val s = state(spec)) {
                         is InstallState.Downloading -> s.doneBytes
@@ -180,96 +222,143 @@ fun SettingsScreen(app: SottoApp, firstRun: Boolean, onDone: () -> Unit, onLicen
                     }
                 }
                 val total = needed.sumOf { it.source.downloadBytes }
-                LinearWavyProgressIndicator(progress = { done.toFloat() / total }, modifier = Modifier.fillMaxWidth())
-                Spacer(Modifier.height(10.dp))
+                if (importing) LinearWavyProgressIndicator(Modifier.fillMaxWidth()) else LinearWavyProgressIndicator(progress = { done.toFloat() / total }, modifier = Modifier.fillMaxWidth())
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "Downloading  ${formatBytes(done)} of ${formatBytes(total)}",
+                        if (importing) "Importing" else "${formatBytes(done)} of ${formatBytes(total)}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = colors.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
                     )
-                    TextButton(onClick = { needed.forEach(app.models::cancel) }) { Text("Pause") }
+                    if (!importing) TextButton(onClick = { needed.forEach(app.models::cancel) }) { Text("Pause") }
                 }
-            } else if (ready) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
-                    Icon(Icons.Rounded.CheckCircle, null, tint = colors.primary)
-                    Spacer(Modifier.width(10.dp))
-                    Text("Ready. New recordings will be transcribed.", style = MaterialTheme.typography.bodyLarge)
-                }
-                Button(onClick = onDone, modifier = Modifier.fillMaxWidth().height(64.dp)) {
-                    Text(if (firstRun) "Start recording" else "Done", style = MaterialTheme.typography.titleMedium)
-                }
-            } else {
-                failure?.let {
-                    Text(it.message, style = MaterialTheme.typography.bodyMedium, color = colors.error, modifier = Modifier.padding(bottom = 10.dp))
-                }
-                Button(onClick = { missing.forEach(app.models::install) }, modifier = Modifier.fillMaxWidth().height(64.dp)) {
-                    Icon(Icons.Rounded.Download, null)
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        (if (failure != null) "Try again" else "Download") + "  ·  " + formatBytes(missing.sumOf { it.source.downloadBytes }),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                }
-                if (firstRun) {
-                    TextButton(onClick = onDone, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp)) {
-                        Text("Not now, just record audio")
+            }
+            missing.isEmpty() -> if (onReady != null) {
+                Button(onClick = onReady, modifier = Modifier.fillMaxWidth().height(60.dp)) { Text(readyLabel, style = MaterialTheme.typography.titleMedium) }
+            }
+            else -> {
+                failure?.let { Text(it.message, style = MaterialTheme.typography.bodyMedium, color = colors.error, modifier = Modifier.padding(bottom = 8.dp)) }
+                if (BuildConfig.NETWORK) {
+                    Button(onClick = { missing.forEach(app.models::install) }, modifier = Modifier.fillMaxWidth().height(60.dp)) {
+                        Icon(Icons.Rounded.Download, null)
+                        Spacer(Modifier.width(10.dp))
+                        Text((if (failure != null) "Try again" else "Download") + "  ·  " + formatBytes(missing.sumOf { it.source.downloadBytes }), style = MaterialTheme.typography.titleMedium)
+                    }
+                } else {
+                    Button(onClick = { picker.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth().height(60.dp)) {
+                        Icon(Icons.Rounded.FolderOpen, null)
+                        Spacer(Modifier.width(10.dp))
+                        Text("Import model files", style = MaterialTheme.typography.titleMedium)
                     }
                 }
             }
         }
+        if (!downloading && !importing && missing.isNotEmpty()) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center) {
+                if (BuildConfig.NETWORK) TextButton(onClick = { picker.launch(arrayOf("*/*")) }) { Text("Import from files instead") }
+                TextButton(onClick = { showSources = true }) { Text("Where to get the files") }
+            }
+        }
+    }
+
+    if (showSources) {
+        val links = missing.map(ModelCatalog::archiveUrl)
+        AlertDialog(
+            onDismissRequest = { showSources = false },
+            title = { Text("Model files") },
+            text = {
+                Column {
+                    Text("Download these on any device, move them to this phone, then import them. They are the archives the sherpa-onnx project publishes.")
+                    Spacer(Modifier.height(12.dp))
+                    for (spec in missing) {
+                        Text("${spec.archive}.tar.bz2", style = MaterialTheme.typography.bodySmall, color = colors.primary, modifier = Modifier.padding(bottom = 8.dp))
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Model files", links.joinToString("\n")))
+                    showSources = false
+                }) { Text("Copy links") }
+            },
+            dismissButton = { TextButton(onClick = { showSources = false }) { Text("Close") } },
+        )
     }
 }
 
+/** Which language model writes summaries, and getting it onto the phone. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun QualityCard(
-    quality: Quality,
-    selected: Boolean,
-    recommended: Boolean,
-    installed: Boolean,
-    sizeLabel: String,
-    enabled: Boolean,
-    onSelect: () -> Unit,
-    onRemove: (() -> Unit)?,
-) {
+private fun SummaryModelChooser(app: SottoApp) {
     val colors = MaterialTheme.colorScheme
-    val container by animateColorAsState(if (selected) colors.secondaryContainer else colors.surfaceContainer, label = "container")
-    Surface(
-        onClick = onSelect,
-        enabled = enabled,
-        shape = RoundedCornerShape(24.dp),
-        color = container,
-        border = if (selected) BorderStroke(2.dp, colors.primary) else null,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(Modifier.padding(start = 8.dp, end = 20.dp, top = 16.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            RadioButton(selected = selected, onClick = null, modifier = Modifier.padding(horizontal = 12.dp))
-            Column(Modifier.weight(1f)) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val states by app.models.states.collectAsState()
+    val chosenId by app.settings.summarizer.collectAsState()
+    fun state(spec: ModelSpec) = states[spec.id] ?: InstallState.Missing
+    // The imported slot only appears once something has been imported into it.
+    val options = ModelCatalog.summarizers + listOfNotNull(ModelCatalog.importedSummarizer.takeIf { state(it) == InstallState.Installed })
+    val chosen = options.firstOrNull { it.id == chosenId } ?: options.first()
+    val chosenState = state(chosen)
+    var importing by remember { mutableStateOf(false) }
+
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        importing = true
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { context.contentResolver.openInputStream(uri)!!.use(app.models::importArchive) }
+            }
+            importing = false
+            result.onSuccess { if (it.kind == ModelKind.CHAT_GGUF) app.settings.setSummarizer(it.id) }
+            Toast.makeText(context, result.fold({ "Imported ${it.title}" }, { "Not imported: ${it.message}" }), Toast.LENGTH_LONG).show()
+        }
+    }
+
+    Column {
+        SheetGroup(
+            options.map { option ->
+                val size = (option.source as? ModelSource.Files)?.downloadBytes ?: 0L
+                SheetRow(
+                    icon = Icons.Rounded.AutoAwesome,
+                    label = option.title,
+                    detail = (if (state(option) == InstallState.Installed) "Ready" else formatBytes(size)) + "  ·  " + option.summary,
+                    trailing = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (state(option) == InstallState.Installed) {
+                                IconButton(onClick = { app.models.delete(option) }) { Icon(Icons.Rounded.DeleteOutline, "Remove ${option.title}", tint = colors.onSurfaceVariant) }
+                            }
+                            RadioButton(selected = option.id == chosen.id, onClick = null)
+                        }
+                    },
+                    onClick = { app.settings.setSummarizer(option.id) },
+                )
+            },
+        )
+        Spacer(Modifier.height(12.dp))
+        when {
+            importing -> LinearWavyProgressIndicator(Modifier.fillMaxWidth())
+            chosenState is InstallState.Downloading -> {
+                LinearWavyProgressIndicator(progress = { chosenState.fraction }, modifier = Modifier.fillMaxWidth())
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(quality.title, style = MaterialTheme.typography.titleMedium)
-                    if (recommended) {
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            "For this phone",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = colors.onTertiaryContainer,
-                            modifier = Modifier.background(colors.tertiaryContainer, RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 3.dp),
-                        )
+                    Text("${formatBytes(chosenState.doneBytes)} of ${formatBytes(chosenState.totalBytes)}", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { app.models.cancel(chosen) }) { Text("Pause") }
+                }
+            }
+            chosenState != InstallState.Installed -> {
+                (chosenState as? InstallState.Failed)?.let { Text(it.message, style = MaterialTheme.typography.bodyMedium, color = colors.error, modifier = Modifier.padding(bottom = 8.dp)) }
+                if (BuildConfig.NETWORK) {
+                    Button(onClick = { app.models.install(chosen) }, modifier = Modifier.fillMaxWidth().height(56.dp)) {
+                        Icon(Icons.Rounded.Download, null)
+                        Spacer(Modifier.width(10.dp))
+                        Text("Download  ·  " + formatBytes(chosen.source.downloadBytes), style = MaterialTheme.typography.titleMedium)
                     }
                 }
-                Text(quality.summary, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
-                Text(
-                    if (installed) "Downloaded  ·  $sizeLabel" else "$sizeLabel download",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (installed) colors.primary else colors.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
             }
-            if (onRemove != null) {
-                IconButton(onClick = onRemove, enabled = enabled) {
-                    Icon(Icons.Rounded.DeleteOutline, "Remove the ${quality.title} download", tint = colors.onSurfaceVariant)
-                }
+        }
+        if (!importing) {
+            TextButton(onClick = { picker.launch(arrayOf("*/*")) }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                Text("Import a GGUF model from files")
             }
         }
     }

@@ -68,6 +68,24 @@ class RecordingStore(context: Context) {
 
     fun peaks(id: String): Peaks = Peaks.load(peaksFile(id))
 
+    private val summaries = HashMap<String, MutableStateFlow<Summary?>>()
+    private fun summaryFile(id: String) = File(dir(id), "summary.json")
+
+    /** The recording's summary, or null until one has been written. */
+    @Synchronized
+    fun summary(id: String): StateFlow<Summary?> = summaryFlow(id)
+
+    @Synchronized
+    private fun summaryFlow(id: String): MutableStateFlow<Summary?> = summaries.getOrPut(id) {
+        MutableStateFlow(runCatching { json.decodeFromString<Summary>(summaryFile(id).readText()) }.getOrNull())
+    }
+
+    fun saveSummary(id: String, summary: Summary) {
+        if (!dir(id).exists()) return
+        summaryFile(id).writeText(json.encodeToString(Summary.serializer(), summary))
+        summaryFlow(id).value = summary
+    }
+
     /** Registers a finished recording and makes it appear in the library. */
     fun add(meta: RecordingMeta, transcript: Transcript, peaks: Peaks) {
         peaks.save(peaksFile(meta.id))
@@ -80,9 +98,11 @@ class RecordingStore(context: Context) {
         if (dir(id).exists()) transcriptFile(id).writeText(json.encodeToString(Transcript.serializer(), transcript))
     }
 
-    fun rename(id: String, title: String) {
+    /** @param auto the app is naming it, as opposed to the user; a user's name is never replaced. */
+    fun rename(id: String, title: String, auto: Boolean = false) {
         val current = meta(id) ?: return
-        putMeta(current.copy(title = title.trim().ifEmpty { current.title }))
+        if (auto && !current.autoTitled) return
+        putMeta(current.copy(title = title.trim().ifEmpty { current.title }, autoTitled = auto))
     }
 
     fun setStarred(id: String, starred: Boolean) {
@@ -92,7 +112,10 @@ class RecordingStore(context: Context) {
 
     fun delete(id: String) {
         dir(id).deleteRecursively()
-        synchronized(this) { transcripts.remove(id) }
+        synchronized(this) {
+            transcripts.remove(id)
+            summaries.remove(id)
+        }
         _recordings.update { list -> list.filterNot { it.id == id } }
     }
 
@@ -146,6 +169,8 @@ class RecordingStore(context: Context) {
                     durationMs = duration,
                     preview = previewOf(newTranscript),
                     pendingRefine = 0,
+                    // A star is a judgment about the original, not something an edit inherits.
+                    starred = false,
                 ),
             )
         } else {

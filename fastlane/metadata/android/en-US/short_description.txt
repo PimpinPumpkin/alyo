@@ -1,0 +1,1 @@
+Voice recorder that transcribes as you speak, entirely on your phone

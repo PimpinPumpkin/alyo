@@ -76,6 +76,10 @@ class Exporter(private val context: Context, private val store: RecordingStore) 
         val date = SimpleDateFormat("EEEE, MMMM d, yyyy 'at' h:mm a", Locale.getDefault()).format(Date(meta.createdAt))
         append(meta.title).append('\n')
         append(date).append("  ·  ").append(formatClock(meta.durationMs)).append("\n")
+        store.summary(meta.id).value?.let { summary ->
+            append("\nSummary\n")
+            for (point in summary.points) append("- ").append(point).append('\n')
+        }
         for (paragraph in paragraphsOf(transcript.segments)) {
             append("\n[").append(formatClock(paragraph.startMs.toLong())).append("]\n")
             append(paragraph.text).append('\n')

@@ -38,6 +38,29 @@ android {
         ndk {
             abiFilters += ((project.findProperty("abis") as String?) ?: "arm64-v8a").split(",")
         }
+        externalNativeBuild {
+            cmake {
+                arguments += "-DANDROID_STL=c++_static"
+                // -PllamaSrc=<path> builds llama.cpp from a local checkout instead of fetching it.
+                (project.findProperty("llamaSrc") as String?)?.let { arguments += "-DLLAMA_SRC=$it" }
+            }
+        }
+    }
+
+    // Two builds of the same app. "standard" can download its speech models; "offline" does not
+    // even ask for the internet permission, and takes models only from files the user imports.
+    // Same application id and signing key, so one can be installed over the other.
+    flavorDimensions += "network"
+    productFlavors {
+        create("standard") {
+            dimension = "network"
+            buildConfigField("boolean", "NETWORK", "true")
+        }
+        create("offline") {
+            dimension = "network"
+            buildConfigField("boolean", "NETWORK", "false")
+            versionNameSuffix = "-offline"
+        }
     }
 
     // Release signing comes from the environment (CI secrets, or keystore.properties exported by
@@ -63,6 +86,15 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             val fromEnv = signingConfigs.getByName("releaseFromEnv")
             signingConfig = if (fromEnv.storeFile?.exists() == true) fromEnv else signingConfigs.getByName("debug")
+        }
+    }
+
+    // The summary model's runtime (llama.cpp), built from source. See src/main/cpp/CMakeLists.txt.
+    ndkVersion = "28.2.13676358"
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
         }
     }
 

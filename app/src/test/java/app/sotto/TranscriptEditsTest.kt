@@ -88,3 +88,28 @@ class TranscriptEditsTest {
         assertEquals(listOf(7L), cut.segments.map { it.id })
     }
 }
+
+class TopicTest {
+    private fun transcript(text: String) = Transcript(
+        segments = listOf(Segment(0, text.split(' ').mapIndexed { i, w -> Word(w, i * 300, i * 300 + 250) })),
+    )
+
+    @Test
+    fun `names a recording after what keeps coming up`() {
+        val topic = app.sotto.data.Titles.topic(
+            transcript("Okay so the budget is tight this quarter. We spent most of the budget on hardware and the hardware arrived late. I think the budget needs another look."),
+        )
+        assertEquals("Budget, Hardware", topic)
+    }
+
+    @Test
+    fun `prefers names`() {
+        val topic = app.sotto.data.Titles.topic(transcript("I talked to Priya about the launch. Then Priya said the launch could slip."))
+        assertEquals("Priya, Launch", topic)
+    }
+
+    @Test
+    fun `says nothing when nothing stands out`() {
+        assertNull(app.sotto.data.Titles.topic(transcript("Hello there, this is just a quick test.")))
+    }
+}

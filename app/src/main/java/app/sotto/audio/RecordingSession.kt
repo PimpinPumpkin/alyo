@@ -5,6 +5,7 @@ import app.sotto.asr.LiveTranscriber
 import app.sotto.data.RecordingMeta
 import app.sotto.data.RecordingStore
 import app.sotto.data.Segment
+import app.sotto.data.Titles
 import app.sotto.data.Transcript
 import app.sotto.data.Word
 import kotlinx.coroutines.CompletableDeferred
@@ -29,6 +30,7 @@ class RecordingSession(
     private val store: RecordingStore,
     private val scope: CoroutineScope,
     private val openSource: () -> PcmSource,
+    private val autoTitle: () -> Boolean,
     transcriberFactory: ((onRefined: (Segment) -> Unit) -> LiveTranscriber)?,
 ) {
     val peaks = Peaks()
@@ -169,7 +171,11 @@ class RecordingSession(
         drafts?.cancel()
         val meta = withContext(Dispatchers.IO) {
             synchronized(saveLock) {
-                val meta = RecordingMeta(id, title.value, startedAt, duration, pendingRefine = transcriber?.pending?.value ?: 0)
+                val meta = RecordingMeta(
+                    id, title.value, startedAt, duration,
+                    pendingRefine = transcriber?.pending?.value ?: 0,
+                    autoTitled = title.value == Titles.forDate(startedAt),
+                )
                 store.add(meta, Transcript(segments = segments.value), peaks)
                 saved = true
                 meta
@@ -184,6 +190,8 @@ class RecordingSession(
             }
             store.setPendingRefine(id, 0)
             store.spool(id).delete()
+            // Name it after its subject, unless the user has already given it a name of their own.
+            if (autoTitle()) Titles.topic(store.transcript(id).value)?.let { store.rename(id, it, auto = true) }
             onSettled()
         }
         return meta

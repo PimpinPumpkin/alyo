@@ -49,6 +49,9 @@ import app.sotto.ui.screens.LicensesScreen
 import app.sotto.ui.screens.PlayerScreen
 import app.sotto.ui.screens.RecordScreen
 import app.sotto.ui.screens.SettingsScreen
+import app.sotto.ui.screens.SetupScreen
+import app.sotto.ui.screens.WhatsNew
+import app.sotto.ui.screens.WhatsNewSheet
 import app.sotto.ui.theme.SottoTheme
 import java.io.File
 
@@ -107,6 +110,8 @@ private fun App(app: SottoApp, debugWav: File?, onDebugWavConsumed: () -> Unit) 
     ) { mutableListOf(Routes.HOME).toMutableStateList() }
     var forward by remember { mutableStateOf(true) }
     var exporting by remember { mutableStateOf<RecordingMeta?>(null) }
+    val notes = remember { WhatsNew.notes(context) }
+    var showNotes by remember { mutableStateOf(WhatsNew.shouldShow(context)) }
     val session by app.recorder.session.collectAsState()
 
     fun push(route: String) {
@@ -208,14 +213,15 @@ private fun App(app: SottoApp, debugWav: File?, onDebugWavConsumed: () -> Unit) 
                 autoplay = parts.getOrNull(2) == "true",
                 onBack = ::pop,
                 onCrop = { push(Routes.crop(parts[1])) },
+                onSettings = { push(Routes.SETTINGS) },
             )
             "crop" -> CropScreen(app, parts[1]) { copy ->
                 pop()
                 // Land on the new copy, with the original one step back.
                 if (copy != null) push(Routes.player(copy))
             }
-            Routes.SETUP -> SettingsScreen(app, firstRun = true, onDone = ::pop)
-            Routes.SETTINGS -> SettingsScreen(app, firstRun = false, onDone = ::pop, onLicenses = { push(Routes.LICENSES) })
+            Routes.SETUP -> SetupScreen(app, onDone = ::pop)
+            Routes.SETTINGS -> SettingsScreen(app, onDone = ::pop, onLicenses = { push(Routes.LICENSES) }, onWhatsNew = notes?.let { { showNotes = true } })
             Routes.LICENSES -> LicensesScreen(onBack = ::pop)
             else -> HomeScreen(
                 app = app,
@@ -230,4 +236,5 @@ private fun App(app: SottoApp, debugWav: File?, onDebugWavConsumed: () -> Unit) 
     }
 
     exporting?.let { ShareSheet(app, it, onDismiss = { exporting = null }) }
+    if (showNotes) notes?.let { WhatsNewSheet(it, onDismiss = { showNotes = false }) }
 }

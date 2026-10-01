@@ -1,12 +1,23 @@
 package app.sotto.ui.components
 
 import androidx.compose.foundation.Canvas
+import kotlinx.coroutines.withTimeoutOrNull
+import app.sotto.ui.formatClockFine
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -177,36 +188,72 @@ fun SeekBar(
     val seek = rememberUpdatedState(onSeek)
     val select = rememberUpdatedState(onSelection)
     val currentSelection = rememberUpdatedState(selection)
-    val bubble = selection != null
+    val haptics = LocalHapticFeedback.current
+    // While a handle is held still, the bar stops showing the whole recording and shows only a
+    // few seconds around the handle, so a finger's width covers a fraction of a second.
+    var zoom by remember { mutableStateOf<Pair<Long, Long>?>(null) }
+    val magnify by animateFloatAsState(if (zoom != null) 1f else 0f, label = "zoom")
 
     Canvas(
         modifier
             .fillMaxWidth()
-            .height(if (bubble) 92.dp else 48.dp)
-            .pointerInput(durationMs) {
-                detectTapGestures { seek.value(msAt(it.x, size.width.toFloat(), 12.dp.toPx(), durationMs)) }
-            }
-            .pointerInput(durationMs) {
+            .height(if (selection != null) 92.dp else 48.dp)
+            .pointerInput(durationMs, selection != null) {
                 val inset = 12.dp.toPx()
                 val reach = 28.dp.toPx()
-                var grab = Grab.SCRUB
-                detectHorizontalDragGestures(
-                    onDragStart = { offset ->
-                        grab = Grab.SCRUB
-                        currentSelection.value?.invoke()?.let { (start, end) ->
-                            val toStart = abs(offset.x - xAt(start, size.width.toFloat(), inset, durationMs))
-                            val toEnd = abs(offset.x - xAt(end, size.width.toFloat(), inset, durationMs))
-                            if (minOf(toStart, toEnd) < reach) grab = if (toStart <= toEnd) Grab.START else Grab.END
+                val still = 6.dp.toPx()
+                fun window() = zoom ?: (0L to durationMs)
+                fun xOf(ms: Long): Float = window().let { (from, to) -> inset + ((ms - from).toFloat() / (to - from)).coerceIn(0f, 1f) * (size.width - inset * 2) }
+                fun msOf(x: Float): Long = window().let { (from, to) -> from + (((x - inset) / (size.width - inset * 2)).coerceIn(0f, 1f) * (to - from)).toLong() }
+
+                awaitEachGesture {
+                    val down = awaitFirstDown()
+                    var grab = Grab.SCRUB
+                    currentSelection.value?.invoke()?.let { (start, end) ->
+                        val toStart = abs(down.position.x - xOf(start))
+                        val toEnd = abs(down.position.x - xOf(end))
+                        if (minOf(toStart, toEnd) < reach) grab = if (toStart <= toEnd) Grab.START else Grab.END
+                    }
+                    fun apply(x: Float) {
+                        val ms = msOf(x)
+                        val current = currentSelection.value?.invoke()
+                        when {
+                            grab == Grab.START && current != null -> select.value(ms, current.second)
+                            grab == Grab.END && current != null -> select.value(current.first, ms)
+                            else -> seek.value(ms)
                         }
-                    },
-                ) { change, _ ->
-                    change.consume()
-                    val ms = msAt(change.position.x, size.width.toFloat(), inset, durationMs)
-                    val current = currentSelection.value?.invoke()
-                    when {
-                        grab == Grab.START && current != null -> select.value(ms, current.second)
-                        grab == Grab.END && current != null -> select.value(current.first, ms)
-                        else -> seek.value(ms)
+                    }
+                    if (grab == Grab.SCRUB) apply(down.position.x)
+                    var anchor = down.position
+                    var restedAt = down.uptimeMillis
+                    try {
+                        while (true) {
+                            // Waking up with no event means the finger has not moved at all.
+                            val event = withTimeoutOrNull(HOLD_MS) { awaitPointerEvent() }
+                            val change = event?.changes?.firstOrNull { it.id == down.id }
+                            if (event != null && (change == null || !change.pressed)) break
+                            val now = change?.uptimeMillis ?: (restedAt + HOLD_MS)
+                            if (change != null && (change.position - anchor).getDistance() > still) {
+                                anchor = change.position
+                                restedAt = now
+                            }
+                            if (zoom == null && grab != Grab.SCRUB && now - restedAt >= HOLD_MS && durationMs > ZOOM_SPAN_MS * 2) {
+                                val (start, end) = currentSelection.value?.invoke() ?: continue
+                                val center = if (grab == Grab.START) start else end
+                                // Keep the handle under the finger: the window is placed so the
+                                // handle's time sits at the finger's current x.
+                                val fraction = ((anchor.x - inset) / (size.width - inset * 2)).coerceIn(0f, 1f)
+                                val from = (center - (fraction * ZOOM_SPAN_MS).toLong()).coerceIn(0, durationMs - ZOOM_SPAN_MS)
+                                zoom = from to from + ZOOM_SPAN_MS
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
+                            if (change != null) {
+                                change.consume()
+                                apply(change.position.x)
+                            }
+                        }
+                    } finally {
+                        zoom = null
                     }
                 }
             },
@@ -214,40 +261,32 @@ fun SeekBar(
         if (durationMs <= 0) return@Canvas
         val inset = 12.dp.toPx()
         val trackY = size.height - 24.dp.toPx()
+        val (from, to) = zoom ?: (0L to durationMs)
+        fun x(ms: Long) = inset + ((ms - from).toFloat() / (to - from)).coerceIn(0f, 1f) * (size.width - inset * 2)
 
-        drawSpeechTrack(peaks, inset, size.width - inset, trackY, colors.primary, colors.outlineVariant)
+        drawSpeechTrack(peaks, inset, size.width - inset, trackY, colors.primary, colors.outlineVariant, from, to, durationMs, thickness = (4f + 4f * magnify).dp.toPx())
 
         selection?.invoke()?.let { (start, end) ->
-            drawSelectionFrame(
-                xAt(start, size.width, inset, durationMs),
-                xAt(end, size.width, inset, durationMs),
-                trackY - 20.dp.toPx(),
-                trackY + 20.dp.toPx(),
-                colors.inverseSurface,
-                colors.inverseOnSurface,
-                handle = 10.dp.toPx(),
-            )
+            drawSelectionFrame(x(start), x(end), trackY - 20.dp.toPx(), trackY + 20.dp.toPx(), colors.inverseSurface, colors.inverseOnSurface, handle = 10.dp.toPx())
         }
 
         val now = positionMs()
-        val thumbX = xAt(now, size.width, inset, durationMs)
-        val thumbHeight = 34.dp.toPx()
-        val thumbWidth = 6.dp.toPx()
-        drawRoundRect(
-            colors.onSurface,
-            Offset(thumbX - thumbWidth / 2f, trackY - thumbHeight / 2f),
-            Size(thumbWidth, thumbHeight),
-            CornerRadius(thumbWidth / 2f),
-        )
+        if (now in from..to) {
+            val thumbX = x(now)
+            val thumbHeight = 34.dp.toPx()
+            val thumbWidth = 6.dp.toPx()
+            drawRoundRect(colors.onSurface, Offset(thumbX - thumbWidth / 2f, trackY - thumbHeight / 2f), Size(thumbWidth, thumbHeight), CornerRadius(thumbWidth / 2f))
+        }
 
-        // The bubble rides over the middle of the selection and says how long it is.
+        // The bubble rides over the middle of the selection and says how long it is. Zoomed in,
+        // tenths of a second matter, so it shows them.
         selection?.invoke()?.let { (start, end) ->
-            val label = measurer.measure(formatStamp(end - start), bubbleStyle)
+            val label = measurer.measure(if (zoom != null) formatClockFine(end - start) else formatStamp(end - start), bubbleStyle)
             val padX = 12.dp.toPx()
             val padY = 6.dp.toPx()
             val boxWidth = label.size.width + padX * 2
             val boxHeight = label.size.height + padY * 2
-            val middle = (xAt(start, size.width, inset, durationMs) + xAt(end, size.width, inset, durationMs)) / 2f
+            val middle = (x(start) + x(end)) / 2f
             val left = (middle - boxWidth / 2f).coerceIn(0f, size.width - boxWidth)
             drawRoundRect(colors.inverseSurface, Offset(left, 0f), Size(boxWidth, boxHeight), CornerRadius(boxHeight / 2f))
             drawText(label, colors.inverseOnSurface, Offset(left + padX, padY))
@@ -255,31 +294,44 @@ fun SeekBar(
     }
 }
 
-private fun xAt(ms: Long, width: Float, inset: Float, durationMs: Long): Float =
-    inset + (ms.toFloat() / durationMs).coerceIn(0f, 1f) * (width - inset * 2)
+/** How long a handle must be held still before the seek bar zooms in, and how much it then shows. */
+private const val HOLD_MS = 450L
+private const val ZOOM_SPAN_MS = 6_000L
 
-private fun msAt(x: Float, width: Float, inset: Float, durationMs: Long): Long =
-    (((x - inset) / (width - inset * 2)).coerceIn(0f, 1f) * durationMs).toLong()
-
-/** A line from [left] to [right], bright over the stretches where someone is speaking and dim over silence. */
-private fun DrawScope.drawSpeechTrack(peaks: Peaks, left: Float, right: Float, y: Float, speech: Color, silence: Color) {
-    val stroke = 4.dp.toPx()
-    drawLine(silence, Offset(left, y), Offset(right, y), strokeWidth = stroke, cap = StrokeCap.Round)
+/**
+ * A line from [left] to [right], bright over the stretches where someone is speaking and dim over
+ * silence. It shows the recording between [fromMs] and [toMs] of [durationMs]; the defaults are
+ * the whole of it.
+ */
+private fun DrawScope.drawSpeechTrack(
+    peaks: Peaks,
+    left: Float,
+    right: Float,
+    y: Float,
+    speech: Color,
+    silence: Color,
+    fromMs: Long = 0,
+    toMs: Long = 1,
+    durationMs: Long = 1,
+    thickness: Float = 4.dp.toPx(),
+) {
+    drawLine(silence, Offset(left, y), Offset(right, y), strokeWidth = thickness, cap = StrokeCap.Round)
     if (peaks.size == 0) return
     val step = 3.dp.toPx()
     val runs = ((right - left) / step).toInt().coerceAtLeast(1)
-    val perRun = peaks.size / runs.toFloat()
+    val firstPeak = peaks.size * (fromMs.toFloat() / durationMs)
+    val perRun = peaks.size * ((toMs - fromMs).toFloat() / durationMs) / runs
     var runStart = -1
     for (run in 0..runs) {
         var level = 0f
         if (run < runs) {
-            val first = (run * perRun).toInt()
-            for (p in first until maxOf(first + 1, ((run + 1) * perRun).toInt())) level = maxOf(level, peaks.relative(p))
+            val first = (firstPeak + run * perRun).toInt()
+            for (p in first until maxOf(first + 1, (firstPeak + (run + 1) * perRun).toInt())) level = maxOf(level, peaks.relative(p))
         }
         val speaking = run < runs && level >= SILENCE
         if (speaking && runStart < 0) runStart = run
         if (!speaking && runStart >= 0) {
-            drawLine(speech, Offset(left + runStart * step, y), Offset(minOf(right, left + run * step), y), strokeWidth = stroke, cap = StrokeCap.Butt)
+            drawLine(speech, Offset(left + runStart * step, y), Offset(minOf(right, left + run * step), y), strokeWidth = thickness, cap = StrokeCap.Butt)
             runStart = -1
         }
     }

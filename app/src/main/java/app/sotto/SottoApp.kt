@@ -5,6 +5,7 @@ import app.sotto.asr.AsrEngine
 import app.sotto.asr.ModelManager
 import app.sotto.data.RecordingStore
 import app.sotto.data.Settings
+import app.sotto.llm.Summarizer
 import app.sotto.service.RecorderController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +25,8 @@ class SottoApp : Application() {
         private set
     lateinit var recorder: RecorderController
         private set
+    lateinit var summarizer: Summarizer
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -32,6 +35,7 @@ class SottoApp : Application() {
         models = ModelManager(this, scope)
         engine = AsrEngine(models)
         recorder = RecorderController(this, store, models, engine, settings, scope)
+        summarizer = Summarizer(store, models, settings, isRecording = { recorder.busy.value }, scope = scope)
         scope.launch(Dispatchers.IO) { store.load() }
         models.resumeInterrupted()
     }

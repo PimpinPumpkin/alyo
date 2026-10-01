@@ -51,16 +51,14 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
     val states: StateFlow<Map<String, InstallState>> = _states
 
     init {
-        _states.value = ModelCatalog.languages
-            .flatMap { pack -> listOf(pack.live) + pack.qualities.map { it.refiner } }
+        _states.value = ModelCatalog.allModels
             .associate { it.id to if (isInstalled(it)) InstallState.Installed else InstallState.Missing }
     }
 
     /** Continues any download that was interrupted rather than paused. */
     fun resumeInterrupted() {
         val unfinished = wanted
-        ModelCatalog.languages
-            .flatMap { pack -> listOf(pack.live) + pack.qualities.map { it.refiner } }
+        ModelCatalog.allModels
             .filter { it.id in unfinished }
             .forEach(::install)
     }
@@ -106,6 +104,80 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
         jobs.remove(spec.id)?.cancel()
         dir(spec).deleteRecursively()
         set(spec, InstallState.Missing)
+    }
+
+    /**
+     * Installs a model from a `.tar.bz2` the user already has: the same archive sherpa-onnx
+     * publishes, fetched on another device or by other means. This is the only way in for the
+     * offline build, and lets anyone avoid the in-app download.
+     *
+     * @return the model that was installed
+     * @throws IOException if the file is not an archive of a model this version uses
+     */
+    fun importArchive(source: InputStream): ModelSpec {
+        val staging = File(root, ".import").apply { deleteRecursively(); mkdirs() }
+        val input = BufferedInputStream(source, 256 * 1024)
+        try {
+            // A summary model is a single GGUF file rather than an archive: tell by its first bytes.
+            input.mark(4)
+            val magic = ByteArray(4).also { input.read(it) }
+            input.reset()
+            if (String(magic, Charsets.US_ASCII) == "GGUF") return importGguf(input, staging)
+
+            var spec: ModelSpec? = null
+            TarArchiveInputStream(BZip2CompressorInputStream(BufferedInputStream(input, 256 * 1024))).use { tar ->
+                while (true) {
+                    val entry = tar.nextEntry ?: break
+                    val parts = entry.name.removePrefix("./").split('/')
+                    if (spec == null) {
+                        spec = ModelCatalog.allModels.firstOrNull { it.archive == parts.first() }
+                            ?: throw IOException("This is not a speech model Sotto Recorder uses.")
+                    }
+                    val name = parts.last()
+                    val wanted = spec?.let { setOf(it.encoder, it.decoder, it.joiner, it.tokens) }.orEmpty()
+                    if (entry.isDirectory || parts.size != 2 || name !in wanted) continue
+                    File(staging, name).outputStream().use { tar.copyTo(it, 256 * 1024) }
+                }
+            }
+            val found = spec ?: throw IOException("The file is empty or not a .tar.bz2 archive.")
+            val needed = listOf(found.encoder, found.decoder, found.joiner, found.tokens)
+            if (needed.any { !File(staging, it).exists() }) throw IOException("The archive is missing files. It may be incomplete.")
+            // Where hashes are pinned, an imported file is held to them just as a download is.
+            (found.source as? ModelSource.Files)?.files?.forEach { file ->
+                if (file.sha256 != null && sha256(File(staging, file.name)) != file.sha256) {
+                    throw IOException("${file.name} does not match the expected model. The file may be damaged.")
+                }
+            }
+            synchronized(this) {
+                jobs.remove(found.id)?.cancel()
+                val dir = dir(found).apply { deleteRecursively(); mkdirs() }
+                needed.forEach { if (!File(staging, it).renameTo(File(dir, it))) throw IOException("Could not save $it") }
+                File(dir, DONE).createNewFile()
+                wanted = wanted - found.id
+                set(found, InstallState.Installed)
+            }
+            return found
+        } finally {
+            staging.deleteRecursively()
+        }
+    }
+
+    /** One of the listed summary models if the file is exactly that, otherwise kept as the user's own. */
+    private fun importGguf(input: InputStream, staging: File): ModelSpec {
+        val file = File(staging, ModelCatalog.GGUF)
+        file.outputStream().use { input.copyTo(it, 1 shl 20) }
+        val hash = sha256(file)
+        val spec = ModelCatalog.summarizers.firstOrNull { (it.source as ModelSource.Files).files.single().sha256 == hash }
+            ?: ModelCatalog.importedSummarizer
+        synchronized(this) {
+            jobs.remove(spec.id)?.cancel()
+            val dir = dir(spec).apply { deleteRecursively(); mkdirs() }
+            if (!file.renameTo(File(dir, ModelCatalog.GGUF))) throw IOException("Could not save the model")
+            File(dir, DONE).createNewFile()
+            wanted = wanted - spec.id
+            set(spec, InstallState.Installed)
+        }
+        return spec
     }
 
     private fun set(spec: ModelSpec, state: InstallState) = _states.update { it + (spec.id to state) }

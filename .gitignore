@@ -14,3 +14,5 @@ keystore.properties
 *.jks
 # 50 MB prebuilt speech runtime; app/build.gradle.kts downloads it on first build.
 app/libs/*.aar
+# Written by CI from the commit log just before a release build; local builds have none.
+app/src/main/assets/whatsnew.txt

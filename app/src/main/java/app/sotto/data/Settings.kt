@@ -31,6 +31,24 @@ class Settings(context: Context) {
         _quality.value = id
     }
 
+    private val _autoTitle = MutableStateFlow(prefs.getBoolean(AUTO_TITLE, true))
+    /** Name new recordings after what was talked about, once the transcript is in. */
+    val autoTitle: StateFlow<Boolean> = _autoTitle
+
+    fun setAutoTitle(on: Boolean) {
+        prefs.edit { putBoolean(AUTO_TITLE, on) }
+        _autoTitle.value = on
+    }
+
+    private val _summarizer = MutableStateFlow(prefs.getString(SUMMARIZER, null) ?: ModelCatalog.summarizers.first().id)
+    /** Id of the model the user wants summaries written by. */
+    val summarizer: StateFlow<String> = _summarizer
+
+    fun setSummarizer(id: String) {
+        prefs.edit { putString(SUMMARIZER, id) }
+        _summarizer.value = id
+    }
+
     private val packages = context.packageManager
     private val named = ComponentName(context, "app.sotto.LauncherNamed")
     private val plain = ComponentName(context, "app.sotto.LauncherPlain")
@@ -58,5 +76,7 @@ class Settings(context: Context) {
     private companion object {
         const val LANGUAGE = "language"
         const val QUALITY = "quality"
+        const val AUTO_TITLE = "auto_title"
+        const val SUMMARIZER = "summarizer"
     }
 }

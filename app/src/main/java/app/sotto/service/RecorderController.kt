@@ -59,6 +59,7 @@ class RecorderController(
             store = store,
             scope = scope,
             openSource = openSource,
+            autoTitle = { settings.autoTitle.value },
             transcriberFactory = if (!models.isInstalled(pack.live)) null else { onRefined ->
                 LiveTranscriber(engine, pack.live, refiner, pack.continuers, store.spool(id), scope, onRefined)
             },

@@ -1,0 +1,20 @@
+Sotto Recorder records audio and writes down what is said while you are still talking. Everything happens on the phone: no account, no cloud, no Google services.
+
+<b>What it does</b>
+
+• Live transcript: words appear as you speak, then each sentence is rewritten with punctuation once you pause.
+• Linked audio and text: the word being played is highlighted, and tapping a word jumps to it.
+• Fix mistakes: tap a sentence to correct it. Words you leave alone stay locked to the audio.
+• Crop and remove: select by dragging across the words, the waveform or the seek bar, listen to the result, and save it as a copy.
+• Summaries: a small language model on the phone can write a title and the key points. Optional, and a separate download.
+• Search across every transcript, and within one.
+• Export audio (M4A), transcript (TXT), subtitles (SRT) or per-word timings (JSON).
+• Background playback with lock screen controls.
+
+<b>Offline</b>
+
+The app goes online for one thing only: downloading the speech model the first time, and the summary model if you want one. You can import those files yourself instead, and the "offline" build does not ask for the internet permission at all.
+
+<b>Models</b>
+
+Speech recognition uses NVIDIA's FastConformer and Parakeet models through sherpa-onnx. Summaries use Qwen2.5 through llama.cpp. English only for now.
