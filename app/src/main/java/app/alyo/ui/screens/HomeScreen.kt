@@ -95,6 +95,25 @@ fun modelProgress(needed: List<ModelSpec>, states: Map<String, InstallState>): M
 private fun keyboardEnabled(context: Context): Boolean =
     (context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).enabledInputMethodList.any { it.packageName == context.packageName }
 
+/**
+ * Other voice typing apps that are turned on in the keyboard list. A keyboard's microphone key
+ * goes to whichever one the system picks, so while any of these is on, it may not be Alyo.
+ */
+private fun otherVoiceApps(context: Context): List<String> {
+    val manager = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+    return manager.enabledInputMethodList
+        .filter { it.packageName != context.packageName }
+        // FUTO Voice Input is named outright in case it does not declare its subtype as voice.
+        .filter { method -> method.packageName == "org.futo.voiceinput" || manager.getEnabledInputMethodSubtypeList(method, true).any { it.mode == "voice" } }
+        .map { it.loadLabel(context.packageManager).toString() }
+}
+
+/** The keyboard in use, if it is one known to answer its own microphone key unless told otherwise. */
+private fun keyboardWithOwnVoice(context: Context): String? {
+    val current = SystemSettings.Secure.getString(context.contentResolver, SystemSettings.Secure.DEFAULT_INPUT_METHOD).orEmpty()
+    return if (current.startsWith("org.futo.inputmethod.latin")) "FUTO Keyboard" else null
+}
+
 /** The app's one real screen: three steps to get going, then somewhere to try it. */
 @Composable
 fun HomeScreen(app: AlyoApp, onSettings: () -> Unit) {
@@ -107,9 +126,16 @@ fun HomeScreen(app: AlyoApp, onSettings: () -> Unit) {
     var microphone by remember { mutableStateOf(app.hasMicrophone) }
     var keyboard by remember { mutableStateOf(keyboardEnabled(context)) }
     // Both are changed outside the app (a permission sheet, the system's keyboard list), so look again on return.
+    var rivals by remember { mutableStateOf(otherVoiceApps(context)) }
+    var ownVoice by remember { mutableStateOf(keyboardWithOwnVoice(context)) }
+    // Whether that keyboard's own switch has been flipped cannot be seen from here, so the tip stays until dismissed.
+    val prefs = remember { context.getSharedPreferences("tips", Context.MODE_PRIVATE) }
+    var ownVoiceDismissed by remember { mutableStateOf(prefs.getBoolean("own_voice_done", false)) }
     LifecycleResumeEffect(Unit) {
         microphone = app.hasMicrophone
         keyboard = keyboardEnabled(context)
+        rivals = otherVoiceApps(context)
+        ownVoice = keyboardWithOwnVoice(context)
         onPauseOrDispose { }
     }
     val askMicrophone = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { microphone = it }
@@ -130,6 +156,24 @@ fun HomeScreen(app: AlyoApp, onSettings: () -> Unit) {
             modifier = Modifier.padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 20.dp),
         )
 
+        AnimatedVisibility(keyboard && rivals.isNotEmpty()) {
+            Notice(
+                title = "Make the microphone key open Alyo?",
+                body = "${rivals.joinToString(" and ")} ${if (rivals.size == 1) "is" else "are"} also turned on, so your keyboard's microphone key may open ${if (rivals.size == 1) "it" else "them"} instead. " +
+                    "Switch ${if (rivals.size == 1) "it" else "them"} off in the keyboard list and the key comes here. Nothing is uninstalled.",
+                action = "Open keyboard list",
+            ) { context.startActivity(Intent(SystemSettings.ACTION_INPUT_METHOD_SETTINGS)) }
+        }
+        AnimatedVisibility(keyboard && ownVoice != null && !ownVoiceDismissed) {
+            Notice(
+                title = "One switch in $ownVoice",
+                body = "$ownVoice answers its microphone key itself. In its settings, under Voice Input, turn off the built-in voice input and the key will open Alyo.",
+                action = "Done that",
+            ) {
+                prefs.edit().putBoolean("own_voice_done", true).apply()
+                ownVoiceDismissed = true
+            }
+        }
         AnimatedVisibility(ready) { TryIt() }
 
         Step(
@@ -200,6 +244,23 @@ private fun Step(number: Int, title: String, body: String, done: Boolean, progre
             if (!done) {
                 Spacer(Modifier.height(16.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { action() }
+            }
+        }
+    }
+}
+
+/** Something standing between the microphone key and Alyo, with the way to fix it. */
+@Composable
+private fun Notice(title: String, body: String, action: String?, onAction: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Surface(color = colors.tertiaryContainer, shape = RoundedCornerShape(28.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+        Column(Modifier.padding(20.dp)) {
+            Text(title, style = MaterialTheme.typography.titleLarge, color = colors.onTertiaryContainer)
+            Spacer(Modifier.height(4.dp))
+            Text(body, style = MaterialTheme.typography.bodyMedium, color = colors.onTertiaryContainer)
+            if (action != null) {
+                Spacer(Modifier.height(16.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { Button(onClick = onAction) { Text(action) } }
             }
         }
     }

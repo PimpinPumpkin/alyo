@@ -9,6 +9,13 @@
     <!-- Used for exactly one thing: downloading the speech model. Nothing is ever uploaded. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- So the app can see which other voice typing apps are turned on, and say so. -->
+    <queries>
+        <intent>
+            <action android:name="android.view.InputMethod" />
+        </intent>
+    </queries>
+
     <application
         android:name=".AlyoApp"
         android:allowBackup="false"
