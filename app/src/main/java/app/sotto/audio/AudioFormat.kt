@@ -26,3 +26,22 @@ data class Span(val startMs: Long, val endMs: Long) {
     val lengthMs: Long get() = endMs - startMs
     operator fun contains(ms: Long): Boolean = ms in startMs until endMs
 }
+
+/**
+ * Treating this list as pieces of an original recording laid end to end, returns the pieces that
+ * make up the stretch from [startMs] to [endMs] of the joined result. This is how a selection made
+ * on an already-edited recording is traced back to the audio it came from.
+ */
+fun List<Span>.slice(startMs: Long, endMs: Long): List<Span> {
+    val out = ArrayList<Span>()
+    var offset = 0L
+    for (span in this) {
+        val from = maxOf(startMs, offset)
+        val to = minOf(endMs, offset + span.lengthMs)
+        if (to > from) out += Span(span.startMs + (from - offset), span.startMs + (to - offset))
+        offset += span.lengthMs
+    }
+    return out
+}
+
+val List<Span>.totalMs: Long get() = sumOf { it.lengthMs }

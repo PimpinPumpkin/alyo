@@ -21,6 +21,10 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Fill
@@ -29,19 +33,23 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import app.sotto.data.Segment
 import app.sotto.data.Word
-import app.sotto.ui.formatClock
+import app.sotto.ui.formatStamp
 
 /**
  * A paragraph on screen: one or more sentences run together. Sentences are short (they end at
  * every pause), so showing each on its own line would read like a list rather than prose.
  */
 @Immutable
-class Paragraph(val segments: List<Segment>, val live: Boolean = false) {
+class Paragraph(
+    val segments: List<Segment>,
+    val live: Boolean = false,
+    /** Where the paragraph before this one ends and the one after begins, or null at either end of the transcript. */
+    val previousEndMs: Int? = null,
+    val nextStartMs: Int? = null,
+) {
     val words: List<Word> = segments.flatMap { it.words }
     val startMs: Int = words.firstOrNull()?.startMs ?: 0
     val endMs: Int = words.lastOrNull()?.endMs ?: 0
@@ -57,6 +65,9 @@ class Paragraph(val segments: List<Segment>, val live: Boolean = false) {
         }
         offsets[words.size] = length + 1
     }
+
+    fun wordStart(index: Int): Int = offsets[index]
+    fun wordEnd(index: Int): Int = offsets[index + 1] - 1
 
     fun wordAtChar(offset: Int): Int {
         for (i in words.indices) if (offset < offsets[i + 1] - 1) return i
@@ -83,6 +94,20 @@ class Paragraph(val segments: List<Segment>, val live: Boolean = false) {
         }
         return segments.last()
     }
+
+    /** Character ranges where [query] occurs, ignoring case. */
+    fun find(query: String): List<IntRange> {
+        if (query.isBlank()) return emptyList()
+        val out = ArrayList<IntRange>()
+        var from = 0
+        while (true) {
+            val at = text.indexOf(query, from, ignoreCase = true)
+            if (at < 0) break
+            out += at until at + query.length
+            from = at + query.length
+        }
+        return out
+    }
 }
 
 /** Groups sentences into paragraphs: a new one after a real pause, or once one has grown long. */
@@ -102,7 +127,9 @@ fun paragraphsOf(segments: List<Segment>): List<Paragraph> {
         words += segment.words.size
     }
     if (current.isNotEmpty()) out += Paragraph(current)
-    return out
+    // Second pass so each paragraph knows its neighbours; a selection uses that to decide whether
+    // it starts or ends here or merely passes through.
+    return out.mapIndexed { i, p -> Paragraph(p.segments, previousEndMs = out.getOrNull(i - 1)?.endMs, nextStartMs = out.getOrNull(i + 1)?.startMs) }
 }
 
 private const val PARAGRAPH_GAP_MS = 2000
@@ -115,6 +142,9 @@ private const val PARAGRAPH_WORDS = 70
  * @param partial words of the sentence still being spoken while recording, drawn fainter
  * @param positionMs current playback position, or null when nothing is playing (recording)
  * @param editing when true a tap reports the sentence for editing instead of seeking
+ * @param query text to mark wherever it occurs (search within the transcript)
+ * @param selection a stretch of the recording whose words are shown as selected, with a handle at
+ *   each end (crop and remove)
  */
 @Composable
 fun TranscriptView(
@@ -123,18 +153,20 @@ fun TranscriptView(
     partial: List<Word> = emptyList(),
     positionMs: (() -> Long)? = null,
     editing: Boolean = false,
+    query: String = "",
+    selection: (() -> Pair<Long, Long>)? = null,
     listState: LazyListState = rememberLazyListState(),
-    contentPadding: PaddingValues = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+    contentPadding: PaddingValues = PaddingValues(horizontal = 24.dp, vertical = 20.dp),
     onWordTap: (Word) -> Unit = {},
     onEditSegment: (Segment) -> Unit = {},
 ) {
     val livePartial = remember(partial) { if (partial.isEmpty()) null else Paragraph(listOf(Segment(Long.MAX_VALUE, partial)), live = true) }
     LazyColumn(modifier, state = listState, contentPadding = contentPadding) {
         itemsIndexed(paragraphs, key = { _, p -> p.key }) { _, paragraph ->
-            ParagraphBlock(paragraph, positionMs, editing, onWordTap, onEditSegment)
+            ParagraphBlock(paragraph, positionMs, editing, query, selection, onWordTap, onEditSegment)
         }
         if (livePartial != null) {
-            item(key = "partial") { ParagraphBlock(livePartial, null, false, {}, {}) }
+            item(key = "partial") { ParagraphBlock(livePartial, null, false, "", null, {}, {}) }
         }
     }
 }
@@ -144,6 +176,8 @@ private fun ParagraphBlock(
     paragraph: Paragraph,
     positionMs: (() -> Long)?,
     editing: Boolean,
+    query: String,
+    selection: (() -> Pair<Long, Long>)?,
     onWordTap: (Word) -> Unit,
     onEditSegment: (Segment) -> Unit,
 ) {
@@ -157,45 +191,70 @@ private fun ParagraphBlock(
     val edit = rememberUpdatedState(onEditSegment)
     val isEditing = rememberUpdatedState(editing)
 
-    val text: AnnotatedString = remember(paragraph, active, colors) {
-        buildAnnotatedString {
-            if (active < 0) {
-                append(paragraph.text)
-            } else {
-                append(paragraph.text.substring(0, paragraph.offsets[active]))
-                withStyle(SpanStyle(color = colors.onPrimaryContainer)) {
-                    append(paragraph.text.substring(paragraph.offsets[active], paragraph.offsets[active + 1] - 1))
-                }
-                append(paragraph.text.substring(paragraph.offsets[active + 1] - 1))
+    val text: AnnotatedString = remember(paragraph, active, query, colors) {
+        AnnotatedString.Builder(paragraph.text).apply {
+            for (match in paragraph.find(query)) {
+                // A span background would paint over the active word's box, so that word goes without.
+                if (active >= 0 && match.first < paragraph.wordEnd(active) && match.last >= paragraph.wordStart(active)) continue
+                addStyle(SpanStyle(background = colors.tertiaryContainer, color = colors.onTertiaryContainer), match.first, match.last + 1)
             }
-        }
+            // The box behind the active word is drawn by hand below; here only its text colour flips.
+            if (active >= 0) addStyle(SpanStyle(color = colors.onPrimary), paragraph.wordStart(active), paragraph.wordEnd(active))
+        }.toAnnotatedString()
     }
-    val highlight = colors.primaryContainer
+    val activeBox = colors.primary
+    // Opaque, because the box is a fill plus a stroke and a translucent colour would show the overlap.
+    val selectedBox = colors.outlineVariant
+    val handleColor = colors.inverseSurface
 
     Column(Modifier.fillMaxWidth().padding(bottom = 20.dp)) {
         Text(
-            if (paragraph.live) "" else formatClock(paragraph.startMs.toLong()),
-            style = MaterialTheme.typography.labelMedium,
-            color = colors.primary,
-            modifier = Modifier.padding(bottom = 4.dp),
+            if (paragraph.live) "" else formatStamp(paragraph.startMs.toLong()),
+            style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
+            color = colors.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 6.dp),
         )
         Text(
             text,
-            style = MaterialTheme.typography.bodyLarge.copy(fontSize = MaterialTheme.typography.bodyLarge.fontSize * 1.12f, lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.2f),
+            style = MaterialTheme.typography.bodyLarge.copy(fontSize = MaterialTheme.typography.bodyLarge.fontSize * 1.18f, lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.3f),
             color = if (paragraph.live) colors.onSurfaceVariant.copy(alpha = 0.7f) else colors.onSurface,
             onTextLayout = { layout = it },
             modifier = Modifier
                 .fillMaxWidth()
                 .drawBehind {
                     val result = layout ?: return@drawBehind
-                    if (active < 0 || active >= paragraph.words.size) return@drawBehind
-                    val end = (paragraph.offsets[active + 1] - 1).coerceAtMost(result.layoutInput.text.length)
-                    val start = paragraph.offsets[active].coerceAtMost(end)
-                    val path = result.getPathForRange(start, end)
-                    val corner = PathEffect.cornerPathEffect(6.dp.toPx())
-                    drawPath(path, highlight, style = Fill)
-                    // The stroke pads the box out around the glyphs and rounds its corners.
-                    drawPath(path, highlight, style = Stroke(width = 6.dp.toPx(), join = StrokeJoin.Round, pathEffect = corner))
+                    val length = result.layoutInput.text.length
+                    val corner = PathEffect.cornerPathEffect(4.dp.toPx())
+                    fun box(from: Int, to: Int, color: Color) {
+                        if (to <= from || to > length) return
+                        val path = result.getPathForRange(from, to)
+                        drawPath(path, color, style = Fill)
+                        // The stroke pads the box out around the glyphs and rounds its corners.
+                        drawPath(path, color, style = Stroke(width = 5.dp.toPx(), join = StrokeJoin.Round, pathEffect = corner))
+                    }
+
+                    selection?.invoke()?.let { (start, end) ->
+                        val first = paragraph.words.indexOfFirst { (it.startMs + it.endMs) / 2 >= start }
+                        val last = paragraph.words.indexOfLast { (it.startMs + it.endMs) / 2 < end }
+                        if (first in 0..last) {
+                            val from = paragraph.wordStart(first)
+                            val to = paragraph.wordEnd(last)
+                            box(from, to, selectedBox)
+                            // A handle where the selection begins and ends, if that is in this paragraph.
+                            val handle = Size(5.dp.toPx(), 0f)
+                            val startsHere = first > 0 || paragraph.previousEndMs.let { it == null || start >= it }
+                            val endsHere = last < paragraph.words.lastIndex || paragraph.nextStartMs.let { it == null || end <= it }
+                            if (startsHere) {
+                                val at = result.getBoundingBox(from.coerceAtMost(length - 1))
+                                drawRoundRect(handleColor, Offset(at.left - 7.dp.toPx(), at.top), handle.copy(height = at.height), CornerRadius(3.dp.toPx()))
+                            }
+                            if (endsHere) {
+                                val at = result.getBoundingBox((to - 1).coerceIn(0, length - 1))
+                                drawRoundRect(handleColor, Offset(at.right + 2.dp.toPx(), at.top), handle.copy(height = at.height), CornerRadius(3.dp.toPx()))
+                            }
+                        }
+                    }
+                    if (active in paragraph.words.indices) box(paragraph.wordStart(active), paragraph.wordEnd(active), activeBox)
                 }
                 .pointerInput(paragraph) {
                     if (paragraph.live) return@pointerInput

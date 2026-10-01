@@ -109,20 +109,13 @@ fun RecordScreen(app: SottoApp, session: RecordingSession, onMinimise: () -> Uni
             Spacer(Modifier.width(48.dp))
         }
 
-        ViewToggle(showTranscript, { showTranscript = it }, Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp))
-
-        Box(Modifier.weight(1f).fillMaxWidth()) {
+        ContentCard(Modifier.weight(1f)) {
             AnimatedContent(showTranscript, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "tab") { transcript ->
-                if (transcript) {
-                    LiveTranscript(session.hasTranscript, segments, partial)
-                } else {
-                    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
-                        LiveWaveform(session, paused)
-                    }
-                }
+                if (transcript) LiveTranscript(session.hasTranscript, segments, partial) else LiveWaveform(session, paused)
             }
         }
 
+        ViewToggle(showTranscript, { showTranscript = it }, Modifier.align(Alignment.CenterHorizontally).padding(top = 16.dp, bottom = 8.dp))
         Timer(session, paused)
         failure?.let {
             Text(it, color = colors.error, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(8.dp))
@@ -196,7 +189,7 @@ private fun LiveTranscript(available: Boolean, segments: List<Segment>, partial:
         val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
         if (last >= 0 && lastVisible >= last - 1) listState.scrollToItem(last, Int.MAX_VALUE / 2)
     }
-    TranscriptView(paragraphs, partial = partial, listState = listState, modifier = Modifier.fillMaxSize().background(colors.surface))
+    TranscriptView(paragraphs, partial = partial, listState = listState, modifier = Modifier.fillMaxSize())
 }
 
 @Composable
@@ -216,9 +209,9 @@ private fun LiveWaveform(session: RecordingSession, paused: Boolean) {
         peaks = session.peaks,
         peakCount = peakCount,
         positionMs = { session.elapsedMs.value },
-        playedColor = if (paused) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
+        barColor = if (paused) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
         playheadColor = LocalSottoColors.current.record,
-        modifier = Modifier.fillMaxWidth().height(240.dp),
+        modifier = Modifier.fillMaxSize(),
     )
 }
 
@@ -231,8 +224,8 @@ private fun Timer(session: RecordingSession, paused: Boolean) {
         formatClock(seconds * 1000),
         style = MaterialTheme.typography.displayLarge.copy(
             fontFamily = TimerFont,
-            fontSize = 72.sp,
-            lineHeight = 80.sp,
+            fontSize = 64.sp,
+            lineHeight = 72.sp,
             // Fixed-width digits, so the clock does not shuffle sideways as it counts.
             fontFeatureSettings = "tnum",
         ),

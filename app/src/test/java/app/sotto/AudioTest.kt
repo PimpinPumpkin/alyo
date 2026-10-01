@@ -4,6 +4,8 @@ import app.sotto.audio.Adts
 import app.sotto.audio.Decimator
 import app.sotto.audio.Peaks
 import app.sotto.audio.Span
+import app.sotto.audio.slice
+import app.sotto.audio.totalMs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -55,5 +57,19 @@ class AudioTest {
         val sliced = peaks.slice(listOf(Span(0, 400), Span(1000, 1200)))
         assertEquals(20 + 10, sliced.size)
         assertEquals(peaks.level(50), sliced.level(20))
+    }
+}
+
+class SpanTest {
+    @Test
+    fun `a selection on an edited recording maps back to the original audio`() {
+        // The recording has already had 2s..5s cut out of it.
+        val kept = listOf(Span(0, 2000), Span(5000, 9000))
+        assertEquals(6000L, kept.totalMs)
+        // Selecting 1s..3s of the result straddles the join.
+        assertEquals(listOf(Span(1000, 2000), Span(5000, 6000)), kept.slice(1000, 3000))
+        assertEquals(listOf(Span(5500, 9000)), kept.slice(2500, 6000))
+        assertEquals(kept, kept.slice(0, 6000))
+        assertTrue(kept.slice(3000, 3000).isEmpty())
     }
 }

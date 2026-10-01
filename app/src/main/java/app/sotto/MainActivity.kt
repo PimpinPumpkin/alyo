@@ -42,12 +42,12 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import app.sotto.asr.InstallState
 import app.sotto.data.RecordingMeta
-import app.sotto.ui.screens.ExportSheet
+import app.sotto.ui.screens.CropScreen
+import app.sotto.ui.screens.ShareSheet
 import app.sotto.ui.screens.HomeScreen
 import app.sotto.ui.screens.PlayerScreen
 import app.sotto.ui.screens.RecordScreen
 import app.sotto.ui.screens.SettingsScreen
-import app.sotto.ui.screens.TrimScreen
 import app.sotto.ui.theme.SottoTheme
 import java.io.File
 
@@ -94,7 +94,7 @@ private object Routes {
     const val SETUP = "setup"
     const val SETTINGS = "settings"
     fun player(id: String, autoplay: Boolean = false) = "player/$id/$autoplay"
-    fun trim(id: String) = "trim/$id"
+    fun crop(id: String) = "crop/$id"
 }
 
 @Composable
@@ -205,11 +205,12 @@ private fun App(app: SottoApp, debugWav: File?, onDebugWavConsumed: () -> Unit) 
                 id = parts[1],
                 autoplay = parts.getOrNull(2) == "true",
                 onBack = ::pop,
-                onTrim = { push(Routes.trim(parts[1])) },
+                onCrop = { push(Routes.crop(parts[1])) },
             )
-            "trim" -> TrimScreen(app, parts[1]) { result ->
+            "crop" -> CropScreen(app, parts[1]) { copy ->
                 pop()
-                if (result != null && result != parts[1]) replaceTop(Routes.player(result))
+                // Land on the new copy, with the original one step back.
+                if (copy != null) push(Routes.player(copy))
             }
             Routes.SETUP -> SettingsScreen(app, firstRun = true, onDone = ::pop)
             Routes.SETTINGS -> SettingsScreen(app, firstRun = false, onDone = ::pop)
@@ -220,9 +221,10 @@ private fun App(app: SottoApp, debugWav: File?, onDebugWavConsumed: () -> Unit) 
                 onReturnToRecording = { push(Routes.RECORD) },
                 onSettings = { push(Routes.SETTINGS) },
                 onShare = { exporting = it },
+                onCrop = { push(Routes.crop(it.id)) },
             )
         }
     }
 
-    exporting?.let { ExportSheet(app, it, onDismiss = { exporting = null }) }
+    exporting?.let { ShareSheet(app, it, onDismiss = { exporting = null }) }
 }

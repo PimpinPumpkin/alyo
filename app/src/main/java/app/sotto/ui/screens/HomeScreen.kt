@@ -36,6 +36,7 @@ import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Translate
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -93,6 +94,7 @@ fun HomeScreen(
     onReturnToRecording: () -> Unit,
     onSettings: () -> Unit,
     onShare: (RecordingMeta) -> Unit,
+    onCrop: (RecordingMeta) -> Unit,
 ) {
     val all by app.store.recordings.collectAsState()
     val session by app.recorder.session.collectAsState()
@@ -204,25 +206,21 @@ fun HomeScreen(
                 RecordingPill(active, onClick = onReturnToRecording)
             }
         }
+
+        renaming?.let { meta ->
+            EditTitleOverlay(meta.title, onDismiss = { renaming = null }) { app.store.rename(meta.id, it); renaming = null }
+        }
     }
 
     menuFor?.let { meta ->
-        ModalBottomSheet(onDismissRequest = { menuFor = null }) {
-            Text(
-                meta.title,
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 8.dp),
-            )
-            SheetAction(Icons.Rounded.IosShare, "Share or export") { menuFor = null; onShare(meta) }
-            SheetAction(Icons.Rounded.DriveFileRenameOutline, "Rename") { menuFor = null; renaming = meta }
-            SheetAction(Icons.Rounded.Delete, "Delete", danger = true) { menuFor = null; deleting = meta }
-            Spacer(Modifier.height(16.dp))
-        }
-    }
-    renaming?.let { meta ->
-        RenameDialog(meta.title, onDismiss = { renaming = null }) { app.store.rename(meta.id, it); renaming = null }
+        RecordingMenuSheet(
+            meta = meta,
+            onDismiss = { menuFor = null },
+            onEditTitle = { menuFor = null; renaming = meta },
+            onShare = { menuFor = null; onShare(meta) },
+            onCrop = if (meta.pendingRefine > 0) null else ({ menuFor = null; onCrop(meta) }),
+            onDelete = { menuFor = null; deleting = meta },
+        )
     }
     deleting?.let { meta ->
         DeleteDialog(meta.title, onDismiss = { deleting = null }) { app.store.delete(meta.id); deleting = null }
@@ -293,7 +291,13 @@ private fun RecordingRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text(meta.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(meta.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    if (meta.starred) {
+                        Spacer(Modifier.width(6.dp))
+                        Icon(Icons.Rounded.Star, "Favourite", tint = colors.primary, modifier = Modifier.size(18.dp))
+                    }
+                }
                 Spacer(Modifier.height(2.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -422,16 +426,4 @@ private fun SetupCard(state: SetupState, onOpen: () -> Unit) {
             }
         }
     }
-}
-
-@Composable
-fun SheetAction(icon: ImageVector, label: String, danger: Boolean = false, onClick: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    val tint = if (danger) colors.error else colors.onSurface
-    ListItem(
-        headlineContent = { Text(label, color = tint) },
-        leadingContent = { Icon(icon, null, tint = if (danger) colors.error else colors.onSurfaceVariant) },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        modifier = Modifier.clickable(onClick = onClick).padding(horizontal = 8.dp),
-    )
 }

@@ -85,6 +85,11 @@ class RecordingStore(context: Context) {
         putMeta(current.copy(title = title.trim().ifEmpty { current.title }))
     }
 
+    fun setStarred(id: String, starred: Boolean) {
+        val current = meta(id) ?: return
+        putMeta(current.copy(starred = starred))
+    }
+
     fun delete(id: String) {
         dir(id).deleteRecursively()
         synchronized(this) { transcripts.remove(id) }
@@ -149,6 +154,12 @@ class RecordingStore(context: Context) {
         }
         return targetId
     }
+
+    /**
+     * Writes what the recording would sound like cut down to [keep] into [target], without touching
+     * the recording itself. Used to audition edits before they are saved.
+     */
+    fun renderPreview(id: String, keep: List<Span>, target: File): Long = M4a.copyRanges(audio(id), target, keep)
 
     /** Full transcript text of every recording whose title or words contain [query]. */
     fun search(query: String): List<RecordingMeta> {

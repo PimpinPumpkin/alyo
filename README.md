@@ -7,10 +7,13 @@ no cloud.
 - **Live transcript.** Words appear while you are still talking.
 - **Linked audio and text.** The word being played is highlighted; tap any word to jump there.
 - **Fix mistakes.** Tap a sentence to correct it. Words you leave alone stay locked to the audio.
-- **Crop and cut.** Keep only a selection, or cut a stretch out. The transcript is trimmed to match.
+- **Crop and remove.** Select a stretch on the waveform, the seek bar, or by tapping words, then
+  keep only that or cut it out. Edits can be undone and listened to before saving a copy, and the
+  transcript is trimmed to match.
 - **Export.** Audio (M4A), transcript with timestamps (TXT), subtitles (SRT), or per-word timings (JSON),
   through the share sheet or straight into `Download/Sotto`.
-- **Search** across titles and every word of every transcript.
+- **Search** across titles and every word of every transcript, and within one transcript with
+  jump-to-match.
 - **Offline.** The only network request the app ever makes is the one-time speech model download.
 
 Requires Android 10 or later on a 64-bit ARM phone.

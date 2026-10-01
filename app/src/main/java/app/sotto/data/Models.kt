@@ -49,4 +49,5 @@ data class RecordingMeta(
     val preview: String = "",
     /** Segments still waiting for the accurate second pass. Non-zero means the transcript will keep improving. */
     val pendingRefine: Int = 0,
+    val starred: Boolean = false,
 )
