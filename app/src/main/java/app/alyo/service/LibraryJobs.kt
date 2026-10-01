@@ -142,7 +142,7 @@ class LibraryJobs(
     private suspend fun runRetranscribe(key: String, id: String) {
         val pack = settings.pack
         val live = models.usable(pack.live) ?: error("no speech model is installed")
-        val decoder = AudioDecoder(store.audio(id))
+        val decoder = AudioDecoder(store.localAudio(id))
         val spool = store.spool(id)
         engine.retain()
         store.setPendingRefine(id, 1)

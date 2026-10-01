@@ -68,7 +68,7 @@ class LibraryProvider : DocumentsProvider() {
     override fun openDocument(documentId: String, mode: String, signal: CancellationSignal?): ParcelFileDescriptor {
         if (!app.settings.shareWithPicker.value || 'w' in mode) throw FileNotFoundException("Read only")
         val (meta, extension) = find(documentId)
-        val file = if (extension == AUDIO) app.store.audio(meta.id) else Exporter(context!!, app.store).textFile(meta)
+        val file = if (extension == AUDIO) app.store.localAudio(meta.id) else Exporter(context!!, app.store).textFile(meta)
         return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
     }
 
@@ -79,7 +79,7 @@ class LibraryProvider : DocumentsProvider() {
     }
 
     private fun add(cursor: MatrixCursor, meta: RecordingMeta, extension: String) {
-        val file: File? = if (extension == AUDIO) app.store.audio(meta.id) else null
+        val file: File? = if (extension == AUDIO) app.store.audio(meta.id).takeIf { it.exists() } else null
         cursor.newRow().apply {
             add(Document.COLUMN_DOCUMENT_ID, "${meta.id}.$extension")
             add(Document.COLUMN_DISPLAY_NAME, "${meta.title}.$extension")

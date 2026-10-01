@@ -152,7 +152,7 @@ fun PlayerScreen(
     var autoplayed by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(player, meta.durationMs, meta.title) {
         val resumeAt = player.positionMs
-        player.load(app.store.audio(id), meta.title)
+        player.load(app.store.source(id), meta.title)
         if (resumeAt > 0) player.seekTo(resumeAt)
         if (autoplay && !autoplayed) {
             autoplayed = true

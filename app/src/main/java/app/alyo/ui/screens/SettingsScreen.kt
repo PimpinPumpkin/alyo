@@ -1,5 +1,6 @@
 package app.alyo.ui.screens
 
+import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.layout.SubcomposeLayout
@@ -285,6 +286,8 @@ fun SettingsScreen(app: AlyoApp, onDone: () -> Unit, onLicenses: () -> Unit, onW
             SummaryModelChooser(app)
 
             SectionTitle("Recordings")
+            LibraryFolderRow(app)
+            Spacer(Modifier.height(8.dp))
             val speakerLabels by app.settings.speakerLabels.collectAsState()
             val states by app.models.states.collectAsState()
             val speakerState = states[ModelCatalog.speakers.id] ?: InstallState.Missing
@@ -375,7 +378,7 @@ private fun BackupRows(app: AlyoApp) {
         working = "Backing up"
         scope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching { context.contentResolver.openOutputStream(uri)!!.use { out -> Backup.write(app.store.folder, out) { done, total -> working = "Backing up $done of $total" } } }
+                runCatching { context.contentResolver.openOutputStream(uri)!!.use { out -> Backup.write(app.store.folder, out, audioOf = { app.store.localAudio(it) }) { done, total -> working = "Backing up $done of $total" } } }
             }
             working = null
             Toast.makeText(context, result.fold({ "Backed up $it recordings" }, { "Backup failed: ${it.message}" }), Toast.LENGTH_LONG).show()
@@ -386,7 +389,7 @@ private fun BackupRows(app: AlyoApp) {
         working = "Restoring"
         scope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching { context.contentResolver.openInputStream(uri)!!.use { Backup.restore(app.store.folder, it) }.also { app.store.load() } }
+                runCatching { context.contentResolver.openInputStream(uri)!!.use { Backup.restore(app.store.folder, it) }.also { app.store.load(); app.library.syncAll() } }
             }
             working = null
             Toast.makeText(context, result.fold({ if (it == 0) "Nothing new in that backup" else "Restored $it recordings" }, { "Restore failed: ${it.message}" }), Toast.LENGTH_LONG).show()
@@ -625,6 +628,75 @@ private fun VoiceDownload(app: AlyoApp, onReady: () -> Unit) {
                 Text((if (state is InstallState.Failed) "Try again" else "Download") + "  ·  " + formatBytes(voice.source.downloadBytes), style = MaterialTheme.typography.titleMedium)
             }
         }
+    }
+}
+
+/** Where recordings are kept, and the choice of somewhere else. */
+@Composable
+private fun LibraryFolderRow(app: AlyoApp) {
+    val context = LocalContext.current
+    val colors = MaterialTheme.colorScheme
+    val scope = rememberCoroutineScope()
+    val location by app.settings.libraryLocation.collectAsState()
+    val status by app.library.status.collectAsState()
+    var choosing by remember { mutableStateOf(false) }
+
+    fun move(to: String) {
+        choosing = false
+        scope.launch {
+            val found = app.library.moveTo(to)
+            if (found > 0) Toast.makeText(context, if (found == 1) "Found 1 recording in the folder" else "Found $found recordings in the folder", Toast.LENGTH_LONG).show()
+        }
+    }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        // Keep the permission across restarts; without this the folder is lost at the next launch.
+        runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
+        move(uri.toString())
+    }
+
+    SheetGroup(
+        listOf(
+            SheetRow(
+                Icons.Rounded.Folder,
+                "Recordings folder",
+                // Read again when the location changes.
+                detail = status ?: location.let { app.library.label } + if (location == Settings.LIBRARY_PRIVATE) ". Deleted if Alyo is uninstalled." else ". Stays if Alyo is uninstalled.",
+                enabled = status == null,
+            ) { choosing = true },
+        ),
+    )
+
+    if (choosing) {
+        AlertDialog(
+            onDismissRequest = { choosing = false },
+            title = { Text("Keep recordings in") },
+            text = {
+                Column {
+                    val options = listOf(
+                        Triple("Documents/Alyo", "On the phone. Any file manager can see them.", Settings.LIBRARY_DEFAULT),
+                        Triple("A folder you choose", "Anywhere, including an SD card. Also how to pick up recordings from an earlier install.", "pick"),
+                        Triple("Inside the app", "Hidden from other apps, and deleted if Alyo is uninstalled.", Settings.LIBRARY_PRIVATE),
+                    )
+                    for ((title, detail, value) in options) {
+                        val selected = if (value == "pick") location != Settings.LIBRARY_DEFAULT && location != Settings.LIBRARY_PRIVATE else location == value
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { if (value == "pick") { choosing = false; picker.launch(null) } else if (!selected) move(value) else choosing = false }.padding(vertical = 10.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = selected, onClick = null)
+                            Spacer(Modifier.width(16.dp))
+                            Column {
+                                Text(if (value == "pick" && selected) app.library.label else title, style = MaterialTheme.typography.bodyLarge)
+                                Text(detail, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                            }
+                        }
+                    }
+                    Text("Recordings you already have are moved.", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+                }
+            },
+            confirmButton = { TextButton(onClick = { choosing = false }) { Text("Close") } },
+        )
     }
 }
 

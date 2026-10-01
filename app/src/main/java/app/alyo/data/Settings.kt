@@ -128,6 +128,18 @@ class Settings(context: Context) {
         _searches.value = list
     }
 
+    private val _libraryLocation = MutableStateFlow(prefs.getString(LIBRARY, LIBRARY_DEFAULT)!!)
+    /**
+     * Where recordings are kept: [LIBRARY_DEFAULT] (Documents/Alyo on the phone), [LIBRARY_PRIVATE]
+     * (inside the app, gone when it is uninstalled), or the URI of a folder the user picked.
+     */
+    val libraryLocation: StateFlow<String> = _libraryLocation
+
+    fun setLibraryLocation(location: String) {
+        prefs.edit { putString(LIBRARY, location) }
+        _libraryLocation.value = location
+    }
+
     private val _stopAfterSeconds = MutableStateFlow(prefs.getInt(STOP_AFTER, 3))
     /** Voice typing stops listening after this many seconds of silence. Zero keeps listening until Done is tapped. */
     val stopAfterSeconds: StateFlow<Int> = _stopAfterSeconds
@@ -247,6 +259,9 @@ class Settings(context: Context) {
         if (java.io.File(context.filesDir, "models/en-parakeet-tdt-0.6b-v2").isDirectory) "best" else "light"
 
     companion object {
+        const val LIBRARY_DEFAULT = "default"
+        const val LIBRARY_PRIVATE = "private"
+        private const val LIBRARY = "library"
         val STOP_AFTER_CHOICES = listOf(2, 3, 5, 10, 0)
         val KEEP_WARM_CHOICES = listOf(0, 1, 5, 15)
         private const val STOP_AFTER = "stop_after_seconds"

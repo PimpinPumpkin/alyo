@@ -45,7 +45,9 @@ Voice typing and the recorder use the same speech models, so those are downloade
 - **Import audio files** and transcribe them.
 - **Export** audio, text, subtitles or word timings.
 - **Background playback**, lock screen controls, a widget and a quick settings tile.
-- **Back up and restore** the whole library.
+- **Recordings are ordinary files** in `Documents/Alyo`, or any folder you choose, including an
+  SD card. They stay if the app is uninstalled.
+- **Back up and restore** the whole library as one file.
 - **One icon.** With the recorder on, Alyo opens straight into your recordings, and the other
   features are a tap away in Settings. A separate "Recorder" icon is there if you want one.
 
@@ -185,9 +187,12 @@ No analytics, no crash reporting, no accounts. Model downloads are the only time
 network. On a system that lets you withhold the network permission from an app, Alyo runs fine
 without it once its models are in place.
 
-Voice typing listens only while its panel is open. Recordings are kept in the app's private
-storage; other apps see one only when you export it, share it, or pick it in the system file
-picker.
+Voice typing listens only while its panel is open.
+
+Recordings are files in `Documents/Alyo` unless you choose another folder, so a file manager, a
+backup app or a computer can reach them, and so can any app you have given access to your files.
+To keep them where no other app can look, choose "Inside the app" in Settings; they are then
+deleted if Alyo is uninstalled.
 
 </details>
 
@@ -219,6 +224,10 @@ models stay in memory for a few minutes so the next sentence starts at once.
   experimental.
 - **Audio**: AAC, 48 kHz mono, written so that a recording survives the app being killed.
   Cropping copies audio frames without re-encoding.
+- **Storage**: when a recording is saved its audio is moved to the recordings folder, with a
+  `.alyo.json` file beside it holding the transcript, speakers, summary and waveform. The app
+  keeps only an index. After a reinstall, choosing that folder in Settings brings every recording
+  back.
 - **Read aloud**: [Piper](https://github.com/OHF-Voice/piper1-gpl) voices, with eSpeak NG turning
   spelling into sounds. Alyo registers as an Android text-to-speech engine, so it works wherever
   the phone speaks. On a Pixel 4a 5G a sentence is ready about six times faster than it is spoken.

@@ -20,6 +20,10 @@ once per clone.
 - `asr/` the shared engine: model catalog and downloads, live and second-pass transcription.
 - `dictation/`, `ime/`, `recognition/`, `text/` voice typing.
 - `audio/`, `data/`, `playback/`, `export/`, `llm/`, `service/` the recorder.
+- `data/Library.kt` moves each finished recording's audio out to the recordings folder
+  (`Documents/Alyo` through the media store, or a folder picked with the system picker) and keeps
+  a sidecar file beside it. `RecordingStore.audio(id)` only exists until that move;
+  use `source(id)` to play and `localAudio(id)` where a real file is needed.
 - `tts/` read aloud: the Piper engine, the Android `TextToSpeechService`, and the sheet that
   reads shared or selected text.
 - `data/Settings.kt` holds `Feature`: each feature lists the manifest components it owns. They are

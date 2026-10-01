@@ -1,6 +1,7 @@
 package app.alyo.data
 
 import android.content.Context
+import android.net.Uri
 import android.util.Log
 import app.alyo.audio.M4a
 import app.alyo.audio.Peaks
@@ -17,7 +18,7 @@ import java.util.UUID
 /**
  * Recordings on disk, one folder each under `files/recordings/<id>/`:
  *
- *  - `audio.m4a`       the recording
+ *  - `audio.m4a`       the recording, until it is moved to the recordings folder (see [Library])
  *  - `peaks.bin`       its waveform
  *  - `transcript.json` timed words
  *  - `meta.json`       title, date, duration
@@ -26,8 +27,14 @@ import java.util.UUID
  * `asr.pcm` (audio spooled for the second transcription pass). Finding an `audio.aac` at launch
  * means the app died mid-recording, and [recover] turns it into a normal recording.
  */
-class RecordingStore(context: Context) {
+class RecordingStore(private val context: Context) {
     private val root = File(context.filesDir, "recordings").apply { mkdirs() }
+
+    /** Told whenever a recording's details, transcript, summary or audio change, with its id. */
+    var onChange: (String) -> Unit = {}
+
+    /** Told when a recording is deleted, with what it was, so its files outside the app can go too. */
+    var onDelete: (RecordingMeta) -> Unit = {}
     private val json = Json { ignoreUnknownKeys = true }
 
     private val _recordings = MutableStateFlow<List<RecordingMeta>>(emptyList())
@@ -37,7 +44,76 @@ class RecordingStore(context: Context) {
     private val transcripts = HashMap<String, MutableStateFlow<Transcript>>()
 
     fun dir(id: String) = File(root, id)
+    /**
+     * The audio while it is inside the app: fresh from recording, or just edited. Once it has
+     * been moved to the recordings folder this file is gone and [RecordingMeta.audioUri] says
+     * where it went. Whenever this file exists, it is the truth.
+     */
     fun audio(id: String) = File(dir(id), "audio.m4a")
+
+    /** Where to play the recording from, wherever its audio is. */
+    fun source(id: String): Uri = audio(id).takeIf { it.exists() }?.let(Uri::fromFile) ?: Uri.parse(meta(id)?.audioUri ?: "")
+
+    /**
+     * The audio as a plain file, for code that needs one (cutting, decoding, sharing). Audio that
+     * lives in the recordings folder is copied into the cache first.
+     *
+     * @throws java.io.IOException if the recordings folder cannot be reached
+     */
+    fun localAudio(id: String): File {
+        audio(id).takeIf { it.exists() }?.let { return it }
+        val meta = meta(id) ?: throw java.io.FileNotFoundException("No such recording")
+        val uri = Uri.parse(meta.audioUri ?: throw java.io.FileNotFoundException("The recording has no audio"))
+        val cache = File(context.cacheDir, "audio").apply { mkdirs() }
+        // Named for the length too, so a copy made before an edit is not mistaken for the result.
+        val copy = File(cache, "$id-${meta.durationMs}.m4a")
+        if (!copy.exists() || copy.length() == 0L) {
+            // Room for a few; these are only ever a convenience.
+            cache.listFiles().orEmpty().sortedByDescending { it.lastModified() }.drop(2).forEach { it.delete() }
+            val part = File(cache, "$id.part")
+            (context.contentResolver.openInputStream(uri) ?: throw java.io.FileNotFoundException("The recordings folder is not available")).use { input ->
+                part.outputStream().use { input.copyTo(it, 1 shl 16) }
+            }
+            part.renameTo(copy)
+        }
+        return copy
+    }
+
+    /** Records where a recording's files now are outside the app. */
+    fun setHome(id: String, audioUri: String?, sidecarUri: String?, fileName: String?) {
+        val current = meta(id) ?: return
+        putMeta(current.copy(audioUri = audioUri, sidecarUri = sidecarUri, fileName = fileName), notify = false)
+    }
+
+    /** Everything about a recording but its audio, to be written next to it. */
+    fun sidecar(id: String): Sidecar? {
+        val meta = meta(id) ?: return null
+        return Sidecar(
+            meta = meta.copy(audioUri = null, sidecarUri = null, fileName = null, pendingRefine = 0),
+            transcript = transcriptFlow(id).value,
+            sounds = sounds(id),
+            summary = summaryFlow(id).value,
+            peaks = android.util.Base64.encodeToString(peaks(id).toByteArray(), android.util.Base64.NO_WRAP),
+        )
+    }
+
+    /**
+     * Adds a recording found in the recordings folder that this install does not know: its
+     * details come from the [sidecar], its audio stays where it is.
+     *
+     * @return false if a recording with that id is already here
+     */
+    fun adopt(sidecar: Sidecar, audioUri: String, sidecarUri: String, fileName: String): Boolean {
+        val id = sidecar.meta.id
+        if (meta(id) != null || id.any { !(it.isLetterOrDigit() || it == '-') }) return false
+        dir(id).mkdirs()
+        peaksFile(id).writeBytes(runCatching { android.util.Base64.decode(sidecar.peaks, android.util.Base64.NO_WRAP) }.getOrDefault(ByteArray(0)))
+        transcriptFile(id).writeText(json.encodeToString(Transcript.serializer(), sidecar.transcript))
+        soundsFile(id).writeText(json.encodeToString(ListSerializer(SoundSpan.serializer()), sidecar.sounds))
+        sidecar.summary?.let { summaryFile(id).writeText(json.encodeToString(Summary.serializer(), it)) }
+        putMeta(sidecar.meta.copy(audioUri = audioUri, sidecarUri = sidecarUri, fileName = fileName, pendingRefine = 0), notify = false)
+        return true
+    }
     fun adts(id: String) = File(dir(id), "audio.aac")
     fun spool(id: String) = File(dir(id), "asr.pcm")
     fun peaksFile(id: String) = File(dir(id), "peaks.bin")
@@ -81,6 +157,7 @@ class RecordingStore(context: Context) {
 
     fun saveSounds(id: String, sounds: List<SoundSpan>) {
         if (dir(id).exists()) soundsFile(id).writeText(json.encodeToString(ListSerializer(SoundSpan.serializer()), sounds))
+        onChange(id)
     }
 
     private val summaries = HashMap<String, MutableStateFlow<Summary?>>()
@@ -99,6 +176,7 @@ class RecordingStore(context: Context) {
         if (!dir(id).exists()) return
         summaryFile(id).writeText(json.encodeToString(Summary.serializer(), summary))
         summaryFlow(id).value = summary
+        onChange(id)
     }
 
     /** Registers a finished recording and makes it appear in the library. */
@@ -126,6 +204,7 @@ class RecordingStore(context: Context) {
     }
 
     fun delete(id: String) {
+        meta(id)?.let(onDelete)
         dir(id).deleteRecursively()
         synchronized(this) {
             transcripts.remove(id)
@@ -187,7 +266,7 @@ class RecordingStore(context: Context) {
         if (snapped.isEmpty()) return null
         val targetId = if (asCopy) newId() else id
         val temp = File(dir(targetId), "audio.tmp.m4a")
-        val duration = M4a.copyRanges(audio(id), temp, snapped)
+        val duration = M4a.copyRanges(localAudio(id), temp, snapped)
         if (duration <= 0) {
             temp.delete()
             if (asCopy) dir(targetId).deleteRecursively()
@@ -211,6 +290,10 @@ class RecordingStore(context: Context) {
                     pendingRefine = 0,
                     // A star is a judgment about the original, not something an edit inherits.
                     starred = false,
+                    // The copy's audio is the new file inside the app, not the original's.
+                    audioUri = null,
+                    sidecarUri = null,
+                    fileName = null,
                 ),
             )
         } else {
@@ -224,7 +307,7 @@ class RecordingStore(context: Context) {
      * Writes what the recording would sound like cut down to [keep] into [target], without touching
      * the recording itself. Used to audition edits before they are saved.
      */
-    fun renderPreview(id: String, keep: List<Span>, target: File): Long = M4a.copyRanges(audio(id), target, keep)
+    fun renderPreview(id: String, keep: List<Span>, target: File): Long = M4a.copyRanges(localAudio(id), target, keep)
 
     /** Full transcript text of every recording whose title or words contain [query]. */
     fun search(query: String): List<RecordingMeta> {
@@ -255,13 +338,14 @@ class RecordingStore(context: Context) {
     }
 
     private fun readMeta(id: String): RecordingMeta? {
-        if (!audio(id).exists()) {
+        val saved = runCatching { json.decodeFromString<RecordingMeta>(metaFile(id).readText()) }.getOrNull()
+        // No audio here and none recorded as living elsewhere: not a recording.
+        if (!audio(id).exists() && saved?.audioUri == null) {
             dir(id).deleteRecursively()
             return null
         }
         // Left behind if the app was killed before the second pass finished.
         spool(id).delete()
-        val saved = runCatching { json.decodeFromString<RecordingMeta>(metaFile(id).readText()) }.getOrNull()
         // Nothing is still refining after a restart, whatever the file says.
         if (saved != null) return saved.copy(pendingRefine = 0)
         // The app died between finalizing the audio and writing its metadata: rebuild what we can.
@@ -269,14 +353,16 @@ class RecordingStore(context: Context) {
         return RecordingMeta(id, Titles.forDate(modified), modified, M4a.durationMs(audio(id)))
     }
 
-    private fun putMeta(meta: RecordingMeta) {
+    private fun putMeta(meta: RecordingMeta, notify: Boolean = true) {
         metaFile(meta.id).writeText(json.encodeToString(RecordingMeta.serializer(), meta))
         _recordings.update { list -> (list.filterNot { it.id == meta.id } + meta).sortedByDescending { it.createdAt } }
+        if (notify) onChange(meta.id)
     }
 
     private fun writeTranscript(id: String, transcript: Transcript, publish: Boolean = true) {
         transcriptFile(id).writeText(json.encodeToString(Transcript.serializer(), transcript))
         if (publish) transcriptFlow(id).value = transcript
+        onChange(id)
     }
 
     private fun previewOf(transcript: Transcript): String =

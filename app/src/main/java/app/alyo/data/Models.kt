@@ -58,6 +58,30 @@ data class RecordingMeta(
     val starred: Boolean = false,
     /** True while the title is one the app chose (the date, or a topic), so it may still be improved on. */
     val autoTitled: Boolean = false,
+    /**
+     * Where the audio is once it has been moved out to the recordings folder, as a content URI.
+     * Null while it is still inside the app (`audio.m4a` in the recording's own folder).
+     */
+    val audioUri: String? = null,
+    /** The file next to the audio that holds the transcript and details, so the folder stands on its own. */
+    val sidecarUri: String? = null,
+    /** The name the two files were given, without extension. They are renamed when the title changes. */
+    val fileName: String? = null,
+)
+
+/**
+ * Everything about a recording except its audio, as one file kept next to the audio in the
+ * recordings folder. With it, a folder of recordings can be read back into a fresh install.
+ */
+@Serializable
+data class Sidecar(
+    val version: Int = 1,
+    val meta: RecordingMeta,
+    val transcript: Transcript = Transcript(),
+    val sounds: List<SoundSpan> = emptyList(),
+    val summary: Summary? = null,
+    /** The waveform, base64. */
+    val peaks: String = "",
 )
 
 /** What a recording was about, written by the on-device language model. */

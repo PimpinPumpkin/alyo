@@ -8,6 +8,7 @@ import app.alyo.asr.AsrEngine
 import app.alyo.asr.Diarizer
 import app.alyo.asr.InstallState
 import app.alyo.asr.ModelManager
+import app.alyo.data.Library
 import app.alyo.data.RecordingStore
 import app.alyo.data.Settings
 import app.alyo.dictation.AudioSource
@@ -46,11 +47,14 @@ class AlyoApp : Application() {
         private set
     lateinit var voices: VoiceEngine
         private set
+    lateinit var library: Library
+        private set
 
     override fun onCreate() {
         super.onCreate()
         settings = Settings(this)
         store = RecordingStore(this)
+        library = Library(this, store, settings, scope)
         models = ModelManager(this, scope)
         engine = AsrEngine(models)
         voices = VoiceEngine(models)
@@ -58,7 +62,11 @@ class AlyoApp : Application() {
         recorder = RecorderController(this, store, models, engine, settings, diarizer, scope)
         jobs = LibraryJobs(this, store, models, engine, settings, diarizer, scope)
         summarizer = Summarizer(store, models, settings, isRecording = { recorder.busy.value }, scope = scope)
-        scope.launch(Dispatchers.IO) { store.load() }
+        scope.launch(Dispatchers.IO) {
+            store.load()
+            // Anything still inside the app that belongs in the recordings folder goes there now.
+            library.syncAll()
+        }
         // A download gets a foreground service for as long as it runs. Without one, Android cuts
         // a backgrounded app's network within a minute or so of the screen going off.
         scope.launch {

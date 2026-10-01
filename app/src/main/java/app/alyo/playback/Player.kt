@@ -145,9 +145,12 @@ class Player(private val context: Context, background: Boolean = false) {
     }
 
     /** @param title shown on the lock screen and in the notification */
-    fun load(file: File, title: String = "") {
+    fun load(file: File, title: String = "") = load(Uri.fromFile(file), title)
+
+    /** @param uri a file, or a document in the recordings folder */
+    fun load(uri: Uri, title: String = "") {
         val item = MediaItem.Builder()
-            .setUri(Uri.fromFile(file))
+            .setUri(uri)
             .setMediaMetadata(MediaMetadata.Builder().setTitle(title).setArtist("Alyo").build())
             .build()
         exo.setMediaItem(item)

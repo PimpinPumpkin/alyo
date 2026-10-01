@@ -67,7 +67,7 @@ class Exporter(private val context: Context, private val store: RecordingStore) 
         val target = File(exports, safeName(meta.title) + "." + format.extension)
         val transcript = store.transcript(meta.id).value
         when (format) {
-            ExportFormat.AUDIO -> store.audio(meta.id).copyTo(target, overwrite = true)
+            ExportFormat.AUDIO -> store.localAudio(meta.id).copyTo(target, overwrite = true)
             ExportFormat.TEXT -> target.writeText(text(meta, transcript))
             ExportFormat.SRT -> target.writeText(srt(transcript))
             ExportFormat.JSON -> target.writeText(json(meta, transcript))

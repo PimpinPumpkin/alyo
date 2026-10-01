@@ -14,8 +14,12 @@ import java.util.zip.ZipOutputStream
  */
 object Backup {
     /** @return how many recordings were written */
-    fun write(root: File, out: OutputStream, onProgress: (done: Int, total: Int) -> Unit): Int {
-        val folders = root.listFiles { f -> f.isDirectory && File(f, "audio.m4a").exists() }.orEmpty()
+    /**
+     * @param audioOf the audio of a recording whose audio is not in its folder, because it has
+     * been moved to the recordings folder
+     */
+    fun write(root: File, out: OutputStream, audioOf: (id: String) -> File?, onProgress: (done: Int, total: Int) -> Unit): Int {
+        val folders = root.listFiles { f -> f.isDirectory && File(f, "meta.json").exists() }.orEmpty()
         ZipOutputStream(out.buffered(1 shl 16)).use { zip ->
             // Audio is already compressed; deflating it again costs time and saves nothing.
             zip.setLevel(1)
@@ -25,6 +29,13 @@ object Backup {
                     zip.putNextEntry(ZipEntry("${folder.name}/${file.name}"))
                     file.inputStream().use { it.copyTo(zip, 1 shl 16) }
                     zip.closeEntry()
+                }
+                if (!File(folder, "audio.m4a").exists()) {
+                    runCatching { audioOf(folder.name) }.getOrNull()?.let { audio ->
+                        zip.putNextEntry(ZipEntry("${folder.name}/audio.m4a"))
+                        audio.inputStream().use { it.copyTo(zip, 1 shl 16) }
+                        zip.closeEntry()
+                    }
                 }
                 onProgress(index + 1, folders.size)
             }

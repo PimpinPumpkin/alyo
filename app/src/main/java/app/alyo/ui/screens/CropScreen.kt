@@ -119,13 +119,16 @@ fun CropScreen(app: AlyoApp, id: String, onClose: (copyId: String?) -> Unit) {
         player.pause()
         start = 0
         end = maxOf(duration / 4, minOf(duration, 1000))
-        val audio = if (!edited) app.store.audio(id) else {
+        if (!edited) {
+            player.load(app.store.source(id))
+        } else {
             rendering = true
-            withContext(Dispatchers.IO) {
-                File(context.cacheDir, "crop-preview-${history.size}.m4a").also { app.store.renderPreview(id, keep, it) }
-            }
+            player.load(
+                withContext(Dispatchers.IO) {
+                    File(context.cacheDir, "crop-preview-${history.size}.m4a").also { app.store.renderPreview(id, keep, it) }
+                },
+            )
         }
-        player.load(audio)
         rendering = false
     }
 
