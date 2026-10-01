@@ -1,5 +1,16 @@
 package app.sotto.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.material.icons.rounded.ChatBubble
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.SentimentVerySatisfied
+import androidx.compose.material.icons.rounded.SignLanguage
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -224,14 +235,42 @@ fun RecordingDot(modifier: Modifier = Modifier, color: Color = LocalSottoColors.
 
 /**
  * Names what is being heard at this moment ("Speech", "Music"), in the color the waveform is drawn
- * in for it. Shown above the waveform while recording and while playing back.
+ * in for it. Shown above the waveform while recording and while playing back. A new label rises
+ * into place from the bottom edge of its own strip while the old one leaves through the top.
+ *
+ * @param kind what to show, or null for nothing (silence)
  */
 @Composable
-fun SoundLabel(kind: String, modifier: Modifier = Modifier) {
+fun SoundLabel(kind: String?, modifier: Modifier = Modifier) {
     val palette = LocalSottoColors.current
-    val tint = if (kind == SPEECH_LABEL) palette.speech else palette.sound(kind)
-    Surface(shape = CircleShape, color = tint.copy(alpha = 0.16f), contentColor = tint, modifier = modifier) {
-        Text(kind, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
+    AnimatedContent(
+        targetState = kind,
+        modifier = modifier.height(44.dp),
+        contentAlignment = Alignment.Center,
+        transitionSpec = {
+            (slideInVertically { it } + fadeIn()) togetherWith (slideOutVertically { -it } + fadeOut()) using SizeTransform(clip = true)
+        },
+        label = "sound",
+    ) { shown ->
+        if (shown == null) {
+            Spacer(Modifier.size(1.dp))
+        } else {
+            val tint = if (shown == SPEECH_LABEL) palette.speech else palette.sound(shown)
+            val glyph = when (shown) {
+                SPEECH_LABEL -> Icons.Rounded.ChatBubble
+                "Music" -> Icons.Rounded.MusicNote
+                "Applause" -> Icons.Rounded.SignLanguage
+                "Laughter" -> Icons.Rounded.SentimentVerySatisfied
+                else -> Icons.Rounded.GraphicEq
+            }
+            Surface(shape = CircleShape, color = tint.copy(alpha = 0.16f), contentColor = tint) {
+                Row(Modifier.padding(start = 14.dp, end = 18.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(glyph, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(shown, style = MaterialTheme.typography.titleMedium)
+                }
+            }
+        }
     }
 }
 

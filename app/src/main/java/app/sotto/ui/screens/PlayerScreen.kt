@@ -241,7 +241,7 @@ fun PlayerScreen(
                                         ?: SPEECH_LABEL.takeIf { paragraphs.any { at >= it.startMs && at < it.endMs } }
                                 }
                             }
-                            heard?.let { SoundLabel(it, Modifier.align(Alignment.TopCenter).padding(top = 28.dp)) }
+                            SoundLabel(heard, Modifier.align(Alignment.TopCenter).padding(top = 24.dp))
                         }
                     } else if (paragraphs.isEmpty() && sounds.isEmpty()) {
                         Column(Modifier.fillMaxSize().padding(horizontal = 40.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {

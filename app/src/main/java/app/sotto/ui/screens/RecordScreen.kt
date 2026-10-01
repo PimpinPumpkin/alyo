@@ -136,7 +136,7 @@ fun RecordScreen(app: SottoApp, session: RecordingSession, onMinimize: () -> Uni
                 } else {
                     Box(Modifier.fillMaxSize()) {
                         LiveWaveform(session, paused)
-                        HearingLabel(session, paused, Modifier.align(Alignment.TopCenter).padding(top = 28.dp))
+                        HearingLabel(session, paused, Modifier.align(Alignment.TopCenter).padding(top = 24.dp))
                     }
                 }
             }
@@ -308,8 +308,7 @@ private fun LiveWaveform(session: RecordingSession, paused: Boolean) {
 @Composable
 private fun HearingLabel(session: RecordingSession, paused: Boolean, modifier: Modifier = Modifier) {
     val hearing by session.hearing.collectAsState()
-    val heard = hearing?.takeIf { !paused } ?: return
-    SoundLabel(heard, modifier)
+    SoundLabel(hearing.takeIf { !paused }, modifier)
 }
 
 @Composable
