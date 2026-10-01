@@ -151,12 +151,30 @@ class LiveTranscriber(
             }
         }
 
+        // Set once the stray mark opening the current hypothesis has been handed back (see below).
+        var strayReturned = false
+
         fun currentWords(): List<Word> {
             val result = recognizer.getResult(stream)
             val start = sampleToMs(timeBase)
-            return wordsFromTokens(result.tokens, result.timestamps, null, start - liveSpec.lagMs, sampleToMs(fed))
+            var words = wordsFromTokens(result.tokens, result.timestamps, null, start - liveSpec.lagMs, sampleToMs(fed))
                 .map { if (it.startMs >= start) it else it.copy(startMs = start, endMs = maxOf(it.endMs, start + 1)) }
-                .drop(claimed)
+            // A model that punctuates can decide on the full stop only after the pause that closed
+            // the sentence, so it arrives as the first "word" of the next one. It belongs on the
+            // end of the sentence before.
+            val stray = words.firstOrNull()?.text?.takeIf { text -> text.none { it.isLetterOrDigit() } }
+            if (stray != null) {
+                words = words.drop(1)
+                if (!strayReturned) {
+                    strayReturned = true
+                    _segments.update { list ->
+                        val last = list.lastOrNull()?.takeIf { !it.refined && !it.edited && it.words.isNotEmpty() } ?: return@update list
+                        val word = last.words.last()
+                        if (word.text.last().isLetterOrDigit()) list.dropLast(1) + last.copy(words = last.words.dropLast(1) + word.copy(text = word.text + stray)) else list
+                    }
+                }
+            }
+            return words.drop(claimed)
         }
 
         // Whether the next piece follows straight on from a split, with no pause in between.
@@ -188,6 +206,7 @@ class LiveTranscriber(
             timeBase = end
             claimed = 0
             afterSplit = false
+            strayReturned = false
         }
 
         /**
@@ -234,7 +253,9 @@ class LiveTranscriber(
                 if (recognizer.isEndpoint(stream)) closeSegment(words) else _partial.value = splitIfLong(words)
             }
             // Flush: the model needs trailing context before it will commit to the final word.
-            stream.acceptWaveform(FloatArray(AudioSpec.ASR_SAMPLE_RATE * 3 / 5), AudioSpec.ASR_SAMPLE_RATE)
+            // At least one whole step of silence, or a model that works in long steps never gets to
+            // the audio still waiting for its step to fill.
+            stream.acceptWaveform(FloatArray(maxOf(AudioSpec.ASR_SAMPLE_RATE * 3 / 5, (chunkSamples + AudioSpec.ASR_SAMPLE_RATE * 2 / 5).toInt())), AudioSpec.ASR_SAMPLE_RATE)
             stream.inputFinished()
             decodeReady()
             closeSegment(currentWords())

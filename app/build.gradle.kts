@@ -13,7 +13,7 @@ val mirror = "https://github.com/PimpinPumpkin/sotto/releases/download/models"
 fun fetch(target: File, upstream: String) {
     target.parentFile.mkdirs()
     val tmp = File(target.parentFile, target.name + ".part")
-    val urls = listOf("$mirror/build.${upstream.substringAfterLast('/')}", upstream)
+    val urls = listOf("$mirror/build.${upstream.substringAfterLast('/')}", upstream).distinct()
     for ((index, url) in urls.withIndex()) {
         try {
             logger.lifecycle("Downloading $url")
@@ -33,6 +33,19 @@ val sherpaVersion: String = libs.versions.sherpaOnnx.get()
 val sherpaAar = layout.projectDirectory.file("libs/sherpa-onnx-$sherpaVersion.aar").asFile
 if (!sherpaAar.exists()) {
     fetch(sherpaAar, "https://github.com/k2-fsa/sherpa-onnx/releases/download/v$sherpaVersion/sherpa-onnx-$sherpaVersion.aar")
+}
+
+// ONNX Runtime, rebuilt with only the operators Sotto's models use: half the size of the one in
+// the AAR, which carries every operator there is. scripts/build-onnxruntime.sh builds it, and
+// the result is kept on the `models` release. It takes the place of the AAR's copy at packaging
+// (see pickFirsts below). If it cannot be fetched the build still works, with the larger one.
+val ortSlim = layout.projectDirectory.file("libs/onnxruntime/arm64-v8a/libonnxruntime.so").asFile
+if (!ortSlim.exists()) {
+    try {
+        fetch(ortSlim, "$mirror/libonnxruntime-1.28.2-sotto1-arm64-v8a.so")
+    } catch (e: java.io.IOException) {
+        logger.warn("Trimmed ONNX Runtime not available (${e.message}); packaging the full one from the AAR.")
+    }
 }
 
 // The sound classifier (CED tiny, 6 MB) ships inside the APK: it is what tells music and applause
@@ -147,9 +160,14 @@ android {
         noCompress += "onnx"
     }
 
+    sourceSets["main"].jniLibs.srcDir("libs/onnxruntime")
+
     packaging {
         // The AAR also ships its C and C++ API libraries; the Kotlin bindings only load the JNI one.
         jniLibs.excludes += listOf("**/libsherpa-onnx-c-api.so", "**/libsherpa-onnx-cxx-api.so")
+        // Two copies of ONNX Runtime arrive, the trimmed one from libs/onnxruntime and the full
+        // one inside the AAR. The app's own comes first.
+        jniLibs.pickFirsts += "**/libonnxruntime.so"
         resources.excludes += listOf("META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*")
     }
 

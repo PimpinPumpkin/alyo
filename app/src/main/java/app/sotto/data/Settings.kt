@@ -7,14 +7,33 @@ import android.media.AudioDeviceInfo
 import androidx.core.content.edit
 import app.sotto.asr.LanguagePack
 import app.sotto.asr.ModelCatalog
+import app.sotto.asr.ModelSpec
 import app.sotto.asr.Quality
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 class Settings(context: Context) {
     private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-    private val _language = MutableStateFlow(prefs.getString(LANGUAGE, "en")!!)
+    // Until a language is chosen it follows the phone's, so a German phone starts in German.
+    private val _language = MutableStateFlow(prefs.getString(LANGUAGE, null) ?: ModelCatalog.languageFor(java.util.Locale.getDefault()).code)
     val language: StateFlow<String> = _language
+
+    fun setLanguage(code: String) {
+        prefs.edit().putString(LANGUAGE, code).apply()
+        _language.value = code
+    }
+
+    /**
+     * The second-pass model to use: the chosen quality's if it is installed, otherwise any other
+     * that is. Null when the chosen quality has none by design, or nothing is installed.
+     */
+    fun refiner(models: app.sotto.asr.ModelManager): ModelSpec? {
+        val wanted = chosenQuality.refiner ?: return null
+        return models.usable(wanted) ?: pack.qualities.firstNotNullOfOrNull { it.refiner?.let(models::usable) }
+    }
+
+    /** What transcribing needs with the current choices: the live model, and the second pass if the quality has one. */
+    val neededModels: List<ModelSpec> get() = listOfNotNull(pack.live, chosenQuality.refiner)
 
     private val _quality = MutableStateFlow(prefs.getString(QUALITY, null) ?: recommendedQuality(context))
     val quality: StateFlow<String> = _quality

@@ -120,6 +120,7 @@ class LibraryJobs(
                 transcriberFactory = models.usable(pack.live)?.let { live ->
                     { onRefined -> LiveTranscriber(engine, live, refiner, pack.continuers, store.spool(id), scope, onRefined) }
                 },
+                language = pack.code,
             )
             session.begin()
             while (!session.sourceEnded.value && session.failure.value == null) {
@@ -169,7 +170,7 @@ class LibraryJobs(
             transcriber.awaitRefined()
             sounds.await()
             // Names the user gave speakers survive; the words they were attached to do not.
-            store.updateTranscript(id) { Transcript(language = it.language, segments = transcriber.segments.value, speakerNames = it.speakerNames) }
+            store.updateTranscript(id) { Transcript(language = pack.code, segments = transcriber.segments.value, speakerNames = it.speakerNames) }
             store.saveSounds(id, sounds.spans.value)
             if (settings.speakerLabels.value && diarizer.isReady()) store.applySpeakers(id, diarizer.turns(spool))
         } finally {
@@ -182,8 +183,7 @@ class LibraryJobs(
         }
     }
 
-    private fun installedRefiner() = models.usable(settings.chosenQuality.refiner)
-        ?: settings.pack.qualities.firstNotNullOfOrNull { models.usable(it.refiner) }
+    private fun installedRefiner() = settings.refiner(models)
 
     private fun displayName(uri: Uri): String = runCatching {
         context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->

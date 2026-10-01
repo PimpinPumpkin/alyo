@@ -37,7 +37,8 @@ private class Credit(val name: String, val by: String, val license: String, val 
  * authors a condition of using them, so this page is not optional.
  */
 private val CREDITS = listOf(
-    Credit("Parakeet TDT 0.6B v2 and 110M", "NVIDIA", "CC BY 4.0", "The speech model that writes the finished transcript", "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2"),
+    Credit("Parakeet TDT 0.6B v2, v3 and 110M", "NVIDIA", "CC BY 4.0", "The speech models that write the finished transcript", "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3"),
+    Credit("Kroko ASR", "Banafo", "CC BY-SA 4.0", "The live speech models for German, French and Spanish", "https://huggingface.co/Banafo/Kroko-ASR"),
     Credit("FastConformer streaming transducer", "NVIDIA", "CC BY 4.0", "The speech model behind the live text", "https://huggingface.co/nvidia/stt_en_fastconformer_hybrid_large_streaming_multi"),
     Credit("CED tiny", "Heinrich Dinkel and Xiaomi", "Apache 2.0", "Tells music, applause and laughter from speech", "https://github.com/RicherMans/CED"),
     Credit("pyannote segmentation 3.0", "Hervé Bredin and CNRS", "MIT", "Finds where the speaker changes", "https://huggingface.co/pyannote/segmentation-3.0"),

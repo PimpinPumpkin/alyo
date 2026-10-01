@@ -78,6 +78,7 @@ class Summarizer(
     private fun run(id: String) {
         val spec = model() ?: error("No summary model is installed")
         if (isRecording()) error("Finish recording first: there is not enough memory to do both")
+        val language = store.transcript(id).value.language
         val parts = paragraphsOf(store.transcript(id).value.segments).map { it.text }
         if (parts.isEmpty()) error("There is no transcript to summarize")
 
@@ -108,15 +109,15 @@ class Summarizer(
                 else -> 3..5
             }
             val reply = if (chunks.size == 1) {
-                llama.generate(system(points), chunks[0], REPLY_TOKENS, OPENING, shape(points), listener(writing = true))
+                llama.generate(system(points, language), chunks[0], REPLY_TOKENS, OPENING, shape(points, language), listener(writing = true))
             } else {
                 val notes = StringBuilder()
                 for (chunk in chunks) {
-                    val part = llama.generate(NOTES_SYSTEM, chunk, NOTE_TOKENS, "", NOTES_SHAPE, listener(writing = false)) ?: return
+                    val part = llama.generate(notesSystem(language), chunk, NOTE_TOKENS, "", notesShape(language), listener(writing = false)) ?: return
                     notes.append(part.trim()).append('\n')
                     done++
                 }
-                llama.generate(system(points), "Notes taken from a long recording, in order:\n\n$notes", REPLY_TOKENS, OPENING, shape(points), listener(writing = true))
+                llama.generate(system(points, language), "Notes taken from a long recording, in order:\n\n$notes", REPLY_TOKENS, OPENING, shape(points, language), listener(writing = true))
             } ?: return
 
             val summary = parse(reply, "the ${spec.title} model")
@@ -164,27 +165,33 @@ class Summarizer(
         private const val OPENING = "Title:"
         private const val MAX_TITLE_WORDS = 8
 
-        private fun system(points: IntRange): String =
+        private fun system(points: IntRange, language: String): String =
             "You label transcripts of voice recordings. Reply with a title of two to six words that says what the recording is about" +
-                if (points.last == 0) "." else ", then ${points.first} to ${points.last} sentences that each state one thing that was said: a fact, a decision, or something to do. State the thing itself, with its details. Use only what is in the transcript."
+                (if (points.last == 0) "." else ", then ${points.first} to ${points.last} sentences that each state one thing that was said: a fact, a decision, or something to do. State the thing itself, with its details. Use only what is in the transcript.") +
+                inLanguage(language)
+
+        /** Small models answer in English unless told otherwise, whatever language they are reading. */
+        private fun inLanguage(code: String): String = if (code == "en") "" else " Write in ${java.util.Locale.forLanguageTag(code).getDisplayLanguage(java.util.Locale.ENGLISH)}, the language of the transcript."
 
         // The reply's shape as a grammar, continuing from the "Title:" the reply is started with.
         // A title is a few plain words on one line: no brackets, colons or markup, which is what
         // a model echoing its instructions would need. Each point is exactly one sentence: it
         // starts with a capital, has no colon to hang a "Key points:" label on, and stops at the
         // first full stop, so a point cannot run on into a second one.
-        private const val WORDS = """word ::= [^ \n<>\[\]{}:*#"]{1,24}
+        // English sentences open with a plain capital. Other languages open with letters outside
+        // A to Z (É, Ü) or with a mark (¿, ¡), so there the rule is only "not a space or a dash".
+        private fun words(language: String): String = """word ::= [^ \n<>\[\]{}:*#"]{1,24}
 title ::= word (" " word){1,6}
-line ::= [A-Z0-9$] [^\n.!?<>*#:]{12,170} [.!?]
+line ::= ${if (language == "en") "[A-Z0-9$]" else "[^ \\n<>*#:.!?-]"} [^\n.!?<>*#:]{12,170} [.!?]
 """
 
-        private fun shape(points: IntRange): String = WORDS + (
+        private fun shape(points: IntRange, language: String): String = words(language) + (
             if (points.last == 0) "root ::= \" \" title \"\\n\"\n"
             else "root ::= \" \" title \"\\n\" (\"- \" line \"\\n\"){${points.first},${points.last}}\n"
             )
 
-        private const val NOTES_SYSTEM = "Write 2 to 4 sentences that each state one thing said in this part of a transcript, with its details. Use only what is in the text."
-        private const val NOTES_SHAPE = WORDS + "root ::= (\"- \" line \"\\n\"){2,4}\n"
+        private fun notesSystem(language: String) = "Write 2 to 4 sentences that each state one thing said in this part of a transcript, with its details. Use only what is in the text." + inLanguage(language)
+        private fun notesShape(language: String) = words(language) + "root ::= (\"- \" line \"\\n\"){2,4}\n"
 
         /** Turns the model's reply into a title and points, forgiving the ways small models stray from the format. */
         fun parse(reply: String, model: String): Summary {

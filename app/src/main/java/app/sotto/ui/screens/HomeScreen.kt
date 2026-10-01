@@ -145,9 +145,10 @@ fun HomeScreen(
     }
     val groups = remember(shown) { shown.groupBy { monthLabel(it.createdAt) }.toList() }
     val qualityId by app.settings.quality.collectAsState()
-    val setup = remember(modelStates, qualityId) {
+    val languageCode by app.settings.language.collectAsState()
+    val setup = remember(modelStates, qualityId, languageCode) {
         val pack = app.settings.pack
-        val needed = listOf(pack.live, app.settings.chosenQuality.refiner)
+        val needed = app.settings.neededModels
         val downloading = needed.mapNotNull { modelStates[it.id] as? InstallState.Downloading }
         when {
             downloading.isNotEmpty() -> {
@@ -163,7 +164,7 @@ fun HomeScreen(
             }
             !modelStates[pack.live.id].works -> SetupState.Off
             // Any installed second-pass model will do; the chosen one is only a preference.
-            pack.qualities.none { modelStates[it.refiner.id].works } -> SetupState.RoughOnly
+            app.settings.chosenQuality.refiner != null && pack.qualities.none { modelStates[it.refiner?.id].works } -> SetupState.RoughOnly
             needed.any { modelStates[it.id] == InstallState.Outdated } -> SetupState.Update
             else -> SetupState.Ready
         }

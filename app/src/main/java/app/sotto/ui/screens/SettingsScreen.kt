@@ -1,5 +1,9 @@
 package app.sotto.ui.screens
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.rounded.Translate
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -324,12 +328,14 @@ private fun ModelChooser(app: SottoApp, onReady: (() -> Unit)?, readyLabel: Stri
     val scope = rememberCoroutineScope()
     val states by app.models.states.collectAsState()
     val qualityId by app.settings.quality.collectAsState()
-    val pack = app.settings.pack
+    val languageCode by app.settings.language.collectAsState()
+    val pack = ModelCatalog.language(languageCode)
     val quality = pack.qualities.firstOrNull { it.id == qualityId } ?: pack.qualities.first()
+    var choosingLanguage by remember { mutableStateOf(false) }
     val speakerLabels by app.settings.speakerLabels.collectAsState()
     // The small voice model rides along with the speech models, so speaker labels work from the
     // first recording rather than being something to discover and turn on later.
-    val needed: List<ModelSpec> = listOf(pack.live, quality.refiner) + listOfNotNull(ModelCatalog.speakers.takeIf { speakerLabels })
+    val needed: List<ModelSpec> = listOfNotNull(pack.live, quality.refiner, ModelCatalog.speakers.takeIf { speakerLabels })
     fun state(spec: ModelSpec) = states[spec.id] ?: InstallState.Missing
     val missing = needed.filter { state(it) != InstallState.Installed }
     val downloading = needed.any { state(it) is InstallState.Downloading }
@@ -356,9 +362,15 @@ private fun ModelChooser(app: SottoApp, onReady: (() -> Unit)?, readyLabel: Stri
 
     Column {
         SheetGroup(
+            listOf(
+                SheetRow(Icons.Rounded.Translate, "Language", detail = pack.name, enabled = !downloading) { choosingLanguage = true },
+            ),
+        )
+        Spacer(Modifier.height(8.dp))
+        SheetGroup(
             pack.qualities.map { option ->
-                val installed = state(pack.live).works && state(option.refiner).works
-                val size = formatBytes(pack.live.source.downloadBytes + option.refiner.source.downloadBytes + if (ModelCatalog.speakers in needed) ModelCatalog.speakers.source.downloadBytes else 0L)
+                val installed = state(pack.live).works && (option.refiner == null || state(option.refiner).works)
+                val size = formatBytes(pack.live.source.downloadBytes + (option.refiner?.source?.downloadBytes ?: 0L) + if (ModelCatalog.speakers in needed) ModelCatalog.speakers.source.downloadBytes else 0L)
                 SheetRow(
                     icon = if (option.id == "best") Icons.Rounded.HighQuality else Icons.Rounded.Speed,
                     label = option.title,
@@ -366,8 +378,10 @@ private fun ModelChooser(app: SottoApp, onReady: (() -> Unit)?, readyLabel: Stri
                     enabled = !downloading,
                     trailing = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (state(option.refiner).works && onReady == null) {
-                                IconButton(onClick = { app.models.delete(option.refiner) }) {
+                            // With no second pass of its own, a quality's download is the live model.
+                            val removable = option.refiner ?: pack.live
+                            if (state(removable).works && onReady == null) {
+                                IconButton(onClick = { app.models.delete(removable) }) {
                                     Icon(Icons.Rounded.DeleteOutline, "Remove the ${option.title} download", tint = colors.onSurfaceVariant)
                                 }
                             }
@@ -427,6 +441,29 @@ private fun ModelChooser(app: SottoApp, onReady: (() -> Unit)?, readyLabel: Stri
                 TextButton(onClick = { showSources = true }) { Text("Where to get the files") }
             }
         }
+    }
+
+    if (choosingLanguage) {
+        AlertDialog(
+            onDismissRequest = { choosingLanguage = false },
+            title = { Text("Language spoken") },
+            text = {
+                Column {
+                    for (option in ModelCatalog.languages) {
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { app.settings.setLanguage(option.code); choosingLanguage = false }.padding(vertical = 12.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = option.code == pack.code, onClick = null)
+                            Spacer(Modifier.width(16.dp))
+                            Text(option.name, style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                    Text("Each language has its own speech model. Recordings you already made keep their transcripts.", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+                }
+            },
+            confirmButton = { TextButton(onClick = { choosingLanguage = false }) { Text("Close") } },
+        )
     }
 
     if (showSources) {

@@ -41,6 +41,8 @@ class RecordingSession(
     /** Tells speakers apart once the transcript is final; given the spooled audio, returns who spoke when. */
     private val diarize: ((File) -> List<SpeakerTurn>)? = null,
     transcriberFactory: ((onRefined: (Segment) -> Unit) -> LiveTranscriber)?,
+    /** Code of the language being transcribed, kept with the transcript. */
+    private val language: String = "en",
 ) {
     val peaks = Peaks()
 
@@ -87,7 +89,7 @@ class RecordingSession(
     private val drafts: Job? = transcriber?.let { t ->
         scope.launch(Dispatchers.IO) {
             t.segments.collect { segments ->
-                synchronized(saveLock) { if (!saved) store.saveDraft(id, Transcript(segments = segments)) }
+                synchronized(saveLock) { if (!saved) store.saveDraft(id, Transcript(language, segments)) }
             }
         }
     }
@@ -236,7 +238,7 @@ class RecordingSession(
                     pendingRefine = transcriber?.pending?.value ?: 0,
                     autoTitled = title.value == Titles.forDate(startedAt),
                 )
-                store.add(meta, Transcript(segments = segments.value), peaks)
+                store.add(meta, Transcript(language, segments.value), peaks)
                 sounds?.let { store.saveSounds(id, it.spans.value) }
                 saved = true
                 meta

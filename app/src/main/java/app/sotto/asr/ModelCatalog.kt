@@ -60,7 +60,10 @@ data class ModelSpec(
 )
 
 /** How good the finished transcript is, traded against download size and memory. */
-data class Quality(val id: String, val title: String, val summary: String, val refiner: ModelSpec)
+/**
+ * @param refiner the second-pass model, or null where the live model's own text is the transcript
+ */
+data class Quality(val id: String, val title: String, val summary: String, val refiner: ModelSpec?)
 
 /**
  * Everything needed to transcribe one language: a streaming model for the live text and a choice
@@ -162,7 +165,107 @@ object ModelCatalog {
         ),
     )
 
-    val languages: List<LanguagePack> = listOf(english)
+    /**
+     * Banafo's Kroko streaming models. Unlike the English live model they write capitals and
+     * punctuation as they go, so their text can stand as the transcript without a second pass.
+     */
+    private fun kroko(code: String, name: String, files: List<ModelFile>) = ModelSpec(
+        id = "$code-live-kroko",
+        archive = "sherpa-onnx-streaming-zipformer-$code-kroko-2025-08-06",
+        kind = ModelKind.STREAMING_TRANSDUCER,
+        title = "Live $name",
+        summary = "Kroko streaming Zipformer",
+        encoder = "encoder.onnx",
+        decoder = "decoder.onnx",
+        joiner = "joiner.onnx",
+        // Each step takes 128 feature frames of 10 ms.
+        chunkMs = 1280,
+        source = ModelSource.Files(files),
+    )
+
+    private fun krokoFiles(code: String, encoderBytes: Long, encoder: String, decoderBytes: Long, decoder: String, joiner: String, tokensBytes: Long, tokens: String): List<ModelFile> {
+        val base = "$HF/sherpa-onnx-streaming-zipformer-$code-kroko-2025-08-06/resolve/main"
+        return listOf(
+            ModelFile("encoder.onnx", "$base/encoder.onnx", encoderBytes, encoder),
+            ModelFile("decoder.onnx", "$base/decoder.onnx", decoderBytes, decoder),
+            ModelFile("joiner.onnx", "$base/joiner.onnx", 336_817, joiner),
+            ModelFile("tokens.txt", "$base/tokens.txt", tokensBytes, tokens),
+        )
+    }
+
+    /** The second pass for every European language but English: one model that covers 25 of them. */
+    private val euParakeet = ModelSpec(
+        id = "eu-parakeet-tdt-0.6b-v3",
+        archive = "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8",
+        kind = ModelKind.OFFLINE_NEMO_TRANSDUCER,
+        title = "Parakeet TDT 0.6B v3",
+        summary = "NVIDIA Parakeet, 600M parameters, 25 European languages",
+        source = "$HF/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/main".let { base ->
+            ModelSource.Files(
+                listOf(
+                    ModelFile("encoder.int8.onnx", "$base/encoder.int8.onnx", 652_184_281, "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247"),
+                    ModelFile("decoder.int8.onnx", "$base/decoder.int8.onnx", 11_845_275, "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e"),
+                    ModelFile("joiner.int8.onnx", "$base/joiner.int8.onnx", 6_355_277, "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3"),
+                    ModelFile("tokens.txt", "$base/tokens.txt", 93_939, "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d"),
+                ),
+            )
+        },
+    )
+
+    private fun european(code: String, name: String, live: ModelSpec, continuers: Set<String>) = LanguagePack(
+        code = code,
+        name = name,
+        live = live,
+        continuers = continuers,
+        qualities = listOf(
+            Quality("light", "Standard", "The live text is the transcript. Small and quick.", refiner = null),
+            Quality("best", "Best", "Each sentence is rewritten by a larger model. About 1 GB of memory while recording.", refiner = euParakeet),
+        ),
+    )
+
+    val german = european(
+        "de", "Deutsch",
+        kroko(
+            "de", "German",
+            krokoFiles(
+                "de", 70_091_557, "6e83993d6967ec7a3498b055b7e85ace85b5d64d1b1e8773cb29a43a11f5edb5",
+                617_489, "94a29592b403c53fa2231b478637da1ab4abcef7f5e46e432098416a4a3ed562",
+                "28356bff070aea51ab1d725a3278e81d19f9300f860d3248a7014292264df15a",
+                5_606, "86e8370994ff2c01149ba8c4f8709aa93cdc18914b27a717e291e96faf39a6eb",
+            ),
+        ),
+        setOf("und", "aber", "oder", "weil", "dass", "wenn", "als", "obwohl", "während", "denn", "sondern", "wobei", "damit", "sodass", "bevor", "nachdem"),
+    )
+
+    val french = european(
+        "fr", "Français",
+        kroko(
+            "fr", "French",
+            krokoFiles(
+                "fr", 70_092_599, "e02facae1daf6f1f13da67ea3ace7c722516d0868d1768d78c0580bc22cc0c5b",
+                617_488, "6aed547570e3ab5afc05429a017cedd3a056c16df3baa5703f02461cefa25bac",
+                "a51eec759bcdcaae2614686fa2a8b57417b2d420dd55a5a5558b388d35a9b2b6",
+                5_415, "fedfb9c844bfb2bf14171f8184863e3d617b815a8667bdd9fc9a3149fde73298",
+            ),
+        ),
+        setOf("et", "mais", "ou", "donc", "car", "parce", "que", "qui", "quand", "si", "puisque", "lorsque", "comme", "dont", "où", "alors", "tandis"),
+    )
+
+    val spanish = european(
+        "es", "Español",
+        kroko(
+            "es", "Spanish",
+            krokoFiles(
+                "es", 154_878_102, "2d9f5ef87d1a5257f8a6687e21501c56f3aa2fcbfcfab9364dcc4ce4e06ae81b",
+                617_488, "d4ce176b94b25f7acc88717bc3f704fcf5d6e131aaac2e0cabab3885541181ee",
+                "dae35df88d676e320fcdb99217328e66dcf722bf11b0f2459e14ddb5b982ded5",
+                6_385, "1be5e0a58e05d06d327df4c6b7b5e4f8aba01da6981eb016fcaceafc6a56680f",
+            ),
+        ),
+        setOf("y", "e", "pero", "o", "u", "porque", "que", "cuando", "si", "aunque", "mientras", "donde", "como", "pues", "sino", "entonces"),
+    )
+
+    val languages: List<LanguagePack> = listOf(english, german, spanish, french)
 
     /** File name every summary model is stored under, whatever it was called when it arrived. */
     const val GGUF = "model.gguf"
@@ -222,7 +325,7 @@ object ModelCatalog {
 
     /** Every model this version offers. */
     val allModels: List<ModelSpec>
-        get() = languages.flatMap { pack -> listOf(pack.live) + pack.qualities.map { it.refiner } } + summarizers + importedSummarizer + speakers
+        get() = (languages.flatMap { pack -> listOf(pack.live) + pack.qualities.mapNotNull { it.refiner } } + summarizers + importedSummarizer + speakers).distinct()
 
     /**
      * Sotto's own copies of the model files, tried before the upstream hosts. The models belong to
@@ -241,4 +344,7 @@ object ModelCatalog {
     fun archiveUrl(spec: ModelSpec): String = "$GH/${spec.archive}.tar.bz2"
 
     fun language(code: String): LanguagePack = languages.firstOrNull { it.code == code } ?: english
+
+    /** The language to start in: the phone's own if Sotto can transcribe it, otherwise English. */
+    fun languageFor(locale: java.util.Locale): LanguagePack = language(locale.language)
 }

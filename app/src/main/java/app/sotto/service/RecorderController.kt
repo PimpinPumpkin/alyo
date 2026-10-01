@@ -54,7 +54,7 @@ class RecorderController(
         val now = System.currentTimeMillis()
         val pack = settings.pack
         val live = models.usable(pack.live)
-        val refiner = models.usable(settings.chosenQuality.refiner) ?: pack.qualities.firstNotNullOfOrNull { models.usable(it.refiner) }
+        val refiner = settings.refiner(models)
         val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         var mic: MicSource? = null
         val openSource: () -> PcmSource = if (wav != null) ({ WavFileSource(wav) }) else ({
@@ -81,6 +81,7 @@ class RecorderController(
             transcriberFactory = if (live == null) null else { onRefined ->
                 LiveTranscriber(engine, live, refiner, pack.continuers, store.spool(id), scope, onRefined)
             },
+            language = pack.code,
         )
         _session.value = session
         refreshBusy()
