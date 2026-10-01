@@ -12,6 +12,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import android.graphics.Color
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -43,6 +45,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import app.sotto.asr.InstallState
 import app.sotto.data.RecordingMeta
+import app.sotto.data.Settings
 import app.sotto.ui.screens.CropScreen
 import app.sotto.ui.screens.ShareSheet
 import app.sotto.ui.screens.HomeScreen
@@ -68,7 +71,19 @@ class MainActivity : ComponentActivity() {
         readDebugIntent(intent)
         if (savedInstanceState == null) readAction(intent)
         setContent {
-            SottoTheme(dark = debugDark.value ?: isSystemInDarkTheme()) {
+            val choice by (application as SottoApp).settings.theme.collectAsState()
+            val dark = debugDark.value ?: when (choice) {
+                Settings.THEME_LIGHT -> false
+                Settings.THEME_DARK -> true
+                else -> isSystemInDarkTheme()
+            }
+            // The status and navigation bar icons have to follow the app's theme, not the phone's,
+            // or a light app on a dark phone gets white icons on a white bar.
+            LaunchedEffect(dark) {
+                val bars = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { dark }
+                enableEdgeToEdge(statusBarStyle = bars, navigationBarStyle = bars)
+            }
+            SottoTheme(dark = dark) {
                 Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
                     App(application as SottoApp, debugWav.value, recordRequested.value, onRecordConsumed = { recordRequested.value = false }) { debugWav.value = null }
                 }

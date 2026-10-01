@@ -66,6 +66,15 @@ class Settings(context: Context) {
         _microphone.value = choice
     }
 
+    private val _theme = MutableStateFlow(prefs.getString(THEME, THEME_SYSTEM)!!)
+    /** [THEME_SYSTEM] follows the phone; [THEME_LIGHT] and [THEME_DARK] hold the app to one look. */
+    val theme: StateFlow<String> = _theme
+
+    fun setTheme(theme: String) {
+        prefs.edit { putString(THEME, theme) }
+        _theme.value = theme
+    }
+
     private val _shareWithPicker = MutableStateFlow(prefs.getBoolean(PICKER, true))
     /** Show the library in the system file picker, so other apps can be handed a recording the user picks. */
     val shareWithPicker: StateFlow<Boolean> = _shareWithPicker
@@ -123,6 +132,11 @@ class Settings(context: Context) {
         /** A stable name for an input. Device ids change between connections; its kind and product name do not. */
         fun micKey(device: AudioDeviceInfo): String = "${device.type}:${device.productName}"
 
+        const val THEME_SYSTEM = "system"
+        const val THEME_LIGHT = "light"
+        const val THEME_DARK = "dark"
+
+        private const val THEME = "theme"
         private const val PICKER = "share_with_picker"
         private const val SEARCHES = "searches"
         private const val MAX_SEARCHES = 8

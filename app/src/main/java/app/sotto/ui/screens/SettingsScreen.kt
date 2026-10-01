@@ -1,6 +1,7 @@
 package app.sotto.ui.screens
 
 import app.sotto.export.LibraryProvider
+import androidx.compose.material.icons.rounded.Contrast
 import androidx.compose.material.icons.rounded.FolderShared
 import android.provider.DocumentsContract
 import app.sotto.data.Settings
@@ -115,6 +116,7 @@ fun SettingsScreen(app: SottoApp, onDone: () -> Unit, onLicenses: () -> Unit, on
     val plainName by app.settings.plainName.collectAsState()
     val autoTitle by app.settings.autoTitle.collectAsState()
     val sharePicker by app.settings.shareWithPicker.collectAsState()
+    val theme by app.settings.theme.collectAsState()
 
     Column(Modifier.fillMaxSize().background(colors.surface).statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -168,6 +170,19 @@ fun SettingsScreen(app: SottoApp, onDone: () -> Unit, onLicenses: () -> Unit, on
             SectionTitle("App")
             SheetGroup(
                 listOfNotNull(
+                    SheetRow(
+                        Icons.Rounded.Contrast,
+                        "Theme",
+                        detail = when (theme) {
+                            Settings.THEME_LIGHT -> "Light"
+                            Settings.THEME_DARK -> "Dark"
+                            else -> "Same as the phone"
+                        },
+                        onClick = {
+                            val order = listOf(Settings.THEME_SYSTEM, Settings.THEME_LIGHT, Settings.THEME_DARK)
+                            app.settings.setTheme(order[(order.indexOf(theme) + 1) % order.size])
+                        },
+                    ),
                     SheetRow(
                         Icons.Rounded.FolderShared,
                         "Show in the file picker",
