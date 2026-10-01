@@ -223,7 +223,7 @@ fun VoiceTypingScreen(app: AlyoApp, onBack: () -> Unit, onSettings: () -> Unit) 
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun Step(number: Int, title: String, body: String, done: Boolean, progress: Float? = null, action: @Composable () -> Unit) {
+internal fun Step(number: Int, title: String, body: String, done: Boolean, progress: Float? = null, action: @Composable () -> Unit) {
     val colors = MaterialTheme.colorScheme
     Surface(color = colors.surfaceBright, shape = RoundedCornerShape(28.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         Column(Modifier.padding(20.dp)) {
@@ -255,7 +255,7 @@ private fun Step(number: Int, title: String, body: String, done: Boolean, progre
 
 /** Something standing between the microphone key and Alyo, with the way to fix it. */
 @Composable
-private fun Notice(title: String, body: String, action: String?, onAction: () -> Unit) {
+internal fun Notice(title: String, body: String, action: String?, onAction: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     Surface(color = colors.tertiaryContainer, shape = RoundedCornerShape(28.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         Column(Modifier.padding(20.dp)) {

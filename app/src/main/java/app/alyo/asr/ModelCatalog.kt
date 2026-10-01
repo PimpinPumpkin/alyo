@@ -11,7 +11,12 @@ sealed interface ModelSource {
     }
 
     /** A `.tar.bz2` from the sherpa-onnx model releases; only the entries named in [keep] are unpacked. */
-    data class Tarball(val url: String, override val downloadBytes: Long, val keep: Set<String>) : ModelSource
+    /**
+     * @param keep the files to unpack, by name, wherever they sit in the archive
+     * @param tree unpack everything instead, keeping the folders: a voice comes with a folder of
+     * pronunciation data hundreds of files deep
+     */
+    data class Tarball(val url: String, override val downloadBytes: Long, val keep: Set<String> = emptySet(), val tree: Boolean = false) : ModelSource
 }
 
 enum class ModelKind {
@@ -26,6 +31,9 @@ enum class ModelKind {
 
     /** Turns a stretch of speech into a fingerprint of the voice, for telling speakers apart. */
     SPEAKER_EMBEDDING,
+
+    /** Goes the other way: a Piper voice, which turns text into speech. */
+    VOICE,
 }
 
 data class ModelSpec(
@@ -62,6 +70,12 @@ data class ModelSpec(
      * in the model's own terms, so each model has its own. Lower finds more speakers.
      */
     val speakerThreshold: Float = 0f,
+    /** For voices: the language spoken, as a tag like `en-US`. */
+    val locale: String = "",
+    /** For voices: the license of the recordings the voice was trained on, shown where it is chosen. */
+    val license: String = "",
+    /** For voices: true when that license forbids commercial use, which also keeps it out of F-Droid's main repository. */
+    val nonCommercial: Boolean = false,
 )
 
 /** How good the finished transcript is, traded against download size and memory. */
@@ -354,9 +368,56 @@ object ModelCatalog {
         ),
     )
 
+    private const val TTS = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models"
+
+    /**
+     * A Piper voice as sherpa-onnx packages it: the model, its tokens, and the eSpeak NG data
+     * that turns spelling into sounds. The full-precision models are used on purpose: on a phone
+     * the 8-bit ones are smaller but more than twice as slow.
+     */
+    private fun piper(name: String, title: String, summary: String, locale: String, bytes: Long, license: String, nonCommercial: Boolean = false) = ModelSpec(
+        id = "voice-$name",
+        archive = "vits-piper-$name-medium",
+        kind = ModelKind.VOICE,
+        title = title,
+        summary = summary,
+        encoder = "$name-medium.onnx",
+        locale = locale,
+        license = license,
+        nonCommercial = nonCommercial,
+        source = ModelSource.Tarball("$TTS/vits-piper-$name-medium.tar.bz2", bytes, tree = true),
+    )
+
+    /**
+     * The voices offered for reading aloud, the default for each language first. Chosen for clear
+     * speech at a speed an old phone keeps up with (about six times faster than real time on a
+     * Pixel 4a 5G), and, with one labeled exception, for training data anyone may use.
+     */
+    val voices: List<ModelSpec> = listOf(
+        piper("en_US-kristin", "Kristin", "American, female", "en-US", 67_259_230, "Public domain recordings"),
+        piper("en_US-norman", "Norman", "American, male", "en-US", 67_203_672, "Public domain recordings"),
+        piper("en_US-joe", "Joe", "American, male", "en-US", 67_169_394, "CC0"),
+        piper("en_US-ljspeech", "Linda", "American, female", "en-US", 67_169_893, "Public domain recordings"),
+        piper("en_US-hfc_female", "HFC", "American, female. The clearest of these.", "en-US", 67_228_166, "CC BY-NC-SA 4.0", nonCommercial = true),
+        piper("en_GB-cori", "Cori", "British, female", "en-GB", 67_257_412, "Public domain recordings"),
+        piper("en_GB-alba", "Alba", "Scottish, female", "en-GB", 67_212_349, "CC BY 4.0"),
+        piper("de_DE-thorsten", "Thorsten", "Deutsch, male", "de-DE", 67_214_254, "CC0"),
+        piper("fr_FR-siwis", "Siwis", "Français, female", "fr-FR", 67_207_459, "CC BY 4.0"),
+        piper("es_ES-davefx", "Dave", "Español de España, male", "es-ES", 67_184_952, "CC0"),
+        piper("es_MX-ald", "Ald", "Español de México, male", "es-MX", 67_196_497, "Unlicense"),
+    )
+
+    /** The voice to start with for [locale]: its country's first, else its language's first, else the first of all. */
+    fun voiceFor(locale: java.util.Locale): ModelSpec {
+        val tags = voices.map { java.util.Locale.forLanguageTag(it.locale) }
+        val index = tags.indexOfFirst { it.language == locale.language && it.country == locale.country }
+            .takeIf { it >= 0 } ?: tags.indexOfFirst { it.language == locale.language }.takeIf { it >= 0 } ?: 0
+        return voices[index]
+    }
+
     /** Every model this version offers. */
     val allModels: List<ModelSpec>
-        get() = (languages.flatMap { pack -> listOf(pack.live) + pack.qualities.mapNotNull { it.refiner } } + summarizers + importedSummarizer + speakers).distinct()
+        get() = (languages.flatMap { pack -> listOf(pack.live) + pack.qualities.mapNotNull { it.refiner } } + summarizers + importedSummarizer + speakers + voices).distinct()
 
     /**
      * Alyo's own copies of the model files, tried before the upstream hosts. The models belong to

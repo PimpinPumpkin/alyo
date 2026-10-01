@@ -5,6 +5,8 @@
     <!-- The name shown in the phone's keyboard list. -->
     <string name="ime_name">Alyo voice typing</string>
     <string name="subtype_voice">Voice (English)</string>
+    <!-- In the menu that appears over selected text, and in the share sheet. -->
+    <string name="read_aloud">Read aloud</string>
     <string name="tile_label">Record</string>
     <string name="widget_label">Record</string>
     <string name="widget_description">Start recording with one tap</string>

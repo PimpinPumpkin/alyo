@@ -144,7 +144,7 @@ fun SetupScreen(app: AlyoApp, onDone: (finishInVoiceTyping: Boolean) -> Unit) {
                 Column {
                     Text("What would you like it for?", style = heading)
                     Spacer(Modifier.height(if (tall) 8.dp else 4.dp))
-                    Text("Pick one or both. You can change this at any time, and what you leave off stays out of your way.", style = body, color = colors.onSurfaceVariant)
+                    Text("Pick any or all. You can change this at any time, and what you leave off stays out of your way.", style = body, color = colors.onSurfaceVariant)
                     Spacer(Modifier.height(if (tall) 20.dp else 12.dp))
                     SheetGroup(
                         Feature.entries.map { feature ->
@@ -170,9 +170,14 @@ fun SetupScreen(app: AlyoApp, onDone: (finishInVoiceTyping: Boolean) -> Unit) {
                 Column {
                     Text("One download", style = heading)
                     Spacer(Modifier.height(if (tall) 8.dp else 4.dp))
-                    Text("Speech is turned into text on this phone, never sent anywhere. It needs a speech model first.", style = body, color = colors.onSurfaceVariant)
+                    Text(
+                        if (app.settings.hearing) "Speech is turned into text on this phone, never sent anywhere. It needs a speech model first."
+                        else "The voice is made on this phone, and nothing you have read to you is sent anywhere. It needs a voice first.",
+                        style = body,
+                        color = colors.onSurfaceVariant,
+                    )
                     Spacer(Modifier.height(if (tall) 20.dp else 12.dp))
-                    ModelChooser(app, onReady = finish, readyLabel = "Done")
+                    if (app.settings.hearing) ModelChooser(app, onReady = finish, readyLabel = "Done") else VoiceDownload(app, onReady = finish)
                     TextButton(onClick = finish, modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 4.dp)) {
                         Text(if (downloading) "Carry on while it downloads" else "Not now")
                     }
@@ -226,8 +231,10 @@ fun SettingsScreen(app: AlyoApp, onDone: () -> Unit, onLicenses: () -> Unit, onW
                 },
             )
 
-            SectionTitle("Speech model")
-            ModelChooser(app, onReady = null, readyLabel = "")
+            if (app.settings.hearing) {
+                SectionTitle("Speech model")
+                ModelChooser(app, onReady = null, readyLabel = "")
+            }
 
             if (Feature.VOICE_TYPING in features) {
                 SectionTitle("Voice typing")
@@ -408,7 +415,14 @@ private fun ModelChooser(app: AlyoApp, onReady: (() -> Unit)?, readyLabel: Strin
     // The small voice model rides along with the speech models, so speaker labels work from the
     // first recording rather than being something to discover and turn on later.
     val features by app.settings.features.collectAsState()
-    val needed: List<ModelSpec> = listOfNotNull(pack.live, quality.refiner, ModelCatalog.speakers.takeIf { speakerLabels && Feature.RECORDER in features })
+    val voiceId by app.settings.voice.collectAsState()
+    // Everything the chosen features need rides on the one button: the voice model for speaker
+    // labels with the recorder, and the reading voice with read aloud.
+    val extras: List<ModelSpec> = listOfNotNull(
+        ModelCatalog.speakers.takeIf { speakerLabels && Feature.RECORDER in features },
+        ModelCatalog.voices.firstOrNull { it.id == voiceId }?.takeIf { Feature.READ_ALOUD in features },
+    )
+    val needed: List<ModelSpec> = listOfNotNull(pack.live, quality.refiner) + extras
     fun state(spec: ModelSpec) = states[spec.id] ?: InstallState.Missing
     val missing = needed.filter { state(it) != InstallState.Installed }
     val downloading = needed.any { state(it) is InstallState.Downloading }
@@ -443,7 +457,7 @@ private fun ModelChooser(app: AlyoApp, onReady: (() -> Unit)?, readyLabel: Strin
         SheetGroup(
             pack.qualities.map { option ->
                 val installed = state(pack.live).works && (option.refiner == null || state(option.refiner).works)
-                val size = formatBytes(pack.live.source.downloadBytes + (option.refiner?.source?.downloadBytes ?: 0L) + if (ModelCatalog.speakers in needed) ModelCatalog.speakers.source.downloadBytes else 0L)
+                val size = formatBytes(pack.live.source.downloadBytes + (option.refiner?.source?.downloadBytes ?: 0L) + extras.sumOf { it.source.downloadBytes })
                 SheetRow(
                     icon = if (option.id == "best") Icons.Rounded.HighQuality else Icons.Rounded.Speed,
                     label = option.title,
@@ -561,6 +575,32 @@ private fun ModelChooser(app: AlyoApp, onReady: (() -> Unit)?, readyLabel: Strin
             },
             dismissButton = { TextButton(onClick = { showSources = false }) { Text("Close") } },
         )
+    }
+}
+
+/** The one download for someone who chose only read aloud: the voice for their language. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun VoiceDownload(app: AlyoApp, onReady: () -> Unit) {
+    val states by app.models.states.collectAsState()
+    val voiceId by app.settings.voice.collectAsState()
+    val voice = ModelCatalog.voices.firstOrNull { it.id == voiceId } ?: ModelCatalog.voices.first()
+    val state = states[voice.id] ?: InstallState.Missing
+    Column {
+        SheetGroup(listOf(SheetRow(Icons.Rounded.RecordVoiceOver, voice.title, detail = voice.summary + ". More voices are in the app.", onClick = { })))
+        Spacer(Modifier.height(12.dp))
+        when {
+            state is InstallState.Downloading -> {
+                LinearWavyProgressIndicator(progress = { state.fraction }, modifier = Modifier.fillMaxWidth())
+                Text("${formatBytes(state.doneBytes)} of ${formatBytes(state.totalBytes)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            state.works -> Button(onClick = onReady, modifier = Modifier.fillMaxWidth().height(60.dp)) { Text("Done", style = MaterialTheme.typography.titleMedium) }
+            else -> Button(onClick = { app.models.install(voice) }, modifier = Modifier.fillMaxWidth().height(60.dp)) {
+                Icon(Icons.Rounded.Download, null)
+                Spacer(Modifier.width(10.dp))
+                Text((if (state is InstallState.Failed) "Try again" else "Download") + "  ·  " + formatBytes(voice.source.downloadBytes), style = MaterialTheme.typography.titleMedium)
+            }
+        }
     }
 }
 

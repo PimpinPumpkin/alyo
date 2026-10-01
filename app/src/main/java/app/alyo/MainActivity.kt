@@ -57,6 +57,7 @@ import app.alyo.ui.screens.SetupScreen
 import app.alyo.ui.screens.WhatsNew
 import app.alyo.ui.screens.WhatsNewSheet
 import app.alyo.ui.screens.HubScreen
+import app.alyo.ui.screens.ReadAloudScreen
 import app.alyo.ui.screens.VoiceTypingScreen
 import app.alyo.data.Feature
 import app.alyo.ui.theme.AlyoTheme
@@ -102,12 +103,16 @@ class MainActivity : ComponentActivity() {
         readDebugIntent(intent)
         readAction(intent)
         // Tapping an icon while the app is already open goes to that icon's own screen.
-        if (intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_LAUNCHER)) entry.value = entryFor(intent) to entry.value.second + 1
+        if (intent.action == ACTION_READ_ALOUD || (intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_LAUNCHER))) entry.value = entryFor(intent) to entry.value.second + 1
     }
 
     /** The "Recorder" icon opens the recordings; the "Alyo" icon opens the front page. */
     private fun entryFor(intent: Intent?): String =
-        if (intent?.component?.className?.endsWith(".RecorderLauncher") == true || intent?.action == ACTION_RECORD) Routes.HOME else Routes.HUB
+        when {
+            intent?.component?.className?.endsWith(".RecorderLauncher") == true || intent?.action == ACTION_RECORD -> Routes.HOME
+            intent?.action == ACTION_READ_ALOUD -> Routes.READ
+            else -> Routes.HUB
+        }
 
     private fun readAction(intent: Intent?) {
         if (intent?.action == ACTION_RECORD) {
@@ -118,6 +123,9 @@ class MainActivity : ComponentActivity() {
     companion object {
         /** Open the app and start recording straight away. */
         const val ACTION_RECORD = "app.alyo.action.RECORD"
+
+        /** Open the app on the read-aloud page, where voices are chosen. */
+        const val ACTION_READ_ALOUD = "app.alyo.action.READ_ALOUD"
     }
 
     /**
@@ -144,6 +152,7 @@ private object Routes {
     /** The recordings. */
     const val HOME = "home"
     const val VOICE = "voice"
+    const val READ = "read"
     const val RECORD = "record"
     const val SETUP = "setup"
     const val SETTINGS = "settings"
@@ -189,6 +198,7 @@ private fun App(app: AlyoApp, entry: Pair<String, Int>, debugWav: File?, recordR
         if (entry.second > 0 && app.settings.onboarded && session == null) {
             forward = true
             stack.clear()
+            if (entry.first == Routes.READ) stack.add(Routes.HUB)
             stack.add(entry.first)
         }
     }
@@ -293,10 +303,12 @@ private fun App(app: AlyoApp, entry: Pair<String, Int>, debugWav: File?, recordR
                 if (finishInVoiceTyping) stack.add(Routes.VOICE) else if (features == setOf(Feature.RECORDER)) stack.add(Routes.HOME)
             }
             Routes.VOICE -> VoiceTypingScreen(app, onBack = ::pop, onSettings = { push(Routes.SETTINGS) })
+            Routes.READ -> ReadAloudScreen(app, onBack = ::pop, onSettings = { push(Routes.SETTINGS) })
             Routes.HUB -> HubScreen(
                 app = app,
                 onRecorder = { push(Routes.HOME) },
                 onVoiceTyping = { push(Routes.VOICE) },
+                onReadAloud = { push(Routes.READ) },
                 onSettings = { push(Routes.SETTINGS) },
             )
             Routes.SETTINGS -> SettingsScreen(app, onDone = ::pop, onLicenses = { push(Routes.LICENSES) }, onWhatsNew = notes?.let { { showNotes = true } })

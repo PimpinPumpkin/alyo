@@ -5,3 +5,8 @@
 -keep class app.alyo.llm.Llama { *; }
 -keep interface app.alyo.llm.Llama$Sink { *; }
 -keepclassmembers class * implements app.alyo.llm.Llama$Sink { *; }
+
+# The speech library calls back into this by exact name and signature from native code.
+-keepclassmembers class app.alyo.tts.VoiceEngine$* {
+    public java.lang.Integer invoke(float[]);
+}

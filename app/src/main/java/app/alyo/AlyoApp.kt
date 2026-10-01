@@ -18,6 +18,7 @@ import app.alyo.llm.Summarizer
 import app.alyo.service.DownloadService
 import app.alyo.service.LibraryJobs
 import app.alyo.service.RecorderController
+import app.alyo.tts.VoiceEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -43,6 +44,8 @@ class AlyoApp : Application() {
         private set
     lateinit var jobs: LibraryJobs
         private set
+    lateinit var voices: VoiceEngine
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -50,6 +53,7 @@ class AlyoApp : Application() {
         store = RecordingStore(this)
         models = ModelManager(this, scope)
         engine = AsrEngine(models)
+        voices = VoiceEngine(models)
         val diarizer = Diarizer(this, models)
         recorder = RecorderController(this, store, models, engine, settings, diarizer, scope)
         jobs = LibraryJobs(this, store, models, engine, settings, diarizer, scope)

@@ -38,6 +38,8 @@ private class Credit(val name: String, val by: String, val license: String, val 
  */
 private val CREDITS = listOf(
     Credit("Parakeet TDT 0.6B v2, v3 and 110M", "NVIDIA", "CC BY 4.0", "The speech models that write the finished transcript", "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3"),
+    Credit("Piper voices", "The Piper and Open Home Foundation contributors, and each voice's speaker", "Varies by voice, shown where voices are chosen", "The voices that read aloud", "https://huggingface.co/rhasspy/piper-voices"),
+    Credit("eSpeak NG", "The eSpeak NG authors", "GPL 3.0", "Turns spelling into sounds for the voices", "https://github.com/espeak-ng/espeak-ng"),
     Credit("Kroko ASR", "Banafo", "CC BY-SA 4.0", "The live speech models for German, French and Spanish", "https://huggingface.co/Banafo/Kroko-ASR"),
     Credit("FastConformer streaming transducer", "NVIDIA", "CC BY 4.0", "The speech model behind the live text", "https://huggingface.co/nvidia/stt_en_fastconformer_hybrid_large_streaming_multi"),
     Credit("CED tiny", "Heinrich Dinkel and Xiaomi", "Apache 2.0", "Tells music, applause and laughter from speech", "https://github.com/RicherMans/CED"),

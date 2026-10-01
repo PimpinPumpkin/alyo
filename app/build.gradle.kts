@@ -42,7 +42,7 @@ if (!sherpaAar.exists()) {
 val ortSlim = layout.projectDirectory.file("libs/onnxruntime/arm64-v8a/libonnxruntime.so").asFile
 if (!ortSlim.exists()) {
     try {
-        fetch(ortSlim, "$mirror/libonnxruntime-1.28.2-alyo2-arm64-v8a.so")
+        fetch(ortSlim, "$mirror/libonnxruntime-1.28.2-alyo3-arm64-v8a.so")
     } catch (e: java.io.IOException) {
         logger.warn("Trimmed ONNX Runtime not available (${e.message}); packaging the full one from the AAR.")
     }

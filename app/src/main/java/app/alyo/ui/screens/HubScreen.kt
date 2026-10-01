@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.KeyboardVoice
+import androidx.compose.material.icons.rounded.RecordVoiceOver
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,6 +51,7 @@ val Feature.icon: ImageVector
     get() = when (this) {
         Feature.RECORDER -> Icons.Rounded.GraphicEq
         Feature.VOICE_TYPING -> Icons.Rounded.KeyboardVoice
+        Feature.READ_ALOUD -> Icons.Rounded.RecordVoiceOver
     }
 
 /**
@@ -58,14 +60,15 @@ val Feature.icon: ImageVector
  * touching what it has saved.
  */
 @Composable
-fun HubScreen(app: AlyoApp, onRecorder: () -> Unit, onVoiceTyping: () -> Unit, onSettings: () -> Unit) {
+fun HubScreen(app: AlyoApp, onRecorder: () -> Unit, onVoiceTyping: () -> Unit, onReadAloud: () -> Unit, onSettings: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val features by app.settings.features.collectAsState()
     val recordings by app.store.recordings.collectAsState()
     val states by app.models.states.collectAsState()
     val quality by app.settings.quality.collectAsState()
     val language by app.settings.language.collectAsState()
-    val progress = remember(states, quality, language, features) { modelProgress(app.settings.downloads, states) }
+    val voice by app.settings.voice.collectAsState()
+    val progress = remember(states, quality, language, features, voice) { modelProgress(app.settings.downloads, states) }
 
     Column(
         Modifier.fillMaxSize().background(colors.surface).statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState()),
@@ -86,16 +89,17 @@ fun HubScreen(app: AlyoApp, onRecorder: () -> Unit, onVoiceTyping: () -> Unit, o
             )
 
             if (features.isNotEmpty() && !progress.ready) {
-                Surface(onClick = onSettings, shape = RoundedCornerShape(28.dp), color = colors.tertiaryContainer, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                // Speech models are chosen in Settings; a voice on its own is chosen on its own page.
+                Surface(onClick = if (app.settings.hearing) onSettings else onReadAloud, shape = RoundedCornerShape(28.dp), color = colors.tertiaryContainer, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                     Column(Modifier.padding(20.dp)) {
                         Text(
-                            if (progress.downloading) "Downloading the speech model" else "Get the speech model",
+                            if (progress.downloading) "Downloading" else "One download to finish",
                             style = MaterialTheme.typography.titleLarge,
                             color = colors.onTertiaryContainer,
                         )
                         Text(
                             if (progress.downloading) "${formatBytes(progress.doneBytes)} of ${formatBytes(progress.totalBytes)}. You can leave the app."
-                            else "Nothing can be turned into text until it is on the phone. Tap to choose and download.",
+                            else "What you turned on needs ${formatBytes(progress.totalBytes - progress.doneBytes)} of models on the phone before it can work. Tap to choose and download.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = colors.onTertiaryContainer,
                         )
@@ -120,6 +124,13 @@ fun HubScreen(app: AlyoApp, onRecorder: () -> Unit, onVoiceTyping: () -> Unit, o
                 status = "Set up, settings and a place to try it",
                 onOpen = onVoiceTyping,
                 onToggle = { app.settings.setFeature(Feature.VOICE_TYPING, it) },
+            )
+            FeatureCard(
+                feature = Feature.READ_ALOUD,
+                on = Feature.READ_ALOUD in features,
+                status = "${app.settings.voiceSpec.title}. Voices, speed and a place to try it",
+                onOpen = onReadAloud,
+                onToggle = { app.settings.setFeature(Feature.READ_ALOUD, it) },
             )
             Spacer(Modifier.padding(bottom = 24.dp))
         }

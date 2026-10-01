@@ -36,7 +36,12 @@ class Settings(context: Context) {
     val neededModels: List<ModelSpec> get() = listOfNotNull(pack.live, chosenQuality.refiner)
 
     /** Everything to download for the features in use: the speech models, and the voice model if recordings are to be labeled by speaker. */
-    val downloads: List<ModelSpec> get() = neededModels + listOfNotNull(ModelCatalog.speakers.takeIf { speakerLabels.value && Feature.RECORDER in features.value })
+    val downloads: List<ModelSpec>
+        get() = (if (hearing) neededModels else emptyList()) +
+            listOfNotNull(ModelCatalog.speakers.takeIf { speakerLabels.value && Feature.RECORDER in features.value }, voiceSpec.takeIf { Feature.READ_ALOUD in features.value })
+
+    /** True when a feature that turns speech into text is on, so the speech models are needed. */
+    val hearing: Boolean get() = Feature.RECORDER in features.value || Feature.VOICE_TYPING in features.value
 
     private val _quality = MutableStateFlow(prefs.getString(QUALITY, null) ?: recommendedQuality(context))
     val quality: StateFlow<String> = _quality
@@ -150,6 +155,25 @@ class Settings(context: Context) {
         _keepWarmMinutes.value = minutes
     }
 
+    private val _voice = MutableStateFlow(prefs.getString(VOICE, null) ?: ModelCatalog.voiceFor(java.util.Locale.getDefault()).id)
+    /** The voice that reads aloud, by model id. Starts as the first one for the phone's language. */
+    val voice: StateFlow<String> = _voice
+    val voiceSpec: ModelSpec get() = ModelCatalog.voices.firstOrNull { it.id == _voice.value } ?: ModelCatalog.voices.first()
+
+    fun setVoice(id: String) {
+        prefs.edit { putString(VOICE, id) }
+        _voice.value = id
+    }
+
+    private val _speechRate = MutableStateFlow(prefs.getFloat(SPEECH_RATE, 1f))
+    /** How fast Alyo reads, on top of whatever speed the app asking for speech wants. 1 is natural. */
+    val speechRate: StateFlow<Float> = _speechRate
+
+    fun setSpeechRate(rate: Float) {
+        prefs.edit { putFloat(SPEECH_RATE, rate) }
+        _speechRate.value = rate
+    }
+
     private val packages = context.packageManager
     private val packageName = context.packageName
 
@@ -193,6 +217,9 @@ class Settings(context: Context) {
         private const val STOP_AFTER = "stop_after_seconds"
         private const val SPOKEN_PUNCTUATION = "spoken_punctuation"
         private const val KEEP_WARM = "keep_warm_minutes"
+        val SPEECH_RATES = listOf(0.8f, 1f, 1.2f, 1.5f, 2f)
+        private const val VOICE = "voice"
+        private const val SPEECH_RATE = "speech_rate"
         private const val FEATURES = "features"
         private const val ONBOARDED = "onboarded"
 
@@ -234,5 +261,10 @@ enum class Feature(val title: String, val summary: String, val components: List<
         "Voice typing",
         "Dictate into any app. The microphone key on your keyboard opens it.",
         listOf(".ime.AlyoIme", ".recognition.AlyoRecognitionService", ".recognition.RecognizeActivity"),
+    ),
+    READ_ALOUD(
+        "Read aloud",
+        "A voice for the phone. Reads text you share or select, and speaks for any app that talks.",
+        listOf(".tts.AlyoTtsService", ".tts.CheckVoiceData", ".tts.InstallVoiceData", ".tts.SampleText", ".tts.ReadAloudActivity"),
     ),
 }

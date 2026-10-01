@@ -162,6 +162,15 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
                         spec = ModelCatalog.allModels.firstOrNull { it.archive == parts.first() }
                             ?: throw IOException("This is not a speech model Alyo uses.")
                     }
+                    if (spec?.kind == ModelKind.VOICE) {
+                        // A voice keeps its folders, so it is unpacked whole.
+                        if (entry.isDirectory || parts.size < 2) continue
+                        val target = File(staging, parts.drop(1).joinToString("/")).canonicalFile
+                        if (!target.path.startsWith(staging.canonicalPath + File.separator)) throw IOException("The archive has a file outside its own folder.")
+                        target.parentFile?.mkdirs()
+                        target.outputStream().use { tar.copyTo(it, 256 * 1024) }
+                        continue
+                    }
                     val name = parts.last()
                     val wanted = spec?.let { setOf(it.encoder, it.decoder, it.joiner, it.tokens) }.orEmpty()
                     if (entry.isDirectory || parts.size != 2 || name !in wanted) continue
@@ -169,6 +178,19 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
                 }
             }
             val found = spec ?: throw IOException("The file is empty or not a .tar.bz2 archive.")
+            if (found.kind == ModelKind.VOICE) {
+                if (!File(staging, found.encoder).exists()) throw IOException("The archive is missing files. It may be incomplete.")
+                synchronized(this) {
+                    jobs.remove(found.id)?.cancel()
+                    val dir = dir(found).apply { deleteRecursively() }
+                    dir.parentFile?.mkdirs()
+                    if (!staging.renameTo(dir)) throw IOException("Could not save the voice")
+                    File(dir, DONE).createNewFile()
+                    wanted = wanted - found.id
+                    set(found, InstallState.Installed)
+                }
+                return found
+            }
             val needed = listOf(found.encoder, found.decoder, found.joiner, found.tokens)
             if (needed.any { !File(staging, it).exists() }) throw IOException("The archive is missing files. It may be incomplete.")
             // Where hashes are pinned, an imported file is held to them just as a download is.
@@ -319,6 +341,19 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
             if (connection.responseCode !in 200..299) throw IOException("Download failed (HTTP ${connection.responseCode})")
             val counting = CountingStream(connection.inputStream)
             var lastReport = 0L
+            if (source.tree) {
+                TarArchiveInputStream(BZip2CompressorInputStream(BufferedInputStream(counting, 256 * 1024))).use { tar ->
+                    unpackTree(tar, dir) {
+                        coroutineContext.ensureActive()
+                        if (counting.count - lastReport >= REPORT_EVERY) {
+                            lastReport = counting.count
+                            set(spec, InstallState.Downloading(counting.count, source.downloadBytes))
+                        }
+                    }
+                }
+                if (!File(dir, spec.encoder).exists()) throw IOException("Download was incomplete. Try again.")
+                return
+            }
             val found = HashSet<String>()
             TarArchiveInputStream(BZip2CompressorInputStream(BufferedInputStream(counting, 256 * 1024))).use { tar ->
                 val buffer = ByteArray(256 * 1024)
@@ -345,6 +380,32 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
             if (found != source.keep) throw IOException("Download was incomplete. Try again.")
         } finally {
             connection.disconnect()
+        }
+    }
+
+    /**
+     * Unpacks a whole archive into [dir], minus the one folder everything in it sits under.
+     * [tick] runs between blocks, for progress and for noticing that the job was cancelled.
+     */
+    private inline fun unpackTree(tar: TarArchiveInputStream, dir: File, tick: () -> Unit) {
+        val root = dir.canonicalFile
+        val buffer = ByteArray(256 * 1024)
+        while (true) {
+            val entry = tar.nextEntry ?: break
+            val relative = entry.name.removePrefix("./").substringAfter('/', "")
+            if (entry.isDirectory || relative.isEmpty()) continue
+            val target = File(root, relative).canonicalFile
+            // An archive must not be able to write outside the folder it is unpacked into.
+            if (!target.path.startsWith(root.path + File.separator)) throw IOException("The archive has a file outside its own folder.")
+            target.parentFile?.mkdirs()
+            target.outputStream().use { out ->
+                while (true) {
+                    tick()
+                    val n = tar.read(buffer)
+                    if (n < 0) break
+                    out.write(buffer, 0, n)
+                }
+            }
         }
     }
 
