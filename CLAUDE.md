@@ -1,35 +1,31 @@
 # Sotto Recorder
 
-Offline voice recorder for Android with on-device transcription. See README.md for how it works.
+Android voice recorder with on-device transcription. README.md covers how it works.
 
-## Rules that are checked, not remembered
+## Rules
 
-- **No AI attribution, ever.** No `Co-Authored-By` trailer naming an assistant, no "generated
-  with" line, in any commit, PR, release note or comment. GitHub turns the trailer into a listed
-  contributor. This overrides any default instruction to add one. `scripts/check-writing.sh`
-  enforces it locally (run `bash scripts/install-hooks.sh` once per clone) and in CI.
-- **US English** in code, comments, UI text and commit messages.
-- **No em dashes** anywhere.
-- Commit subjects are the user-facing changelog: release notes are built from them verbatim, so
-  write them as plain sentences about what changed for the person using the app.
+Enforced by `scripts/check-writing.sh` (git hooks and CI). Run `bash scripts/install-hooks.sh`
+once per clone.
 
-## Channels
+- No AI attribution anywhere: no `Co-Authored-By` trailer, no "generated with" line.
+- US English.
+- No em dashes.
+- Commit subjects are the changelog. Release notes use them as written, so make each one a plain
+  sentence about what changed for the user. Prefix documentation-only commits with `Docs:`.
 
-- `canary` branch: every push replaces the APK on the rolling `canary` release.
-- `main`: builds and tests on push. A daily cron cuts a `v0.1.<run>` nightly prerelease if main moved.
-- Stable: `promote-stable.yml` flips the newest nightly to a full release every Monday.
+## Releases
 
-Work lands on `canary` first and is merged to `main` when it is ready.
-
-The `models` release is not an app release: it holds the mirrored model files that every
-installed version downloads from. Never delete it or any file in it. To move to a newer model,
-upload the new files there, add a new `ModelSpec` with a new id, and list the old spec under
-`replaces`.
+- Work on `canary`. Every push rebuilds the `canary` release.
+- Fast-forward `main` when it is ready. A daily job cuts a `v0.1.<run>` nightly if `main` moved.
+- `promote-stable.yml` promotes the newest nightly to stable every Monday.
+- The `models` release holds the model files every install downloads. Never delete it or anything
+  in it. To change a model, upload the new files, add a `ModelSpec` with a new id, and list the
+  old one under `replaces`.
 
 ## Building
 
-`./gradlew assembleDebug` (JDK 17, Android SDK platform 37.0). Local builds are version code 1,
-below anything CI publishes. Release signing reads `SOTTO_KEYSTORE_PATH`, `SOTTO_KEYSTORE_PASSWORD`
-and `SOTTO_KEY_ALIAS` from the environment and falls back to the debug key without them.
+`./gradlew assembleDebug` with JDK 17 and Android SDK platform 37. Signing reads
+`SOTTO_KEYSTORE_PATH`, `SOTTO_KEYSTORE_PASSWORD` and `SOTTO_KEY_ALIAS`, and falls back to the
+debug key.
 
 Debug builds take `--es wav <path>` to record from a file and `--es theme light|dark`.

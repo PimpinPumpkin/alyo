@@ -100,15 +100,17 @@ jobs:
 
       - name: Derive build version
         id: ver
-        # One rising line for every channel (1000 + run), so moving between canary, nightly and
+        # One rising line for every channel (2000 + run), so moving between canary, nightly and
         # stable is always a plain upgrade. Only the NAME says which channel a build came from.
+        # The run number belongs to this workflow file: renaming the file restarts it at 1, so
+        # raise the 2000 if that ever happens, or version codes will go backwards.
         run: |
           if [ "${{ github.ref }}" = "refs/heads/canary" ]; then
             echo "name=0.1.${{ github.run_number }}-canary" >> "$GITHUB_OUTPUT"
           else
             echo "name=0.1.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
           fi
-          echo "code=$(( 1000 + ${{ github.run_number }} ))" >> "$GITHUB_OUTPUT"
+          echo "code=$(( 2000 + ${{ github.run_number }} ))" >> "$GITHUB_OUTPUT"
 
       - name: Write the What's new notes
         # The app shows these after an update, and it does not go online for them: the only thing
