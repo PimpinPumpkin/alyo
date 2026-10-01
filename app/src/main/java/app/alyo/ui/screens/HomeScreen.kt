@@ -355,16 +355,27 @@ private fun RecordingCard(
             }
             Row(Modifier.padding(end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(shortDate(meta.createdAt), style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant)
-                if (meta.pendingRefine > 0 || meta.id in labeling) {
-                    Spacer(Modifier.width(12.dp))
-                    LoadingIndicator(Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text(if (job?.progress != null) "Transcribing ${(job.progress * 100).toInt()}%" else if (meta.pendingRefine > 0) "Polishing transcript" else "Labeling speakers", style = MaterialTheme.typography.bodySmall, color = colors.primary)
-                }
                 Spacer(Modifier.weight(1f))
                 Text(formatStamp(meta.durationMs), style = MaterialTheme.typography.bodyLarge.copy(fontFeatureSettings = "tnum"), color = colors.onSurfaceVariant)
             }
-            Spacer(Modifier.height(20.dp))
+            // What is still being done to it gets a line of its own, so the date and length stay put.
+            val working = meta.pendingRefine > 0 || meta.id in labeling
+            if (working) {
+                Row(Modifier.padding(top = 10.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    LoadingIndicator(Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        when {
+                            job?.progress != null -> "Transcribing ${(job.progress * 100).toInt()}%"
+                            meta.pendingRefine > 0 -> "Polishing the transcript"
+                            else -> "Working out who is speaking"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.primary,
+                    )
+                }
+            }
+            Spacer(Modifier.height(if (working) 12.dp else 20.dp))
             SpeechBar(peaks, Modifier.padding(end = 12.dp), sounds = sounds, durationMs = meta.durationMs)
         }
     }

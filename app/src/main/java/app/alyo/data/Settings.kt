@@ -174,6 +174,7 @@ class Settings(context: Context) {
         _speechRate.value = rate
     }
 
+    private val appContext = context.applicationContext
     private val packages = context.packageManager
     private val packageName = context.packageName
 
@@ -195,13 +196,47 @@ class Settings(context: Context) {
         val now = if (on) _features.value + feature else _features.value - feature
         prefs.edit { putStringSet(FEATURES, now.map { it.name }.toSet()) }
         _features.value = now
-        for (component in feature.components) {
-            packages.setComponentEnabledSetting(
-                ComponentName(packageName, "app.alyo$component"),
-                if (on) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                PackageManager.DONT_KILL_APP,
-            )
+        for (component in feature.components) enable(component, on)
+        if (feature == Feature.RECORDER) {
+            // The icon of its own only makes sense while there is a recorder to open.
+            if (!on) setRecorderIcon(false)
+            recordShortcut(on)
         }
+    }
+
+    private fun enable(component: String, on: Boolean) = packages.setComponentEnabledSetting(
+        ComponentName(packageName, "app.alyo$component"),
+        if (on) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+        PackageManager.DONT_KILL_APP,
+    )
+
+    private val _recorderIcon = MutableStateFlow(
+        packages.getComponentEnabledSetting(ComponentName(packageName, "app.alyo.RecorderLauncher")) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+    )
+    /**
+     * Whether the recorder has a home screen icon of its own. Off by default: one icon, which
+     * opens the recordings. On, "Recorder" opens the recordings and "Alyo" opens the front page.
+     */
+    val recorderIcon: StateFlow<Boolean> = _recorderIcon
+
+    fun setRecorderIcon(on: Boolean) {
+        enable(".RecorderLauncher", on)
+        _recorderIcon.value = on
+    }
+
+    /** "New recording" in the menu that a long press on the icon brings up, only while there is a recorder. */
+    private fun recordShortcut(on: Boolean) {
+        val manager = appContext.getSystemService(android.content.pm.ShortcutManager::class.java) ?: return
+        if (!on) {
+            manager.removeDynamicShortcuts(listOf("record"))
+            return
+        }
+        val shortcut = android.content.pm.ShortcutInfo.Builder(appContext, "record")
+            .setShortLabel(appContext.getString(app.alyo.R.string.shortcut_record))
+            .setIcon(android.graphics.drawable.Icon.createWithResource(appContext, app.alyo.R.drawable.ic_shortcut_record))
+            .setIntent(android.content.Intent(app.alyo.MainActivity.ACTION_RECORD, null, appContext, app.alyo.MainActivity::class.java))
+            .build()
+        runCatching { manager.dynamicShortcuts = listOf(shortcut) }
     }
 
     /**
@@ -255,7 +290,7 @@ enum class Feature(val title: String, val summary: String, val components: List<
     RECORDER(
         "Recorder",
         "Record and get a transcript as you talk, with speaker labels, search and summaries.",
-        listOf(".RecorderLauncher", ".service.RecordTile", ".service.RecordWidget", ".export.LibraryProvider"),
+        listOf(".service.RecordTile", ".service.RecordWidget", ".export.LibraryProvider"),
     ),
     VOICE_TYPING(
         "Voice typing",

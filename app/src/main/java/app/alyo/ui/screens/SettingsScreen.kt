@@ -1,5 +1,6 @@
 package app.alyo.ui.screens
 
+import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -208,11 +209,12 @@ private fun Lockup(room: Dp) {
 }
 
 @Composable
-fun SettingsScreen(app: AlyoApp, onDone: () -> Unit, onLicenses: () -> Unit, onWhatsNew: (() -> Unit)?) {
+fun SettingsScreen(app: AlyoApp, onDone: () -> Unit, onLicenses: () -> Unit, onWhatsNew: (() -> Unit)?, onFeature: (Feature) -> Unit = {}) {
     val colors = MaterialTheme.colorScheme
     val context = LocalContext.current
     val features by app.settings.features.collectAsState()
     val recorder = Feature.RECORDER in features
+    val recorderIcon by app.settings.recorderIcon.collectAsState()
     val stopAfter by app.settings.stopAfterSeconds.collectAsState()
     val spoken by app.settings.spokenPunctuation.collectAsState()
     val keepWarm by app.settings.keepWarmMinutes.collectAsState()
@@ -227,14 +229,21 @@ fun SettingsScreen(app: AlyoApp, onDone: () -> Unit, onLicenses: () -> Unit, onW
         }
         Column(Modifier.weight(1f).widthIn(max = 640.dp).align(Alignment.CenterHorizontally).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
             SectionTitle("Features")
+            // The switch turns a feature on or off; the row itself opens its page.
             SheetGroup(
                 Feature.entries.map { feature ->
+                    val on = feature in features
                     SheetRow(
                         feature.icon,
                         feature.title,
-                        detail = feature.summary,
-                        trailing = { Switch(checked = feature in features, onCheckedChange = null) },
-                        onClick = { app.settings.setFeature(feature, feature !in features) },
+                        detail = when {
+                            !on -> feature.summary
+                            feature == Feature.VOICE_TYPING -> "Set up, and a place to try it"
+                            feature == Feature.READ_ALOUD -> "Voices, speed, and a place to try it"
+                            else -> feature.summary
+                        },
+                        trailing = { Switch(checked = on, onCheckedChange = { app.settings.setFeature(feature, it) }) },
+                        onClick = { if (on) onFeature(feature) else app.settings.setFeature(feature, true) },
                     )
                 },
             )
@@ -289,7 +298,7 @@ fun SettingsScreen(app: AlyoApp, onDone: () -> Unit, onLicenses: () -> Unit, onW
                             speakerState.works -> "On. Speakers are labeled when a recording finishes."
                             speakerState is InstallState.Downloading -> "Downloading the voice model, ${(speakerState.fraction * 100).toInt()}%"
                             speakerState is InstallState.Failed -> "Download failed. Tap twice to try again."
-                            else -> "Needs the voice model, which downloads with the speech model below."
+                            else -> "Needs the voice model, which downloads with the speech model."
                         },
                         trailing = { Switch(checked = speakerLabels, onCheckedChange = null) },
                         onClick = {
@@ -328,6 +337,13 @@ fun SettingsScreen(app: AlyoApp, onDone: () -> Unit, onLicenses: () -> Unit, onW
                             app.settings.setTheme(order[(order.indexOf(theme) + 1) % order.size])
                         },
                     ),
+                    if (recorder) SheetRow(
+                        Icons.Rounded.Apps,
+                        "Separate Recorder icon",
+                        detail = if (recorderIcon) "\"Recorder\" opens the recordings and \"Alyo\" opens the front page" else "One icon. It opens the recordings.",
+                        trailing = { Switch(checked = recorderIcon, onCheckedChange = null) },
+                        onClick = { app.settings.setRecorderIcon(!recorderIcon) },
+                    ) else null,
                     if (recorder) SheetRow(
                         Icons.Rounded.FolderShared,
                         "Show in the file picker",

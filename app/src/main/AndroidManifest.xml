@@ -38,9 +38,10 @@
             android:windowSoftInputMode="adjustResize" />
 
         <!--
-            Two icons, one app. "Alyo" is always there. "Recorder" opens straight into the
-            recordings and exists only while the recorder is turned on: it starts disabled, like
-            everything else that belongs to one feature, and Settings enables it.
+            One icon, "Alyo". With the recorder turned on it opens the recordings; otherwise it
+            opens the front page. A second icon named "Recorder" is there for anyone who wants
+            the two apart: it starts disabled and a switch in Settings enables it, after which
+            "Alyo" goes back to opening the front page.
         -->
         <activity-alias
             android:name=".Launcher"
@@ -61,9 +62,6 @@
             android:roundIcon="@mipmap/ic_recorder"
             android:label="@string/recorder_name"
             android:targetActivity=".MainActivity">
-            <meta-data
-                android:name="android.app.shortcuts"
-                android:resource="@xml/shortcuts" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

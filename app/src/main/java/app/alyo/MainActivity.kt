@@ -111,6 +111,8 @@ class MainActivity : ComponentActivity() {
         when {
             intent?.component?.className?.endsWith(".RecorderLauncher") == true || intent?.action == ACTION_RECORD -> Routes.HOME
             intent?.action == ACTION_READ_ALOUD -> Routes.READ
+            // With one icon, the recorder is the app's face whenever it is turned on.
+            (application as AlyoApp).settings.let { Feature.RECORDER in it.features.value && !it.recorderIcon.value } -> Routes.HOME
             else -> Routes.HUB
         }
 
@@ -294,13 +296,12 @@ private fun App(app: AlyoApp, entry: Pair<String, Int>, debugWav: File?, recordR
             }
             Routes.SETUP -> SetupScreen(app) { finishInVoiceTyping ->
                 app.settings.setOnboarded()
-                // With only the recorder chosen there is nothing on the front page to choose
-                // between, so go straight to it.
+                // The recorder, when chosen, is where the app opens.
                 val features = app.settings.features.value
                 forward = true
                 stack.clear()
-                stack.add(Routes.HUB)
-                if (finishInVoiceTyping) stack.add(Routes.VOICE) else if (features == setOf(Feature.RECORDER)) stack.add(Routes.HOME)
+                stack.add(if (Feature.RECORDER in features) Routes.HOME else Routes.HUB)
+                if (finishInVoiceTyping) stack.add(Routes.VOICE)
             }
             Routes.VOICE -> VoiceTypingScreen(app, onBack = ::pop, onSettings = { push(Routes.SETTINGS) })
             Routes.READ -> ReadAloudScreen(app, onBack = ::pop, onSettings = { push(Routes.SETTINGS) })
@@ -311,7 +312,19 @@ private fun App(app: AlyoApp, entry: Pair<String, Int>, debugWav: File?, recordR
                 onReadAloud = { push(Routes.READ) },
                 onSettings = { push(Routes.SETTINGS) },
             )
-            Routes.SETTINGS -> SettingsScreen(app, onDone = ::pop, onLicenses = { push(Routes.LICENSES) }, onWhatsNew = notes?.let { { showNotes = true } })
+            Routes.SETTINGS -> SettingsScreen(
+                app,
+                onDone = ::pop,
+                onLicenses = { push(Routes.LICENSES) },
+                onWhatsNew = notes?.let { { showNotes = true } },
+                onFeature = { feature ->
+                    when (feature) {
+                        Feature.VOICE_TYPING -> push(Routes.VOICE)
+                        Feature.READ_ALOUD -> push(Routes.READ)
+                        Feature.RECORDER -> Unit
+                    }
+                },
+            )
             Routes.LICENSES -> LicensesScreen(onBack = ::pop)
             else -> HomeScreen(
                 app = app,

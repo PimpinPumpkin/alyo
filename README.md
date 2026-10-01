@@ -46,7 +46,8 @@ Voice typing and the recorder use the same speech models, so those are downloade
 - **Export** audio, text, subtitles or word timings.
 - **Background playback**, lock screen controls, a widget and a quick settings tile.
 - **Back up and restore** the whole library.
-- **Its own icon.** With the recorder on, a "Recorder" icon opens straight into it.
+- **One icon.** With the recorder on, Alyo opens straight into your recordings, and the other
+  features are a tap away in Settings. A separate "Recorder" icon is there if you want one.
 
 ## Read aloud
 
