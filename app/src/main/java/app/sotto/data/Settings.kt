@@ -1,0 +1,39 @@
+package app.sotto.data
+
+import android.app.ActivityManager
+import android.content.Context
+import androidx.core.content.edit
+import app.sotto.asr.LanguagePack
+import app.sotto.asr.ModelCatalog
+import app.sotto.asr.Quality
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+
+class Settings(context: Context) {
+    private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    private val totalRamBytes: Long = ActivityManager.MemoryInfo().also {
+        (context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).getMemoryInfo(it)
+    }.totalMem
+
+    private val _language = MutableStateFlow(prefs.getString(LANGUAGE, "en")!!)
+    val language: StateFlow<String> = _language
+
+    private val _quality = MutableStateFlow(prefs.getString(QUALITY, null) ?: recommendedQuality())
+    val quality: StateFlow<String> = _quality
+
+    val pack: LanguagePack get() = ModelCatalog.language(_language.value)
+    val chosenQuality: Quality get() = pack.qualities.firstOrNull { it.id == _quality.value } ?: pack.qualities.first()
+
+    fun setQuality(id: String) {
+        prefs.edit { putString(QUALITY, id) }
+        _quality.value = id
+    }
+
+    /** The large model wants about a gigabyte of headroom; phones sold as "6 GB" report roughly 5.5. */
+    fun recommendedQuality(): String = if (totalRamBytes >= 5L * 1024 * 1024 * 1024) "best" else "light"
+
+    private companion object {
+        const val LANGUAGE = "language"
+        const val QUALITY = "quality"
+    }
+}
