@@ -1,5 +1,11 @@
 package app.alyo.ui.screens
 
+import android.content.Context
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Button
+import android.content.Intent
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.material.icons.rounded.History
 import app.alyo.service.LibraryJobs
@@ -169,6 +175,12 @@ fun HomeScreen(
             else -> SetupState.Ready
         }
     }
+    // A folder of recordings left by an earlier install, which this one cannot see until asked to.
+    val reconnectPrefs = remember { context.getSharedPreferences("ui", Context.MODE_PRIVATE) }
+    var fromBefore by remember { mutableStateOf(false) }
+    LaunchedEffect(all.isEmpty()) {
+        fromBefore = !reconnectPrefs.getBoolean("reconnect_dismissed", false) && withContext(Dispatchers.IO) { app.library.hasFolderFromBefore() }
+    }
     val colors = MaterialTheme.colorScheme
 
     // Focusable so that when a dialog closes, focus comes back here and not to the search field,
@@ -189,6 +201,14 @@ fun HomeScreen(
                 bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 160.dp,
             ),
         ) {
+            if (fromBefore && query.isBlank()) {
+                item(key = "reconnect", span = { GridItemSpan(maxLineSpan) }) {
+                    ReconnectCard(app, onDismiss = {
+                        reconnectPrefs.edit().putBoolean("reconnect_dismissed", true).apply()
+                        fromBefore = false
+                    })
+                }
+            }
             if (setup != SetupState.Ready && query.isBlank()) {
                 item(key = "setup", span = { GridItemSpan(maxLineSpan) }) { SetupCard(setup, onSettings) }
             }
@@ -447,6 +467,39 @@ private fun EmptyState(searching: Boolean, modifier: Modifier = Modifier) {
             color = colors.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
+    }
+}
+
+/** Offers to bring back the recordings of an earlier install, which sit in a folder this one has to be let into. */
+@Composable
+private fun ReconnectCard(app: AlyoApp, onDismiss: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
+        scope.launch {
+            val found = app.library.moveTo(uri.toString())
+            Toast.makeText(context, if (found == 0) "No recordings were found in that folder" else if (found == 1) "1 recording is back" else "$found recordings are back", Toast.LENGTH_LONG).show()
+            onDismiss()
+        }
+    }
+    Surface(shape = RoundedCornerShape(24.dp), color = colors.secondaryContainer, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        Column(Modifier.padding(20.dp)) {
+            Text("Recordings from before?", style = MaterialTheme.typography.titleMedium, color = colors.onSecondaryContainer)
+            Text(
+                "There is an Alyo folder in Documents from an earlier install. Android keeps it closed to a fresh install until you open it: tap Open folder, then Use this folder, and the recordings in it come back.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSecondaryContainer,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onDismiss) { Text("Not now") }
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = { picker.launch(app.library.defaultFolderHint) }) { Text("Open folder") }
+            }
+        }
     }
 }
 

@@ -323,26 +323,6 @@ object ModelCatalog {
         source = ModelSource.Files(emptyList()),
     )
 
-    /** The voice model Alyo first shipped. It split one person into several too readily. */
-    private val speakersCampplus = ModelSpec(
-        id = "speakers-campplus-voxceleb",
-        kind = ModelKind.SPEAKER_EMBEDDING,
-        title = "Speaker labels",
-        summary = "3D-Speaker CAM++ voice model",
-        encoder = "speakers.onnx",
-        speakerThreshold = 0.5f,
-        source = ModelSource.Files(
-            listOf(
-                ModelFile(
-                    "speakers.onnx",
-                    "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx",
-                    29_596_978,
-                    "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b",
-                ),
-            ),
-        ),
-    )
-
     /**
      * The download behind speaker labels. Language does not matter to it: a voice is a voice.
      * Chosen by counting speakers in recordings where the answer is known: of the six models
@@ -355,7 +335,6 @@ object ModelCatalog {
         summary = "NVIDIA TitaNet Large voice model",
         encoder = "speakers.onnx",
         speakerThreshold = 0.85f,
-        replaces = listOf(speakersCampplus),
         source = ModelSource.Files(
             listOf(
                 ModelFile(

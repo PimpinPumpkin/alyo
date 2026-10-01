@@ -226,8 +226,8 @@ models stay in memory for a few minutes so the next sentence starts at once.
   Cropping copies audio frames without re-encoding.
 - **Storage**: when a recording is saved its audio is moved to the recordings folder, with a
   `.alyo.json` file beside it holding the transcript, speakers, summary and waveform. The app
-  keeps only an index. After a reinstall, choosing that folder in Settings brings every recording
-  back.
+  keeps only an index. After a reinstall, Alyo notices the folder and offers to open it; one
+  confirmation in the system's folder picker brings every recording back.
 - **Read aloud**: [Piper](https://github.com/OHF-Voice/piper1-gpl) voices, with eSpeak NG turning
   spelling into sounds. Alyo registers as an Android text-to-speech engine, so it works wherever
   the phone speaks. On a Pixel 4a 5G a sentence is ready about six times faster than it is spoken.

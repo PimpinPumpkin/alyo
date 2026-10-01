@@ -51,7 +51,25 @@ class Library(private val context: Context, private val store: RecordingStore, p
     /** Where recordings are kept, for showing in Settings. */
     val label: String get() = vault()?.label ?: "Inside the app"
 
-    /** Brings every recording in line with the current folder. Call once the library has loaded. */
+    /**
+     * True when the default folder exists but holds nothing this install made, and the library is
+     * empty: the mark of an earlier install's recordings. Android will not show them to a new
+     * install until the user picks the folder, so this is the cue to ask.
+     */
+    fun hasFolderFromBefore(): Boolean {
+        if (settings.libraryLocation.value != Settings.LIBRARY_DEFAULT || store.recordings.value.isNotEmpty()) return false
+        val folder = java.io.File(android.os.Environment.getExternalStorageDirectory(), MediaVault.FOLDER)
+        return folder.isDirectory && runCatching { MediaVault(context).list().isEmpty() }.getOrDefault(false)
+    }
+
+    /** The default folder as the system's folder picker knows it, to open the picker right there. */
+    val defaultFolderHint: Uri
+        get() = android.provider.DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:" + MediaVault.FOLDER)
+
+    /**
+     * Brings every recording in line with the current folder: after the folder is changed, and at
+     * launch to finish any move that was cut short (the app was closed, a card was out).
+     */
     fun syncAll() = scope.launch(worker) {
         val all = store.recordings.value
         val behind = all.filter { needsMove(it) }

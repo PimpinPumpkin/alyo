@@ -43,7 +43,7 @@ class Settings(context: Context) {
     /** True when a feature that turns speech into text is on, so the speech models are needed. */
     val hearing: Boolean get() = Feature.RECORDER in features.value || Feature.VOICE_TYPING in features.value
 
-    private val _quality = MutableStateFlow(prefs.getString(QUALITY, null) ?: recommendedQuality(context))
+    private val _quality = MutableStateFlow(prefs.getString(QUALITY, null) ?: "light")
     val quality: StateFlow<String> = _quality
 
     val pack: LanguagePack get() = ModelCatalog.language(_language.value)
@@ -250,13 +250,6 @@ class Settings(context: Context) {
             .build()
         runCatching { manager.dynamicShortcuts = listOf(shortcut) }
     }
-
-    /**
-     * The lighter model is the default: a third of the download, and close enough that most people
-     * will never want the other. Someone who already has the large one keeps using it.
-     */
-    private fun recommendedQuality(context: Context): String =
-        if (java.io.File(context.filesDir, "models/en-parakeet-tdt-0.6b-v2").isDirectory) "best" else "light"
 
     companion object {
         const val LIBRARY_DEFAULT = "default"
