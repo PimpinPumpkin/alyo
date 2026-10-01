@@ -5,6 +5,19 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Column
+import app.sotto.data.SoundSpan
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.rounded.SentimentVerySatisfied
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -180,11 +193,21 @@ fun TranscriptView(
     onWordTap: (Word) -> Unit = {},
     onEditSegment: (Segment) -> Unit = {},
     onSelectionDrag: (startEdge: Boolean, word: Word) -> Unit = { _, _ -> },
+    sounds: List<SoundSpan> = emptyList(),
+    onSoundTap: (SoundSpan) -> Unit = {},
 ) {
     val livePartial = remember(partial) { if (partial.isEmpty()) null else Paragraph(listOf(Segment(Long.MAX_VALUE, partial)), live = true) }
+    // Each sound marker sits above the first paragraph that starts after it; the rest go at the end.
+    val before = remember(paragraphs, sounds) {
+        sounds.groupBy { sound -> paragraphs.indexOfFirst { it.startMs >= sound.startMs }.let { if (it < 0) paragraphs.size else it } }
+    }
     LazyColumn(modifier, state = listState, contentPadding = contentPadding) {
-        itemsIndexed(paragraphs, key = { _, p -> p.key }) { _, paragraph ->
+        itemsIndexed(paragraphs, key = { _, p -> p.key }) { index, paragraph ->
+            before[index]?.forEach { SoundMarker(it, onSoundTap) }
             ParagraphBlock(paragraph, positionMs, editing, query, selection, onWordTap, onEditSegment, onSelectionDrag)
+        }
+        before[paragraphs.size]?.let { trailing ->
+            item(key = "sounds-end") { trailing.forEach { SoundMarker(it, onSoundTap) } }
         }
         if (livePartial != null) {
             item(key = "partial") { ParagraphBlock(livePartial, null, false, "", null, {}, {}, { _, _ -> }) }
@@ -339,5 +362,32 @@ private fun ParagraphBlock(
                 // just outside the text, are still within reach of a finger.
                 .padding(horizontal = GUTTER),
         )
+    }
+}
+
+/** "Music 00:12", in the transcript where the music was. Tapping it plays from there. */
+@Composable
+private fun SoundMarker(sound: SoundSpan, onTap: (SoundSpan) -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        onClick = { onTap(sound) },
+        shape = CircleShape,
+        color = colors.tertiaryContainer,
+        contentColor = colors.onTertiaryContainer,
+        modifier = Modifier.padding(start = GUTTER, bottom = 20.dp),
+    ) {
+        Row(Modifier.padding(start = 12.dp, end = 16.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                when (sound.kind) {
+                    SoundSpan.MUSIC -> Icons.Rounded.MusicNote
+                    SoundSpan.LAUGHTER -> Icons.Rounded.SentimentVerySatisfied
+                    else -> Icons.Rounded.GraphicEq
+                },
+                null,
+                Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text("${sound.kind}  ${formatStamp(sound.startMs.toLong())}", style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"))
+        }
     }
 }

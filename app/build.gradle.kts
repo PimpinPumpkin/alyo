@@ -20,6 +20,26 @@ if (!sherpaAar.exists()) {
     tmp.renameTo(sherpaAar)
 }
 
+// The sound classifier (CED tiny, 6 MB) ships inside the APK: it is what tells music and applause
+// from speech, it is small, and bundling it means that works with no download at all. Like the
+// AAR it is fetched once at configuration time rather than kept in git.
+val soundsDir = layout.projectDirectory.dir("src/main/assets/sounds").asFile
+if (!File(soundsDir, "model.int8.onnx").exists()) {
+    val name = "sherpa-onnx-ced-tiny-audio-tagging-2024-04-19"
+    val url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/audio-tagging-models/$name.tar.bz2"
+    logger.lifecycle("Downloading $url")
+    val archive = File(layout.buildDirectory.asFile.get(), "$name.tar.bz2").apply { parentFile.mkdirs() }
+    URI(url).toURL().openStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
+    copy {
+        from(tarTree(resources.bzip2(archive))) {
+            include("**/model.int8.onnx", "**/class_labels_indices.csv")
+            eachFile { path = this.name }
+            includeEmptyDirs = false
+        }
+        into(soundsDir)
+    }
+}
+
 android {
     namespace = "app.sotto"
     compileSdk = 37
@@ -106,6 +126,11 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    // sherpa-onnx reads the bundled model straight out of the APK, which needs it stored uncompressed.
+    androidResources {
+        noCompress += "onnx"
     }
 
     packaging {

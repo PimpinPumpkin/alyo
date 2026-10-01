@@ -64,3 +64,17 @@ data class Summary(
 ) {
     val text: String get() = (listOf(title) + points.map { "- $it" }).filter { it.isNotBlank() }.joinToString("\n")
 }
+
+/** A stretch of a recording that is something other than talk: music, applause, laughter. */
+@Serializable
+data class SoundSpan(
+    val kind: String,
+    @SerialName("s") val startMs: Int,
+    @SerialName("e") val endMs: Int,
+) {
+    companion object {
+        const val MUSIC = "Music"
+        const val APPLAUSE = "Applause"
+        const val LAUGHTER = "Laughter"
+    }
+}

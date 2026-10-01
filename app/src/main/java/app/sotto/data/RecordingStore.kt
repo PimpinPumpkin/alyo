@@ -8,6 +8,7 @@ import app.sotto.audio.Span
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.util.UUID
@@ -67,6 +68,16 @@ class RecordingStore(context: Context) {
     }
 
     fun peaks(id: String): Peaks = Peaks.load(peaksFile(id))
+
+    private fun soundsFile(id: String) = File(dir(id), "sounds.json")
+
+    /** Where the recording is music, applause or laughter. Small and read on demand. */
+    fun sounds(id: String): List<SoundSpan> =
+        runCatching { json.decodeFromString<List<SoundSpan>>(soundsFile(id).readText()) }.getOrElse { emptyList() }
+
+    fun saveSounds(id: String, sounds: List<SoundSpan>) {
+        if (dir(id).exists()) soundsFile(id).writeText(json.encodeToString(ListSerializer(SoundSpan.serializer()), sounds))
+    }
 
     private val summaries = HashMap<String, MutableStateFlow<Summary?>>()
     private fun summaryFile(id: String) = File(dir(id), "summary.json")
@@ -155,10 +166,12 @@ class RecordingStore(context: Context) {
             if (asCopy) dir(targetId).deleteRecursively()
             return null
         }
+        val newSounds = sounds(id).keeping(snapped)
         val newPeaks = peaks(id).slice(snapped)
         val newTranscript = transcriptFlow(id).value.keeping(snapped)
         if (!temp.renameTo(audio(targetId))) return null
         newPeaks.save(peaksFile(targetId))
+        saveSounds(targetId, newSounds)
         if (asCopy) {
             writeTranscript(targetId, newTranscript)
             putMeta(

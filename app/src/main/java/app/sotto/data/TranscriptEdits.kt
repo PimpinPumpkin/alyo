@@ -81,3 +81,19 @@ fun Segment.withText(text: String): Segment? {
     fill(n, m, endMs)
     return copy(words = result, edited = true)
 }
+
+/** Sound markers of a recording cut down to [keep], following the same rules as the transcript. */
+fun List<SoundSpan>.keeping(keep: List<Span>): List<SoundSpan> {
+    var kept = 0L
+    val out = ArrayList<SoundSpan>()
+    for (span in keep) {
+        val shift = span.startMs - kept
+        for (sound in this) {
+            val start = maxOf(sound.startMs.toLong(), span.startMs)
+            val end = minOf(sound.endMs.toLong(), span.endMs)
+            if (end - start >= 1000) out += SoundSpan(sound.kind, (start - shift).toInt(), (end - shift).toInt())
+        }
+        kept += span.lengthMs
+    }
+    return out
+}

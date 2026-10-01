@@ -132,6 +132,7 @@ fun PlayerScreen(
     val transcript by app.store.transcript(id).collectAsState()
     val paragraphs = remember(transcript) { paragraphsOf(transcript.segments) }
     val peaks = remember(id, meta.durationMs) { app.store.peaks(id) }
+    val sounds = remember(id, meta.durationMs) { app.store.sounds(id) }
 
     val player = remember(id) { Player(context.applicationContext, background = true) }
     DisposableEffect(player) { onDispose { player.release() } }
@@ -152,8 +153,7 @@ fun PlayerScreen(
     LaunchedEffect(player, player.isPlaying, player.seekCount, player.durationMs) {
         position = player.positionMs
         while (player.isPlaying && isActive) {
-            withFrameNanos { }
-            position = player.positionMs
+            position = player.positionAt(withFrameNanos { it })
         }
     }
 
@@ -219,9 +219,10 @@ fun PlayerScreen(
                             peakCount = peaks.size,
                             positionMs = { position },
                             onScrub = { delta -> player.seekBy(delta) },
+                            sounds = sounds,
                             modifier = Modifier.fillMaxSize(),
                         )
-                    } else if (paragraphs.isEmpty()) {
+                    } else if (paragraphs.isEmpty() && sounds.isEmpty()) {
                         Column(Modifier.fillMaxSize().padding(horizontal = 40.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("No transcript", style = MaterialTheme.typography.titleLarge)
                             Spacer(Modifier.height(8.dp))
@@ -261,6 +262,8 @@ fun PlayerScreen(
                                 listState = listState,
                                 onWordTap = { word -> player.seekTo(word.startMs - LEAD_IN_MS) },
                                 onEditSegment = { segment -> player.pause(); editingSegment = segment },
+                                sounds = sounds,
+                                onSoundTap = { player.seekTo(it.startMs.toLong()); player.play() },
                                 modifier = Modifier.weight(1f).fillMaxWidth(),
                             )
                             if (editing) EditBar(onDone = { editing = false })
@@ -284,7 +287,7 @@ fun PlayerScreen(
                 }
                 ViewToggle(showTranscript, { showTranscript = it }, Modifier.align(Alignment.Center))
             }
-            SeekBar(peaks, meta.durationMs, positionMs = { position }, onSeek = player::seekTo, modifier = Modifier.padding(horizontal = 12.dp))
+            SeekBar(peaks, meta.durationMs, positionMs = { position }, onSeek = player::seekTo, sounds = sounds, modifier = Modifier.padding(horizontal = 12.dp))
             TimeLabels({ position }, meta.durationMs)
             TransportRow(player)
         }

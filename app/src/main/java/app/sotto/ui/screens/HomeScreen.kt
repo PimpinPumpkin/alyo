@@ -78,6 +78,7 @@ import app.sotto.asr.InstallState
 import app.sotto.audio.Peaks
 import app.sotto.audio.RecordingSession
 import app.sotto.data.RecordingMeta
+import app.sotto.data.SoundSpan
 import app.sotto.ui.components.RecordButton
 import app.sotto.ui.components.RecordingDot
 import app.sotto.ui.components.SpeechBar
@@ -275,6 +276,9 @@ private fun RecordingCard(
     val peaks by produceState<Peaks?>(null, meta.id, meta.durationMs) {
         value = withContext(Dispatchers.IO) { app.store.peaks(meta.id) }
     }
+    val sounds by produceState(emptyList<SoundSpan>(), meta.id, meta.durationMs) {
+        value = withContext(Dispatchers.IO) { app.store.sounds(meta.id) }
+    }
     Surface(shape = RoundedCornerShape(36.dp), color = colors.surfaceContainer, modifier = modifier.fillMaxWidth().padding(bottom = 12.dp)) {
         Column(Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick).padding(start = 24.dp, end = 12.dp, top = 12.dp, bottom = 28.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -299,7 +303,7 @@ private fun RecordingCard(
                 Text(formatStamp(meta.durationMs), style = MaterialTheme.typography.bodyLarge.copy(fontFeatureSettings = "tnum"), color = colors.onSurfaceVariant)
             }
             Spacer(Modifier.height(20.dp))
-            SpeechBar(peaks, Modifier.padding(end = 12.dp))
+            SpeechBar(peaks, Modifier.padding(end = 12.dp), sounds = sounds, durationMs = meta.durationMs)
         }
     }
 }

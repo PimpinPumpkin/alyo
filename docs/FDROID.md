@@ -25,6 +25,10 @@ JNI library and ONNX Runtime for arm64-v8a in the recipe's `build:` step, and po
 result instead of the downloaded AAR. llama.cpp should move from FetchContent to a submodule at
 the same time, since F-Droid's build has no network after checkout.
 
+The bundled sound classifier (CED tiny) is fetched as a file at build time for the same reason
+the AAR is, and would need to come from a source F-Droid accepts, or be downloaded at run time
+like the other models.
+
 ## Also needed
 
 - The repository has to be public.

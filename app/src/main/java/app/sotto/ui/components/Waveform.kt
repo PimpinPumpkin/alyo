@@ -33,6 +33,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import app.sotto.audio.AudioSpec
 import app.sotto.audio.Peaks
+import app.sotto.data.SoundSpan
 import app.sotto.ui.formatStamp
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -74,6 +75,8 @@ fun TapeWaveform(
     onScrub: ((deltaMs: Long) -> Unit)? = null,
     selection: (() -> Pair<Long, Long>)? = null,
     onSelection: (startMs: Long, endMs: Long) -> Unit = { _, _ -> },
+    sounds: List<SoundSpan> = emptyList(),
+    soundColor: Color = MaterialTheme.colorScheme.tertiary,
 ) {
     val frameColor = MaterialTheme.colorScheme.inverseSurface
     val gripColor = MaterialTheme.colorScheme.inverseOnSurface
@@ -129,8 +132,10 @@ fun TapeWaveform(
                 drawCircle(silenceColor, radius = 2.5.dp.toPx(), center = Offset(barX, centerY))
             } else {
                 val height = maxOf(12.dp.toPx(), shaped(level) * maxBar)
+                val middle = bar * BAR_MS + BAR_MS / 2
                 drawRoundRect(
-                    color = barColor,
+                    // Music and other non-speech sound gets its own color, so it reads at a glance.
+                    color = if (sounds.any { middle >= it.startMs && middle < it.endMs }) soundColor else barColor,
                     topLeft = Offset(barX - barWidth / 2f, centerY - height / 2f),
                     size = Size(barWidth, height),
                     cornerRadius = CornerRadius(barWidth / 2f),
@@ -181,6 +186,7 @@ fun SeekBar(
     modifier: Modifier = Modifier,
     selection: (() -> Pair<Long, Long>)? = null,
     onSelection: (startMs: Long, endMs: Long) -> Unit = { _, _ -> },
+    sounds: List<SoundSpan> = emptyList(),
 ) {
     val colors = MaterialTheme.colorScheme
     val measurer = rememberTextMeasurer()
@@ -264,7 +270,7 @@ fun SeekBar(
         val (from, to) = zoom ?: (0L to durationMs)
         fun x(ms: Long) = inset + ((ms - from).toFloat() / (to - from)).coerceIn(0f, 1f) * (size.width - inset * 2)
 
-        drawSpeechTrack(peaks, inset, size.width - inset, trackY, colors.primary, colors.outlineVariant, from, to, durationMs, thickness = (4f + 4f * magnify).dp.toPx())
+        drawSpeechTrack(peaks, inset, size.width - inset, trackY, colors.primary, colors.outlineVariant, from, to, durationMs, thickness = (4f + 4f * magnify).dp.toPx(), sounds = sounds, sound = colors.tertiary)
 
         selection?.invoke()?.let { (start, end) ->
             drawSelectionFrame(x(start), x(end), trackY - 20.dp.toPx(), trackY + 20.dp.toPx(), colors.inverseSurface, colors.inverseOnSurface, handle = 10.dp.toPx())
@@ -314,6 +320,8 @@ private fun DrawScope.drawSpeechTrack(
     toMs: Long = 1,
     durationMs: Long = 1,
     thickness: Float = 4.dp.toPx(),
+    sounds: List<SoundSpan> = emptyList(),
+    sound: Color = speech,
 ) {
     drawLine(silence, Offset(left, y), Offset(right, y), strokeWidth = thickness, cap = StrokeCap.Round)
     if (peaks.size == 0) return
@@ -335,19 +343,27 @@ private fun DrawScope.drawSpeechTrack(
             runStart = -1
         }
     }
+    // Music and the like, drawn over the top in its own color. These are in milliseconds, so they
+    // need the real duration; the library cards pass it for exactly this.
+    for (span in sounds) {
+        if (durationMs <= 1 || span.endMs <= fromMs || span.startMs >= toMs) continue
+        fun x(ms: Long) = left + ((ms - fromMs).toFloat() / (toMs - fromMs)).coerceIn(0f, 1f) * (right - left)
+        drawLine(sound, Offset(x(span.startMs.toLong()), y), Offset(x(span.endMs.toLong()), y), strokeWidth = thickness, cap = StrokeCap.Butt)
+    }
 }
 
 /** The speech-and-silence line on its own, as shown on each recording in the library. */
 @Composable
-fun SpeechBar(peaks: Peaks?, modifier: Modifier = Modifier) {
+fun SpeechBar(peaks: Peaks?, modifier: Modifier = Modifier, sounds: List<SoundSpan> = emptyList(), durationMs: Long = 1) {
     val speech = MaterialTheme.colorScheme.primary
     val silence = MaterialTheme.colorScheme.outlineVariant
+    val sound = MaterialTheme.colorScheme.tertiary
     Canvas(modifier.fillMaxWidth().height(8.dp)) {
         val inset = 2.dp.toPx()
         if (peaks == null) {
             drawLine(silence, Offset(inset, size.height / 2f), Offset(size.width - inset, size.height / 2f), strokeWidth = 4.dp.toPx(), cap = StrokeCap.Round)
         } else {
-            drawSpeechTrack(peaks, inset, size.width - inset, size.height / 2f, speech, silence)
+            drawSpeechTrack(peaks, inset, size.width - inset, size.height / 2f, speech, silence, 0, durationMs, durationMs, sounds = sounds, sound = sound)
         }
     }
 }

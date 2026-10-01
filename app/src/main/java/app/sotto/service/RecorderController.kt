@@ -6,6 +6,7 @@ import androidx.core.content.ContextCompat
 import app.sotto.asr.AsrEngine
 import app.sotto.asr.LiveTranscriber
 import app.sotto.asr.ModelManager
+import app.sotto.asr.SoundTagger
 import app.sotto.audio.MicSource
 import app.sotto.audio.PcmSource
 import app.sotto.audio.RecordingSession
@@ -60,6 +61,7 @@ class RecorderController(
             scope = scope,
             openSource = openSource,
             autoTitle = { settings.autoTitle.value },
+            sounds = SoundTagger(context.assets, scope),
             transcriberFactory = if (!models.isInstalled(pack.live)) null else { onRefined ->
                 LiveTranscriber(engine, pack.live, refiner, pack.continuers, store.spool(id), scope, onRefined)
             },

@@ -97,6 +97,8 @@ fun CropScreen(app: SottoApp, id: String, onClose: (copyId: String?) -> Unit) {
     val edited = history.isNotEmpty()
     val duration = keep.totalMs
     val peaks = remember(keep) { if (edited) originalPeaks.slice(keep) else originalPeaks }
+    val originalSounds = remember(id) { app.store.sounds(id) }
+    val sounds = remember(keep) { if (edited) originalSounds.keeping(keep) else originalSounds }
     val paragraphs = remember(keep) { paragraphsOf((if (edited) originalTranscript.keeping(keep) else originalTranscript).segments) }
 
     val player = remember(id) { Player(context.applicationContext) }
@@ -131,8 +133,7 @@ fun CropScreen(app: SottoApp, id: String, onClose: (copyId: String?) -> Unit) {
     LaunchedEffect(player, player.isPlaying, player.seekCount, player.durationMs) {
         position = player.positionMs
         while (player.isPlaying && isActive) {
-            withFrameNanos { }
-            position = player.positionMs
+            position = player.positionAt(withFrameNanos { it })
             // Play auditions the selection: it stops at the selection's end and rewinds to its start.
             if (position >= end) {
                 player.pause()
@@ -191,6 +192,7 @@ fun CropScreen(app: SottoApp, id: String, onClose: (copyId: String?) -> Unit) {
                                     onScrub = { delta -> player.seekBy(delta) },
                                     selection = { start to end },
                                     onSelection = ::select,
+                                    sounds = sounds,
                                     modifier = Modifier.fillMaxSize(),
                                 )
                             } else if (paragraphs.isEmpty()) {
@@ -246,6 +248,7 @@ fun CropScreen(app: SottoApp, id: String, onClose: (copyId: String?) -> Unit) {
                 onSeek = player::seekTo,
                 selection = { start to end },
                 onSelection = ::select,
+                sounds = sounds,
                 modifier = Modifier.padding(horizontal = 12.dp),
             )
             TimeLabels({ position }, duration)

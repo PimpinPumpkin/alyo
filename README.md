@@ -12,6 +12,7 @@ no cloud.
   transcript is trimmed to match.
 - **Export.** Audio (M4A), transcript with timestamps (TXT), subtitles (SRT), or per-word timings (JSON),
   through the share sheet or straight into `Download/Sotto`.
+- **Marks music, applause and laughter** in the waveform and the transcript.
 - **Search** across titles and every word of every transcript, and within one transcript with
   jump-to-match.
 - **Background playback** with lock screen and notification controls.
@@ -51,6 +52,13 @@ against pinned SHA-256 hashes where the host publishes them, and stored in app-p
 English only for now. A language is one entry in
 [`ModelCatalog.kt`](app/src/main/java/app/sotto/asr/ModelCatalog.kt): a streaming model plus one or
 more second-pass models. Nothing else in the app is language-specific.
+
+## Sounds that are not speech
+
+A small sound classifier (CED tiny, 6 MB, bundled in the app) listens two seconds at a time and
+marks runs of music, applause and laughter. They show in their own color on the waveform, the
+seek bar and the library, and as a tag in the transcript where there were no words to write. It
+needs no download and works even without a speech model.
 
 ## Summaries
 

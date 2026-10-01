@@ -2,9 +2,11 @@ package app.sotto.audio
 
 import android.util.Log
 import app.sotto.asr.LiveTranscriber
+import app.sotto.asr.SoundTagger
 import app.sotto.data.RecordingMeta
 import app.sotto.data.RecordingStore
 import app.sotto.data.Segment
+import app.sotto.data.SoundSpan
 import app.sotto.data.Titles
 import app.sotto.data.Transcript
 import app.sotto.data.Word
@@ -31,6 +33,7 @@ class RecordingSession(
     private val scope: CoroutineScope,
     private val openSource: () -> PcmSource,
     private val autoTitle: () -> Boolean,
+    private val sounds: SoundTagger?,
     transcriberFactory: ((onRefined: (Segment) -> Unit) -> LiveTranscriber)?,
 ) {
     val peaks = Peaks()
@@ -62,6 +65,9 @@ class RecordingSession(
         // list; afterwards they have to be written through to the stored transcript.
         synchronized(saveLock) { if (saved) store.applyRefined(id, segment) }
     }
+
+    /** Music and the like heard so far. */
+    val soundSpans: StateFlow<List<SoundSpan>> = sounds?.spans ?: MutableStateFlow(emptyList())
 
     val hasTranscript: Boolean get() = transcriber != null
     val segments: StateFlow<List<Segment>> = transcriber?.segments ?: MutableStateFlow(emptyList())
@@ -124,7 +130,9 @@ class RecordingSession(
                 if (n == 0) continue
                 encoder.write(buffer, n)
                 if (peaks.add(buffer, n) > 0) _peakCount.value = peaks.size
-                transcriber?.accept(decimator.process(buffer, n))
+                val speech = decimator.process(buffer, n)
+                transcriber?.accept(speech)
+                sounds?.accept(speech)
                 samples += n
                 _elapsedMs.value = AudioSpec.samplesToMs(samples)
                 sinceFlush += n
@@ -145,6 +153,7 @@ class RecordingSession(
             runCatching { encoder?.close() }
             runCatching { peaksOut?.close() }
             transcriber?.finish()
+            sounds?.finish()
             captureDone.complete(Unit)
         }
     }
@@ -168,6 +177,7 @@ class RecordingSession(
             return null
         }
         transcriber?.awaitLive()
+        sounds?.await()
         drafts?.cancel()
         val meta = withContext(Dispatchers.IO) {
             synchronized(saveLock) {
@@ -177,6 +187,7 @@ class RecordingSession(
                     autoTitled = title.value == Titles.forDate(startedAt),
                 )
                 store.add(meta, Transcript(segments = segments.value), peaks)
+                sounds?.let { store.saveSounds(id, it.spans.value) }
                 saved = true
                 meta
             }

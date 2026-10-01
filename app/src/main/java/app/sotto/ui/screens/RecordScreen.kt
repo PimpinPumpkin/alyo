@@ -205,7 +205,9 @@ private fun Hint(title: String, body: String) {
 @Composable
 private fun LiveWaveform(session: RecordingSession, paused: Boolean) {
     val peakCount by session.peakCount.collectAsState()
+    val sounds by session.soundSpans.collectAsState()
     TapeWaveform(
+        sounds = sounds,
         peaks = session.peaks,
         peakCount = peakCount,
         positionMs = { session.elapsedMs.value },

@@ -4,7 +4,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.SystemClock
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -27,6 +26,7 @@ import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaSession
 import app.sotto.MainActivity
 import java.io.File
+import kotlin.math.abs
 
 /**
  * Plays one recording. State is exposed as Compose state; everything must be called on the main thread.
@@ -85,22 +85,44 @@ class Player(private val context: Context, background: Boolean = false) {
     var speed by mutableFloatStateOf(1f)
         private set
 
-    // ExoPlayer only refreshes its reported position about once a second for audio. Between
-    // refreshes the clock is carried forward here, so anything following playback moves smoothly.
-    private var reported = 0L
-    private var reportedAt = 0L
+    // ExoPlayer's reported position is not a smooth clock for audio: it can sit still for a
+    // quarter of a second and then jump, and when it does move it lands a few milliseconds off
+    // where steady time would put it. Drawn directly, a playhead stutters. So the UI is given a
+    // clock of its own that runs at the playback speed and is only nudged toward what the player
+    // reports, a twelfth of the difference at a time. A large difference means a real jump (a seek,
+    // a stall), and then it snaps.
+    private var anchorMs = 0L
+    private var anchorAt = 0L
+    private var lastReported = -1L
 
-    val positionMs: Long
-        get() {
-            val raw = exo.currentPosition
-            val now = SystemClock.elapsedRealtime()
-            if (raw != reported || !exo.isPlaying) {
-                reported = raw
-                reportedAt = now
-            }
-            val carried = if (exo.isPlaying) ((now - reportedAt) * speed).toLong().coerceAtMost(MAX_CARRY_MS) else 0L
-            return (raw + carried).coerceIn(0, maxOf(durationMs, 0))
+    val positionMs: Long get() = positionAt(System.nanoTime())
+
+    /**
+     * The position as of [frameNanos], the timestamp of the frame about to be drawn. Asking "where
+     * will playback be when this frame is shown" rather than "where is it now" matters: frame
+     * callbacks arrive a variable few milliseconds after their frame's time, and a clock read at
+     * the moment of the call carries that wobble straight into the playhead.
+     */
+    fun positionAt(frameNanos: Long): Long {
+        val reported = exo.currentPosition
+        val now = frameNanos / 1_000_000
+        if (!exo.isPlaying) {
+            anchorMs = reported
+            anchorAt = now
+            lastReported = reported
+            return reported.coerceIn(0, maxOf(durationMs, 0))
         }
+        var smooth = anchorMs + ((now - anchorAt) * speed).toLong()
+        // Only a fresh report says anything; a repeated one is the player not having looked yet.
+        if (reported != lastReported) {
+            lastReported = reported
+            val error = reported - smooth
+            smooth = if (abs(error) > SNAP_MS) reported else smooth + error / 12
+        }
+        anchorMs = smooth
+        anchorAt = now
+        return smooth.coerceIn(0, maxOf(durationMs, 0))
+    }
 
     /** Bumped on every jump, so the UI knows to re-read [positionMs] even while paused. */
     var seekCount by mutableIntStateOf(0)
@@ -136,10 +158,13 @@ class Player(private val context: Context, background: Boolean = false) {
     fun pause() = exo.pause()
     fun toggle() = if (exo.isPlaying) exo.pause() else exo.play()
     fun seekTo(ms: Long) {
-        exo.seekTo(ms.coerceIn(0, maxOf(durationMs, 0)))
+        val target = ms.coerceIn(0, maxOf(durationMs, 0))
+        exo.seekTo(target)
+        anchorMs = target
+        anchorAt = System.nanoTime() / 1_000_000
         seekCount++
     }
-    fun seekBy(deltaMs: Long) = seekTo(exo.currentPosition + deltaMs)
+    fun seekBy(deltaMs: Long) = seekTo(positionMs + deltaMs)
 
     fun changeSpeed(value: Float) {
         speed = value
@@ -155,6 +180,6 @@ class Player(private val context: Context, background: Boolean = false) {
     }
 
     private companion object {
-        const val MAX_CARRY_MS = 1500L
+        const val SNAP_MS = 400L
     }
 }

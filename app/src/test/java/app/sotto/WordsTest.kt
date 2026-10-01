@@ -102,3 +102,23 @@ class SummaryTitleTest {
         assertEquals(listOf("one"), s.points)
     }
 }
+
+class SoundSpansTest {
+    private val m = app.sotto.data.SoundSpan.MUSIC
+    private fun spans(vararg kinds: String?) = app.sotto.asr.SoundTagger.spansOf(kinds.toList()).map { Triple(it.kind, it.startMs, it.endMs) }
+
+    @Test
+    fun `a run of music becomes one span and a dropout inside it is absorbed`() {
+        assertEquals(listOf(Triple(m, 2000, 12000)), spans(null, m, m, null, m, m, null))
+    }
+
+    @Test
+    fun `one tonal window is not music`() {
+        assertTrue(spans(null, m, null, null).isEmpty())
+    }
+
+    @Test
+    fun `brief applause counts`() {
+        assertEquals(listOf(Triple("Applause", 0, 2000)), spans("Applause", null))
+    }
+}

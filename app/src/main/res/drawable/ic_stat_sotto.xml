@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app's mark (a record dot between waveform bars) as a status bar icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path android:fillColor="#FFFFFF" android:pathData="M2.5,6.5m-1.25,0a1.25,1.25 0,1 1,2.5 0v11a1.25,1.25 0,1 1,-2.5 0z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M6.5,9.5m-1.25,0a1.25,1.25 0,1 1,2.5 0v5a1.25,1.25 0,1 1,-2.5 0z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M12,12m-3.4,0a3.4,3.4 0,1 1,6.8 0a3.4,3.4 0,1 1,-6.8 0" />
+    <path android:fillColor="#FFFFFF" android:pathData="M17.5,9.5m-1.25,0a1.25,1.25 0,1 1,2.5 0v5a1.25,1.25 0,1 1,-2.5 0z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M21.5,6.5m-1.25,0a1.25,1.25 0,1 1,2.5 0v11a1.25,1.25 0,1 1,-2.5 0z" />
+</vector>
