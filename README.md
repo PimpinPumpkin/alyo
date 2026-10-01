@@ -4,7 +4,7 @@
 
 # Alyo
 
-**Speech for your phone, without Google: voice typing and a recorder that transcribes as you talk.**
+**Speech for your phone, without Google: voice typing, a recorder that transcribes as you talk, and a voice that reads aloud.**
 
 [<img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" alt="Get it on Obtainium" height="54">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/PimpinPumpkin/alyo)&nbsp;&nbsp;[<img src="https://img.shields.io/badge/DOWNLOAD%20APK-1A73E8?style=for-the-badge&logo=android&logoColor=white" alt="Download the APK" height="54">](https://github.com/PimpinPumpkin/alyo/releases/latest)
 
@@ -12,16 +12,16 @@ Android 10 or later, 64-bit. No account, no cloud, no Google services.
 
 </div>
 
-| Alyo | Voice typing | Recorder | Live transcript | Speakers |
+| Alyo | Voice typing | Read aloud | Recorder | Live transcript |
 |:-:|:-:|:-:|:-:|:-:|
-| <img src="docs/screenshots/00-alyo.png" width="150"> | <img src="docs/screenshots/11-voice-typing.png" width="150"> | <img src="docs/screenshots/01-home.png" width="150"> | <img src="docs/screenshots/02-live-transcript.png" width="150"> | <img src="docs/screenshots/04-speakers.png" width="150"> |
+| <img src="docs/screenshots/00-alyo.png" width="150"> | <img src="docs/screenshots/11-voice-typing.png" width="150"> | <img src="docs/screenshots/12-read-aloud.png" width="150"> | <img src="docs/screenshots/01-home.png" width="150"> | <img src="docs/screenshots/02-live-transcript.png" width="150"> |
 
-| Music and speech | Summary | Playback | Search | Dark |
+| Speakers | Music and speech | Summary | Playback | Search |
 |:-:|:-:|:-:|:-:|:-:|
-| <img src="docs/screenshots/03-music.png" width="150"> | <img src="docs/screenshots/07-summary.png" width="150"> | <img src="docs/screenshots/05-playback.png" width="150"> | <img src="docs/screenshots/06-search.png" width="150"> | <img src="docs/screenshots/10-speakers-dark.png" width="150"> |
+| <img src="docs/screenshots/04-speakers.png" width="150"> | <img src="docs/screenshots/03-music.png" width="150"> | <img src="docs/screenshots/07-summary.png" width="150"> | <img src="docs/screenshots/05-playback.png" width="150"> | <img src="docs/screenshots/06-search.png" width="150"> |
 
-Alyo is one app with two jobs. Turn on either or both; what you leave off stays out of your way.
-Both use the same speech models, so they are downloaded and kept only once.
+Alyo is one app with three jobs. Turn on any of them; what you leave off stays out of your way.
+Voice typing and the recorder use the same speech models, so those are downloaded and kept once.
 
 ## Voice typing
 
@@ -48,10 +48,19 @@ Both use the same speech models, so they are downloaded and kept only once.
 - **Back up and restore** the whole library.
 - **Its own icon.** With the recorder on, a "Recorder" icon opens straight into it.
 
-## Both
+## Read aloud
 
-- **Private.** Nothing you say leaves the phone.
-- **English, German, French and Spanish** in the recorder. Voice typing is English for now.
+- **A voice for the whole phone.** Choose Alyo as the speech engine and screen readers, navigation
+  and read-aloud buttons in other apps all use it.
+- **Read any text.** Select it and pick "Read aloud", or share it to Alyo.
+- **Eleven voices** in English, German, French and Spanish, each a 67 MB download.
+- **Adjustable speed.**
+
+## All of it
+
+- **Private.** Nothing you say, and nothing read to you, leaves the phone.
+- **English, German, French and Spanish** in the recorder and in read aloud. Voice typing is
+  English for now.
 
 The recorder is a free-software take on Google's Recorder app. Alyo is not affiliated with Google.
 It is new, so expect a bug or two; [open an issue](https://github.com/PimpinPumpkin/alyo/issues)
@@ -148,6 +157,7 @@ on first launch.
 
 - Best uses about 1.1 GB of memory while it is working.
 - With the recorder on and speaker labels left on, add 97 MB for the voice model.
+- Read aloud needs one voice, 67 MB each. It does not need the speech models at all.
 - Summaries need a separate model: Quick (676 MB) or Thorough (1.1 GB). Any other GGUF chat model
   can be imported instead.
 
@@ -165,7 +175,7 @@ When a later version moves to a newer model, the one you have keeps working unti
 
 | What you do | Who hears about it |
 | --- | --- |
-| Dictate, record, transcribe, label speakers, summarize, search | **Nobody.** All of it runs on the phone |
+| Dictate, record, transcribe, label speakers, summarize, search, have text read to you | **Nobody.** All of it runs on the phone |
 | Download a model | **GitHub or Hugging Face**, which see a file download and nothing else |
 | Import a model from files instead | **Nobody** |
 | Export or share a recording | **Whichever app you send it to** |
@@ -208,6 +218,9 @@ models stay in memory for a few minutes so the next sentence starts at once.
   experimental.
 - **Audio**: AAC, 48 kHz mono, written so that a recording survives the app being killed.
   Cropping copies audio frames without re-encoding.
+- **Read aloud**: [Piper](https://github.com/OHF-Voice/piper1-gpl) voices, with eSpeak NG turning
+  spelling into sounds. Alyo registers as an Android text-to-speech engine, so it works wherever
+  the phone speaks. On a Pixel 4a 5G a sentence is ready about six times faster than it is spoken.
 
 Each version of the app pins the exact model files it uses by SHA-256. They are fetched from the
 [`models` release](https://github.com/PimpinPumpkin/alyo/releases/tag/models) here, which holds
@@ -220,7 +233,9 @@ unmodified copies, and from the original publisher if that fails.
 
 <br>
 
-- Reading text aloud is planned and not built yet.
+- Read aloud has no pause or skip yet, and does not highlight the words as it goes.
+- One voice, HFC, was trained on recordings licensed for non-commercial use only. It is labeled
+  where you choose it. The others are free to use for anything.
 - Voice typing is English only. The recorder has four languages; adding one needs a good open
   streaming model, and few languages have one.
 - The app's own text is English only.
@@ -284,5 +299,7 @@ GPL-3.0. See [LICENSE](LICENSE).
 | Banafo Kroko ASR | CC BY-SA 4.0 |
 | CED tiny, Qwen2.5 | Apache 2.0 |
 | pyannote segmentation 3.0 | MIT |
+| Piper voices | Per voice: public domain, CC0, CC BY 4.0, and one CC BY-NC-SA 4.0 |
+| eSpeak NG data (inside each voice) | GPL 3.0 |
 | [Google Sans Flex](https://fonts.google.com/specimen/Google+Sans+Flex) | OFL 1.1, see [licenses/](licenses/GoogleSansFlex-OFL.txt) |
 | AndroidX, Compose, Media3, Commons Compress | Apache 2.0 |

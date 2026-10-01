@@ -22,6 +22,10 @@ models (CED tiny, pyannote segmentation) are fetched at configuration time. F-Dr
 network after checkout, so llama.cpp and sherpa-onnx need to become submodules or srclibs, and the
 two models need to be downloaded at run time like the rest or come from a source F-Droid accepts.
 
+**One voice is not free.** The HFC voice was trained on recordings under CC BY-NC-SA 4.0. It is
+downloaded only if the user picks it, but F-Droid may still want it removed or flagged
+(NonFreeAssets). Every other voice and model is under a free license.
+
 **The repository has to be public.**
 
 ## Until then

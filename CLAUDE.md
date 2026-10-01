@@ -1,8 +1,8 @@
 # Alyo
 
 Speech for Android without Google, in one app: a voice-only keyboard that types while you talk,
-and a recorder that transcribes as it records. Both run on one on-device engine and one set of
-models. README.md covers how it works.
+a recorder that transcribes as it records, and a text-to-speech engine. The first two share one
+on-device engine and one set of models. README.md covers how it works.
 
 ## Rules
 
@@ -20,6 +20,8 @@ once per clone.
 - `asr/` the shared engine: model catalog and downloads, live and second-pass transcription.
 - `dictation/`, `ime/`, `recognition/`, `text/` voice typing.
 - `audio/`, `data/`, `playback/`, `export/`, `llm/`, `service/` the recorder.
+- `tts/` read aloud: the Piper engine, the Android `TextToSpeechService`, and the sheet that
+  reads shared or selected text.
 - `data/Settings.kt` holds `Feature`: each feature lists the manifest components it owns. They are
   disabled in the manifest and enabled when the user turns the feature on, so a new feature's
   components must be added there or they will never appear.

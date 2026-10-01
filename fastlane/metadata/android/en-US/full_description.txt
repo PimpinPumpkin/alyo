@@ -1,6 +1,6 @@
-Alyo is speech for your phone without Google: voice typing in any app, and a recorder that writes down what is said while you are still talking. Everything happens on the phone: no account, no cloud, no Google services.
+Alyo is speech for your phone without Google: voice typing in any app, a recorder that writes down what is said while you are still talking, and a voice that reads text aloud. Everything happens on the phone: no account, no cloud, no Google services.
 
-Turn on either part or both. They share the same speech models, so those are downloaded once.
+Turn on any part. Voice typing and the recorder share the same speech models, so those are downloaded once.
 
 <b>Voice typing</b>
 
@@ -25,9 +25,15 @@ Turn on either part or both. They share the same speech models, so those are dow
 • Search across every transcript, and within one.
 • Export audio (M4A), transcript (TXT), subtitles (SRT) or per-word timings (JSON).
 
+<b>Read aloud</b>
+
+• Choose Alyo as the phone's speech engine and every app that talks uses its voice.
+• Select text and pick "Read aloud", or share text to Alyo.
+• Eleven voices in English, German, French and Spanish.
+
 <b>Offline</b>
 
-The app goes online for one thing only: downloading the speech model the first time, and the summary model if you want one. You can import those files yourself instead, and then it never needs the network at all.
+The app goes online for one thing only: downloading the models and voices you choose. You can import those files yourself instead, and then it never needs the network at all.
 
 <b>Models</b>
 
