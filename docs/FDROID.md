@@ -8,8 +8,8 @@ Where this stands, checked against F-Droid's inclusion policy.
 - No Google Play Services, Firebase, analytics, ads or tracking.
 - No self-updater. Updates come from the store.
 - llama.cpp is built from source as part of the Gradle build.
-- Models are downloaded at run time from their publishers and are freely licensed. The offline
-  flavor does not touch the network at all, and is the one to submit.
+- Models are downloaded at run time, are freely licensed, and can be imported from files instead,
+  so the app is fully usable with no network access.
 - Store text and screenshots are in `fastlane/metadata/android/`.
 
 ## The blocker
@@ -25,9 +25,9 @@ JNI library and ONNX Runtime for arm64-v8a in the recipe's `build:` step, and po
 result instead of the downloaded AAR. llama.cpp should move from FetchContent to a submodule at
 the same time, since F-Droid's build has no network after checkout.
 
-The bundled sound classifier (CED tiny) is fetched as a file at build time for the same reason
-the AAR is, and would need to come from a source F-Droid accepts, or be downloaded at run time
-like the other models.
+The two bundled models (CED tiny for sounds, pyannote segmentation for speakers) are fetched as
+files at build time for the same reason the AAR is, and would need to come from a source F-Droid
+accepts, or be downloaded at run time like the other models.
 
 ## Also needed
 

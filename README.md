@@ -19,14 +19,26 @@ no cloud.
 - **Pauses for phone calls** and resumes by itself afterwards.
 - **Marks music, applause and laughter** in the waveform and the transcript.
 - **Search** across titles and every word of every transcript, with a history you can prune.
-  Opening a result highlights every match in it.
+  Opening a result highlights every match in it, and any recording can be searched on its own.
 - **Shows up in the system file picker**, so another app can be handed a recording you pick.
 - **Background playback** with lock screen and notification controls.
-- **Summaries.** A small language model on the phone writes a title and the key points. Optional.
+- **Summaries.** A small language model on the phone writes a title and the key points, shown
+  above the transcript and ready to copy or share. Optional.
 - **Names recordings by topic** once the transcript is in.
-- **Offline.** The only network request the app ever makes is the one-time speech model download.
+- **Offline.** The only thing the app ever goes online for is downloading its models, and those
+  can be imported from files instead.
 
 Requires Android 10 or later on a 64-bit ARM phone.
+
+## Getting it
+
+APKs are on the [releases page](https://github.com/PimpinPumpkin/sotto/releases), which
+[Obtainium](https://github.com/ImranR98/Obtainium) can follow. There are three channels, and one
+installs over another:
+
+- **Stable**: a release marked Latest, promoted once a week from a nightly that has been out.
+- **Nightly**: a prerelease cut each day the code changed.
+- **Canary**: the single `canary` release, rebuilt on every change. Expect rough edges.
 
 ## How the transcription works
 
@@ -49,11 +61,31 @@ Two quality settings choose the second-pass model:
 
 | Setting | Second pass | Download | Notes |
 | --- | --- | --- | --- |
-| Standard | Parakeet TDT 110M | 245 MB | The default |
-| Best | Parakeet TDT 0.6B v2 | 798 MB | Uses about 1.1 GB of memory while recording |
+| Standard | Parakeet TDT 110M | 275 MB | The default |
+| Best | Parakeet TDT 0.6B v2 | 828 MB | Uses about 1.1 GB of memory while recording |
 
-Models are fetched from the sherpa-onnx releases (GitHub and Hugging Face) on first run, checked
-against pinned SHA-256 hashes where the host publishes them, and stored in app-private storage.
+The download figures include the live model and the 30 MB voice model behind speaker labels.
+
+### Where the models come from
+
+The models are not inside the APK: they would add hundreds of megabytes to every update. Each
+version of the app instead pins the exact files it uses, by name and SHA-256, in
+[`ModelCatalog.kt`](app/src/main/java/app/sotto/asr/ModelCatalog.kt), and downloads them into
+app-private storage the first time.
+
+Every file is tried first from this repository's
+[`models` release](https://github.com/PimpinPumpkin/sotto/releases/tag/models), which holds
+unmodified copies, and then from where it was originally published (the sherpa-onnx releases and
+Hugging Face). The copies exist so that an installed version keeps working if an upstream file is
+moved or removed. Nothing in that release is ever deleted.
+
+A newer version of the app can move to a newer model. A phone that has the old one keeps
+transcribing with it, is told an update is available, and drops the old files once the new ones
+are in. In the catalog that is a new entry with the old one listed under `replaces`.
+
+To skip the in-app download, fetch the files on any device and use "Import from files" in
+Settings. Sotto then never needs the network, and on a system that lets you withhold the network
+permission from an app, it runs fine without it.
 
 English only for now. A language is one entry in
 [`ModelCatalog.kt`](app/src/main/java/app/sotto/asr/ModelCatalog.kt): a streaming model plus one or
@@ -80,34 +112,26 @@ notes. Measured on a Pixel 4a 5G:
 
 The reply is held to a shape by a grammar rather than by asking nicely: a title of a few plain
 words, then one to five single sentences, the count set by how long the recording is. A recording
-under 80 words gets a title only. Small models still make mistakes of fact, so the feature is
-marked experimental.
+under 80 words is not offered a summary at all: it is already its own. Small models still make
+mistakes of fact, so the feature is marked experimental.
 
 A minute of speech is roughly 200 tokens, so on that phone Quick reads a ten-minute recording in
 well under a minute and Thorough takes about three. Any other chat model in GGUF form can be
 imported from Settings and used instead.
 
-## Two builds
-
-- **standard** downloads its models from inside the app.
-- **offline** does not request the internet permission. Models are imported from files: the same
-  `.tar.bz2` archives sherpa-onnx publishes, and a `.gguf` for summaries. The standard build can
-  import too.
-
-Both have the same application id and signing key, so either installs over the other.
-
 ## Building
 
 ```bash
-./gradlew assembleStandardDebug
+./gradlew assembleDebug
 ```
 
 Needs JDK 17, Android SDK platform 37, and the NDK and CMake (for llama.cpp, which is fetched at
-its pinned tag during the build; pass `-PllamaSrc=<checkout>` to use a local copy). The first build downloads the sherpa-onnx AAR (50 MB)
-from its GitHub release into `app/libs/`; it is not on Maven.
+its pinned tag during the build; pass `-PllamaSrc=<checkout>` to use a local copy). The first
+build downloads the sherpa-onnx AAR (50 MB) from its GitHub release into `app/libs/`, since it is
+not on Maven, along with the two small models that ship inside the app.
 
 ```bash
-./gradlew testStandardDebugUnitTest
+./gradlew testDebugUnitTest
 ```
 
 runs the unit tests for the parts with real logic in them: token-to-word timing, re-timing a
@@ -143,8 +167,8 @@ files/recordings/<id>/
 While recording, audio is written as an ADTS stream (`audio.aac`) rather than an MP4. Every ADTS
 frame is self-contained, so if the app is killed mid-recording the file is intact up to the last
 frame; it is wrapped into an M4A at the next launch, along with the waveform and whatever had
-been transcribed. An MP4 written directly would be unreadable
-without the index that is only written at the end.
+been transcribed. An MP4 written directly would be unreadable without the index that is only
+written at the end.
 
 Cropping and cutting copy AAC frames between containers without decoding, so there is no quality
 loss and it is near-instant. Cuts land on frame boundaries (21 ms).
@@ -170,6 +194,7 @@ It builds on:
 
 - [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) and ONNX Runtime: Apache 2.0 and MIT
 - NVIDIA FastConformer and Parakeet TDT speech models: CC BY 4.0 (downloaded at run time, not bundled)
+  in the ONNX form published by the sherpa-onnx project
 - CED tiny (sounds), pyannote segmentation 3.0 and 3D-Speaker CAM++ (speakers): Apache 2.0 and MIT
 - Qwen2.5 (summaries): Apache 2.0, and llama.cpp: MIT
 - [Google Sans Flex](https://fonts.google.com/specimen/Google+Sans+Flex): SIL Open Font License 1.1,

@@ -21,6 +21,11 @@ Offline voice recorder for Android with on-device transcription. See README.md f
 
 Work lands on `canary` first and is merged to `main` when it is ready.
 
+The `models` release is not an app release: it holds the mirrored model files that every
+installed version downloads from. Never delete it or any file in it. To move to a newer model,
+upload the new files there, add a new `ModelSpec` with a new id, and list the old spec under
+`replaces`.
+
 ## Building
 
 `./gradlew assembleDebug` (JDK 17, Android SDK platform 37.0). Local builds are version code 1,

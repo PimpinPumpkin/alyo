@@ -6,7 +6,7 @@ Sotto Recorder records audio and writes down what is said while you are still ta
 • Linked audio and text: the word being played is highlighted, and tapping a word jumps to it.
 • Fix mistakes: tap a sentence to correct it. Words you leave alone stay locked to the audio.
 • Crop and remove: select by dragging across the words, the waveform or the seek bar, listen to the result, and save it as a copy.
-• Summaries: a small language model on the phone can write a title and the key points. Optional, and a separate download.
+• Summaries: a small language model on the phone can write a title and the key points, ready to copy or share. Optional, and a separate download.
 • Speaker labels: tells voices apart and labels who is talking.
 • Music, applause and laughter are marked in the waveform and the transcript.
 • Import audio files and transcribe them, or transcribe a recording again.
@@ -18,7 +18,7 @@ Sotto Recorder records audio and writes down what is said while you are still ta
 
 <b>Offline</b>
 
-The app goes online for one thing only: downloading the speech model the first time, and the summary model if you want one. You can import those files yourself instead, and the "offline" build does not ask for the internet permission at all.
+The app goes online for one thing only: downloading the speech model the first time, and the summary model if you want one. You can import those files yourself instead, and then it never needs the network at all.
 
 <b>Models</b>
 
