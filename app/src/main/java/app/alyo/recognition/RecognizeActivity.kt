@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import app.alyo.AlyoApp
 import app.alyo.MainActivity
 import app.alyo.dictation.Dictation
+import app.alyo.ime.PanelPhase
 import app.alyo.ime.VoiceOrb
 import app.alyo.text.SpokenPunctuation
 import app.alyo.ui.theme.AlyoTheme
@@ -49,7 +50,7 @@ class RecognizeActivity : ComponentActivity() {
     private var dictation: Dictation? = null
 
     private val heard = mutableStateOf("")
-    private val listening = mutableStateOf(true)
+    private val phase = mutableStateOf(PanelPhase.WARMING)
     private val problem = mutableStateOf<String?>(null)
     private val text = StringBuilder()
 
@@ -77,16 +78,16 @@ class RecognizeActivity : ComponentActivity() {
                     ) {
                         Column(Modifier.navigationBarsPadding().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
-                                problem.value ?: heard.value.ifEmpty { prompt ?: "Listening" },
+                                problem.value ?: heard.value.ifEmpty { if (phase.value == PanelPhase.WARMING) "Warming up. Go ahead." else prompt ?: "Listening" },
                                 style = MaterialTheme.typography.headlineSmall,
                                 color = if (heard.value.isEmpty()) colors.onSurfaceVariant else colors.onSurface,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                             )
                             if (problem.value == null) {
-                                VoiceOrb(listening = listening.value, level = { dictation?.level ?: 0f })
+                                VoiceOrb(phase = phase.value, level = { dictation?.level ?: 0f })
                                 Spacer(Modifier.height(12.dp))
-                                Button(onClick = { dictation?.finish() }, enabled = listening.value, modifier = Modifier.fillMaxWidth().height(56.dp)) {
+                                Button(onClick = { dictation?.finish() }, enabled = phase.value != PanelPhase.FINISHING, modifier = Modifier.fillMaxWidth().height(56.dp)) {
                                     Text("Done", style = MaterialTheme.typography.titleMedium)
                                 }
                             } else {
@@ -120,8 +121,9 @@ class RecognizeActivity : ComponentActivity() {
 
             override fun onState(state: Dictation.State) = onMain {
                 when (state) {
-                    Dictation.State.LOADING, Dictation.State.LISTENING -> listening.value = true
-                    Dictation.State.FINISHING -> listening.value = false
+                    Dictation.State.LOADING -> phase.value = PanelPhase.WARMING
+                    Dictation.State.LISTENING -> phase.value = PanelPhase.LISTENING
+                    Dictation.State.FINISHING -> phase.value = PanelPhase.FINISHING
                     Dictation.State.DONE -> if (problem.value == null) deliver()
                 }
             }

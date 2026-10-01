@@ -69,7 +69,12 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-enum class PanelPhase { LISTENING, FINISHING }
+enum class PanelPhase {
+    /** The microphone is open and recording, but the speech model is still loading, so no words can appear yet. */
+    WARMING,
+    LISTENING,
+    FINISHING,
+}
 
 /**
  * What takes the keyboard's place while dictating: a shape that moves with the voice, with undo
@@ -101,7 +106,12 @@ fun DictationPanel(
             }
             AnimatedContent(phase, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "status") { now ->
                 Text(
-                    if (now == PanelPhase.FINISHING) "Finishing" else "Listening",
+                    when (now) {
+                        // Said plainly, because nothing appears in the field yet and that reads as broken.
+                        PanelPhase.WARMING -> "Warming up. Go ahead, it is recording."
+                        PanelPhase.LISTENING -> "Listening"
+                        PanelPhase.FINISHING -> "Finishing"
+                    },
                     style = MaterialTheme.typography.titleMedium,
                     color = colors.onSurfaceVariant,
                 )
@@ -111,13 +121,13 @@ fun DictationPanel(
                 FilledTonalIconButton(onClick = onUndo, enabled = canUndo, modifier = Modifier.size(56.dp)) {
                     Icon(Icons.AutoMirrored.Rounded.Undo, "Undo the last sentence")
                 }
-                VoiceOrb(listening = phase == PanelPhase.LISTENING, level = level)
+                VoiceOrb(phase = phase, level = level)
                 RepeatingKey(Icons.AutoMirrored.Rounded.Backspace, "Backspace", onBackspace)
             }
             Spacer(Modifier.height(14.dp))
             Button(
                 onClick = onDone,
-                enabled = phase == PanelPhase.LISTENING,
+                enabled = phase != PanelPhase.FINISHING,
                 contentPadding = ButtonDefaults.ContentPadding,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
             ) {
@@ -129,10 +139,14 @@ fun DictationPanel(
     }
 }
 
-/** The shape in the middle: it turns slowly while listening and swells with the voice. */
+/**
+ * The shape in the middle. While listening it turns slowly and swells with the voice. While the
+ * model warms up, a morphing ring runs around the microphone, which still swells with the voice
+ * to show that it is being heard.
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun VoiceOrb(listening: Boolean, level: () -> Float, modifier: Modifier = Modifier) {
+fun VoiceOrb(phase: PanelPhase, level: () -> Float, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
     val currentLevel by rememberUpdatedState(level)
     // Followed by hand, once a frame: quick to rise with a word and slower to fall, like a meter.
@@ -149,8 +163,23 @@ fun VoiceOrb(listening: Boolean, level: () -> Float, modifier: Modifier = Modifi
         0f, 360f, infiniteRepeatable(tween(24_000, easing = LinearEasing), RepeatMode.Restart), label = "turn",
     )
     Box(modifier.size(132.dp), contentAlignment = Alignment.Center) {
-        if (!listening) {
+        if (phase == PanelPhase.FINISHING) {
             LoadingIndicator(Modifier.size(84.dp))
+            return@Box
+        }
+        if (phase == PanelPhase.WARMING) {
+            LoadingIndicator(Modifier.size(128.dp), color = colors.primary.copy(alpha = 0.55f))
+            Box(
+                Modifier
+                    .size(64.dp)
+                    .graphicsLayer {
+                        val scale = 1f + shown.floatValue * 0.2f
+                        scaleX = scale
+                        scaleY = scale
+                    }
+                    .background(colors.primaryContainer, CircleShape),
+            )
+            Icon(Icons.Rounded.Mic, "Warming up", tint = colors.onPrimaryContainer, modifier = Modifier.size(32.dp))
             return@Box
         }
         Box(

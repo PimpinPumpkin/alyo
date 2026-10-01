@@ -179,7 +179,8 @@ class AlyoIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner, V
 
             override fun onState(state: Dictation.State) = onMain {
                 when (state) {
-                    Dictation.State.LOADING, Dictation.State.LISTENING -> phase.value = PanelPhase.LISTENING
+                    Dictation.State.LOADING -> phase.value = PanelPhase.WARMING
+                    Dictation.State.LISTENING -> phase.value = PanelPhase.LISTENING
                     Dictation.State.FINISHING -> phase.value = PanelPhase.FINISHING
                     Dictation.State.DONE -> {
                         dictation = null
@@ -195,7 +196,8 @@ class AlyoIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner, V
                 main.post { if (dictation != null && dictation === mine) block() }
             }
         }
-        phase.value = PanelPhase.LISTENING
+        // A model still in memory from the last dictation is ready at once; do not flash the warm-up for it.
+        phase.value = if (app.engine.warm) PanelPhase.LISTENING else PanelPhase.WARMING
         // Assigned before start so the listener's first callbacks find it.
         mine = app.newDictation(listener)
         dictation = mine

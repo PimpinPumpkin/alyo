@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -41,6 +42,7 @@ import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.toShape
@@ -277,8 +279,14 @@ private fun TryIt() {
     val scope = rememberCoroutineScope()
     Surface(color = colors.surfaceBright, shape = RoundedCornerShape(28.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         Column(Modifier.padding(20.dp)) {
-            Text("Try it", style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.height(12.dp))
+            // Tall enough for the button whether or not it is showing, so the box below does not jump.
+            Row(Modifier.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Try it", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                AnimatedVisibility(text.isNotEmpty()) {
+                    TextButton(onClick = { text = "" }) { Text("Clear") }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
             TextField(
                 value = text,
                 onValueChange = { text = it },
