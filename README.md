@@ -1,43 +1,104 @@
+<div align="center">
+
+<img src="docs/logo.svg" width="110" alt="Sotto Recorder logo">
+
 # Sotto Recorder
 
-A voice recorder for Android that writes down what is said while you are still talking. It runs
-entirely on the phone: no account, no cloud, no Google services.
+**A voice recorder that writes down what is said as you speak. Everything stays on the phone.**
 
-It is a free-software take on Google's Recorder app.
+[<img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" alt="Get it on Obtainium" height="54">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/PimpinPumpkin/sotto)&nbsp;&nbsp;[<img src="https://img.shields.io/badge/DOWNLOAD%20APK-1A73E8?style=for-the-badge&logo=android&logoColor=white" alt="Download the APK" height="54">](https://github.com/PimpinPumpkin/sotto/releases/latest)
+
+Android 10 or later, 64-bit. No account, no cloud, no Google services.
+
+</div>
+
+| Library | Live transcript | Music and speech | Speakers | Summary |
+|:-:|:-:|:-:|:-:|:-:|
+| <img src="docs/screenshots/01-home.png" width="150"> | <img src="docs/screenshots/02-live-transcript.png" width="150"> | <img src="docs/screenshots/03-music.png" width="150"> | <img src="docs/screenshots/04-speakers.png" width="150"> | <img src="docs/screenshots/07-summary.png" width="150"> |
+
+| Playback | Search | Settings | Dark: library | Dark: transcript |
+|:-:|:-:|:-:|:-:|:-:|
+| <img src="docs/screenshots/05-playback.png" width="150"> | <img src="docs/screenshots/06-search.png" width="150"> | <img src="docs/screenshots/08-settings.png" width="150"> | <img src="docs/screenshots/09-home-dark.png" width="150"> | <img src="docs/screenshots/10-speakers-dark.png" width="150"> |
 
 ## Features
 
-- Live transcript, with punctuation added a moment after each sentence ends
-- Tap a word to jump to it; the word being played is highlighted
-- Edit the transcript, during or after recording
-- Crop or cut by selecting on the waveform or across the words
-- Speaker labels you can rename
-- Speech, music, applause and laughter shown in different colors
-- Search across all recordings, or inside one
-- Import audio files and transcribe them
-- Export audio (M4A), text (TXT), subtitles (SRT) or word timings (JSON)
-- Optional summaries written by a small language model on the phone
-- Background playback, lock screen controls, widget and quick settings tile
-- Backup and restore of the whole library
-- Recordings appear in the system file picker
+- **Live transcript.** Words appear while you talk, and each sentence is tidied up when you pause.
+- **Tap a word to hear it.** The word being played is highlighted.
+- **Speaker labels** you can rename, merge, or correct from any word.
+- **Fix the text**, during or after recording.
+- **Crop and cut** by selecting on the waveform or across the words.
+- **Music, applause and laughter** shown in their own colors.
+- **Search** every recording at once, or inside one.
+- **Summaries**, written on the phone, ready to copy or share. Optional.
+- **Import audio files** and transcribe them.
+- **Export** audio, text, subtitles or word timings.
+- **English, German, French and Spanish.**
+- **Background playback**, lock screen controls, a widget and a quick settings tile.
+- **Back up and restore** the whole library.
+- **Private.** Nothing you record or say leaves the phone.
 
-Transcribes English, German, French and Spanish. Requires Android 10 or later on a 64-bit ARM
-phone. The app itself is in English.
+Sotto Recorder is a free-software take on Google's Recorder app, and is not affiliated with
+Google. It is new, so expect a bug or two;
+[open an issue](https://github.com/PimpinPumpkin/sotto/issues) if you find one.
 
-## Install
+---
 
-Get the APK from the [releases page](https://github.com/PimpinPumpkin/sotto/releases), or point
-[Obtainium](https://github.com/ImranR98/Obtainium) at this repository.
+## More
 
-| Channel | What it is |
-| --- | --- |
-| Stable | The release marked Latest. Promoted weekly from a nightly. |
-| Nightly | A prerelease for each day the code changed. |
-| Canary | The `canary` release, rebuilt on every change. |
+<details>
+<summary><b>Installing and updates</b></summary>
 
-All three share a signing key, so you can switch between them without reinstalling.
+<br>
 
-## Models
+**Obtainium** (recommended) installs the app and keeps it updated. **Download APK** takes you to
+the latest release: download the `.apk` file and open it.
+
+| Channel | What it is | How often |
+| --- | --- | --- |
+| **Stable** | The newest nightly, promoted | Weekly |
+| **Nightly** | Built from `main` | Every day `main` changes |
+| **Canary** | Built from the `canary` branch | Every push |
+
+All three share one signing key and one rising version code, so moving between them is a plain
+update.
+
+</details>
+
+<details>
+<summary><b>Check you got the real thing</b></summary>
+
+<br>
+
+Every Sotto Recorder APK, from any channel, is signed with the same key. Its certificate
+fingerprint is:
+
+```
+SHA-256  6B:46:17:27:C0:0D:04:FC:20:60:45:55:2D:A9:5C:36:7F:AB:37:A3:21:EA:37:CF:E4:81:86:BC:D0:EC:D3:FE
+```
+
+Check a downloaded file against it before installing:
+
+```bash
+apksigner verify --print-certs sotto-recorder-*.apk
+```
+
+On the phone, [App Verifier](https://github.com/soupslurpr/AppVerifier) checks the same thing. It
+wants the package name on the first line and the fingerprint on the second:
+
+```
+app.sotto
+6B:46:17:27:C0:0D:04:FC:20:60:45:55:2D:A9:5C:36:7F:AB:37:A3:21:EA:37:CF:E4:81:86:BC:D0:EC:D3:FE
+```
+
+Android enforces this for you after the first install: an update signed with a different key is
+refused.
+
+</details>
+
+<details>
+<summary><b>Models and download sizes</b></summary>
+
+<br>
 
 Nothing is transcribed until a speech model is on the phone. The app offers to download one on
 first launch.
@@ -48,21 +109,44 @@ first launch.
 | German, French | 172 MB | 842 MB |
 | Spanish | 257 MB | 927 MB |
 
-Best uses about 1.1 GB of memory while recording. The sizes include the 97 MB voice model behind
-speaker labels, which is skipped if speaker labels are turned off.
+- Best uses about 1.1 GB of memory while recording.
+- The sizes include the 97 MB voice model behind speaker labels. Turn speaker labels off and it
+  is not downloaded.
+- Summaries need a separate model: Quick (676 MB) or Thorough (1.1 GB). Any other GGUF chat model
+  can be imported instead.
 
-Summaries need a separate model: Quick (Qwen2.5 0.5B, 676 MB) or Thorough (Qwen2.5 1.5B, 1.1 GB).
-Any other GGUF chat model can be imported instead.
+To skip the in-app download, fetch the files on another device and use "Import from files" in
+Settings.
 
-Model downloads are the only time the app uses the network. To avoid even that, download the
-files on another device and use "Import from files" in Settings.
+When a later version moves to a newer model, the one you have keeps working until you update it.
 
-Each version of the app pins the exact files it uses by SHA-256. They are fetched from the
-[`models` release](https://github.com/PimpinPumpkin/sotto/releases/tag/models) in this
-repository, which holds unmodified copies, and from the original publisher if that fails. When a
-later version moves to a newer model, the old one keeps working until the new one is downloaded.
+</details>
 
-## How it works
+<details>
+<summary><b>Privacy</b></summary>
+
+<br>
+
+| What you do | Who hears about it |
+| --- | --- |
+| Record, transcribe, label speakers, summarize, search | **Nobody.** All of it runs on the phone |
+| Download a model | **GitHub or Hugging Face**, which see a file download and nothing else |
+| Import a model from files instead | **Nobody** |
+| Export or share a recording | **Whichever app you send it to** |
+
+No analytics, no crash reporting, no accounts. Model downloads are the only time the app uses the
+network. On a system that lets you withhold the network permission from an app, Sotto runs fine
+without it once its models are in place.
+
+Recordings are kept in the app's private storage. Other apps see one only when you export it,
+share it, or pick it in the system file picker.
+
+</details>
+
+<details>
+<summary><b>How it works</b></summary>
+
+<br>
 
 Transcription is two passes, both on the CPU through
 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx):
@@ -76,55 +160,55 @@ Transcription is two passes, both on the CPU through
 | English | NVIDIA FastConformer | Parakeet TDT 110M (Standard) or 0.6B v2 (Best) |
 | German, French, Spanish | Kroko streaming Zipformer | None (Standard) or Parakeet TDT 0.6B v3 (Best) |
 
-The English live model writes lower case with no punctuation, so it always gets a second pass.
 The Kroko models punctuate as they go, so their text can stand as the transcript.
 
-On a Pixel 4a 5G (2020) every one of these runs at 5x real time or better.
-
-Someone who talks without pausing is split at the quietest moment after ten seconds, so a
-sentence is never cut at a fixed length.
-
-Other pieces:
-
-- **Sounds**: CED tiny (6 MB, inside the APK) tags music, applause and laughter.
+- **Sounds**: CED tiny, inside the APK, tags music, applause and laughter.
 - **Speakers**: pyannote segmentation finds where the voice changes, and NVIDIA TitaNet groups
-  the voices. Runs once when a recording is saved, at low priority. Skipped for recordings over
-  45 minutes. Labels can be corrected by hand: for a paragraph, from a chosen word onward, or by
-  merging two speakers into one.
-- **Summaries**: Qwen2.5 through [llama.cpp](https://github.com/ggml-org/llama.cpp), with the
-  output held to a title and one to five sentences by a grammar. Long transcripts are read in
-  pieces. Not offered for recordings under 80 words. Small models get facts wrong, so this is
-  marked experimental.
+  the voices. Runs once when a recording is saved. Skipped for recordings over 45 minutes.
+- **Summaries**: Qwen2.5 through [llama.cpp](https://github.com/ggml-org/llama.cpp), held by a
+  grammar to a title and one to five sentences. Small models get facts wrong, so this is marked
+  experimental.
+- **Audio**: AAC, 48 kHz mono, written so that a recording survives the app being killed.
+  Cropping copies audio frames without re-encoding.
 
-### Storage
+Each version of the app pins the exact model files it uses by SHA-256. They are fetched from the
+[`models` release](https://github.com/PimpinPumpkin/sotto/releases/tag/models) here, which holds
+unmodified copies, and from the original publisher if that fails.
 
-Recordings are in app-private storage, one folder each:
+</details>
 
-```
-files/recordings/<id>/
-  audio.m4a         AAC-LC, 48 kHz mono, 96 kbit/s
-  peaks.bin         waveform, one byte per 20 ms
-  transcript.json   words with start and end times in milliseconds
-  meta.json         title, date, duration
-```
+<details>
+<summary><b>Known gaps</b></summary>
 
-Audio is written as an ADTS stream while recording and wrapped into an M4A afterwards, so a
-recording survives the app being killed. Cropping copies AAC frames without re-encoding.
+<br>
 
-## Building
+- Four languages. Adding one needs a good open streaming model, and few languages have one.
+- The app's own text is English only.
+- The Bluetooth microphone option and pausing for phone calls have not been tested on real
+  hardware.
+- Not on F-Droid yet. See [docs/FDROID.md](docs/FDROID.md).
+
+</details>
+
+<details>
+<summary><b>Building and contributing</b></summary>
+
+<br>
 
 ```bash
 ./gradlew assembleDebug
+```
+
+JDK 17, Android SDK platform 37, the NDK and CMake. The first build downloads the sherpa-onnx
+library, a trimmed ONNX Runtime and two small bundled models, and fetches llama.cpp at its pinned
+tag. Pass `-PllamaSrc=<checkout>` to build llama.cpp from a local copy.
+
+```bash
 ./gradlew testDebugUnitTest
 ```
 
-Needs JDK 17, Android SDK platform 37, the NDK and CMake. The first build downloads the
-sherpa-onnx library and the two bundled models, and fetches llama.cpp at its pinned tag. Pass
-`-PllamaSrc=<checkout>` to build llama.cpp from a local copy.
-
-The APK carries a copy of ONNX Runtime built with only the operators these models use, which
-halves its size. `scripts/build-onnxruntime.sh` rebuilds it, and has to be run again when a
-model is added.
+runs the tests: word timing, transcript edits and cuts, speaker changes, resampling and audio
+framing.
 
 Debug builds can record from a WAV file (16-bit mono, 16 or 48 kHz) instead of the microphone:
 
@@ -134,16 +218,14 @@ adb shell run-as app.sotto cp /data/local/tmp/clip.wav files/clip.wav
 adb shell am start -n app.sotto/.MainActivity --es wav /data/user/0/app.sotto/files/clip.wav
 ```
 
-## Known gaps
+After adding a model, rerun `scripts/build-onnxruntime.sh`: the bundled runtime only carries the
+operators the current models use.
 
-- Four languages. Adding one is an entry in
-  [`ModelCatalog.kt`](app/src/main/java/app/sotto/asr/ModelCatalog.kt), but it needs a streaming
-  model, and few languages have a good open one.
-- The app's own text is English only.
-- A sentence shared by two people is labeled with whoever spoke most of it, until you split it.
-- The Bluetooth microphone option and pausing for phone calls have not been tested on real
-  hardware.
-- Not on F-Droid yet. See [docs/FDROID.md](docs/FDROID.md).
+Issues and pull requests are welcome. Two house rules, both checked by `scripts/check-writing.sh`
+and by CI: US English, and no em dashes. Commit subjects are used verbatim as release notes, so
+write them as plain sentences about what changed for the person using the app.
+
+</details>
 
 ## License
 
@@ -152,12 +234,9 @@ GPL-3.0. See [LICENSE](LICENSE).
 | Component | License |
 | --- | --- |
 | [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), llama.cpp, ONNX Runtime | Apache 2.0, MIT |
-| NVIDIA FastConformer and Parakeet TDT | CC BY 4.0 |
+| NVIDIA FastConformer, Parakeet TDT and TitaNet | CC BY 4.0 |
 | Banafo Kroko ASR | CC BY-SA 4.0 |
-| NVIDIA TitaNet | CC BY 4.0 |
 | CED tiny, Qwen2.5 | Apache 2.0 |
 | pyannote segmentation 3.0 | MIT |
 | [Google Sans Flex](https://fonts.google.com/specimen/Google+Sans+Flex) | OFL 1.1, see [licenses/](licenses/GoogleSansFlex-OFL.txt) |
 | AndroidX, Compose, Media3, Commons Compress | Apache 2.0 |
-
-Not affiliated with or endorsed by Google or NVIDIA.

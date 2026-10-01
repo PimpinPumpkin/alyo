@@ -24,6 +24,8 @@ on:
     # change the build itself.
     paths-ignore:
       - '**.md'
+      - 'docs/**'
+      - 'fastlane/**'
       - 'LICENSE'
       - 'licenses/**'
       - '.gitignore'
