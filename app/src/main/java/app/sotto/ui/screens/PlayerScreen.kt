@@ -190,6 +190,9 @@ fun PlayerScreen(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).clickable { renaming = true }.padding(horizontal = 8.dp, vertical = 8.dp),
                 )
+                if (!transcript.isEmpty) {
+                    IconButton(onClick = { showTranscript = true; searching = true }) { Icon(Icons.Rounded.Search, "Search this recording") }
+                }
                 IconButton(onClick = { app.store.setStarred(id, !meta.starred) }) {
                     Icon(
                         if (meta.starred) Icons.Rounded.Star else Icons.Rounded.StarBorder,
@@ -323,11 +326,6 @@ fun PlayerScreen(
             onCrop = if (busy) null else ({ menuOpen = false; player.pause(); onCrop() }),
             onDelete = { menuOpen = false; deleting = true },
             extra = listOf(
-                SheetRow(Icons.Rounded.Search, "Search transcript", enabled = !transcript.isEmpty) {
-                    menuOpen = false
-                    showTranscript = true
-                    searching = true
-                },
                 SheetRow(Icons.Rounded.Refresh, "Transcribe again", detail = "Replaces the transcript, including your corrections", enabled = !busy && app.jobs.canTranscribe()) {
                     menuOpen = false
                     player.pause()

@@ -163,3 +163,17 @@ fun SottoTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () ->
         )
     }
 }
+
+/**
+ * The fill for a speaker's name tag. These are fixed and far apart on purpose, rather than drawn
+ * from the theme: the point is to tell voices apart at a glance, and theme colors are picked to
+ * go together. All are light enough for [onSpeakerTag] to read on, in either theme.
+ */
+private val speakerTags = listOf(
+    Color(0xFF8AB4F8), Color(0xFFFDD663), Color(0xFFF28B82), Color(0xFF81C995),
+    Color(0xFFC58AF9), Color(0xFF78D9EC), Color(0xFFFCAD70), Color(0xFFFF8BCB),
+)
+
+fun speakerTag(speaker: Int): Color = speakerTags[speaker.mod(speakerTags.size)]
+
+val onSpeakerTag = Color(0xFF202124)

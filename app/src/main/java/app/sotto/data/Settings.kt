@@ -16,7 +16,7 @@ class Settings(context: Context) {
     private val _language = MutableStateFlow(prefs.getString(LANGUAGE, "en")!!)
     val language: StateFlow<String> = _language
 
-    private val _quality = MutableStateFlow(prefs.getString(QUALITY, null) ?: recommendedQuality())
+    private val _quality = MutableStateFlow(prefs.getString(QUALITY, null) ?: recommendedQuality(context))
     val quality: StateFlow<String> = _quality
 
     val pack: LanguagePack get() = ModelCatalog.language(_language.value)
@@ -122,8 +122,12 @@ class Settings(context: Context) {
         _plainName.value = on
     }
 
-    /** The best model is the default everywhere. A phone short on memory can pick the lighter one. */
-    fun recommendedQuality(): String = "best"
+    /**
+     * The lighter model is the default: a third of the download, and close enough that most people
+     * will never want the other. Someone who already has the large one keeps using it.
+     */
+    private fun recommendedQuality(context: Context): String =
+        if (java.io.File(context.filesDir, "models/en-parakeet-tdt-0.6b-v2").isDirectory) "best" else "light"
 
     companion object {
         /** Whatever Android routes to: a wired or USB headset microphone if one is plugged in, else the phone's. */

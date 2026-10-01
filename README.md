@@ -49,8 +49,8 @@ Two quality settings choose the second-pass model:
 
 | Setting | Second pass | Download | Notes |
 | --- | --- | --- | --- |
+| Standard | Parakeet TDT 110M | 245 MB | The default |
 | Best | Parakeet TDT 0.6B v2 | 798 MB | Uses about 1.1 GB of memory while recording |
-| Lighter | Parakeet TDT 110M | 245 MB | For phones with less than 6 GB |
 
 Models are fetched from the sherpa-onnx releases (GitHub and Hugging Face) on first run, checked
 against pinned SHA-256 hashes where the host publishes them, and stored in app-private storage.

@@ -142,16 +142,16 @@ object ModelCatalog {
         ),
         qualities = listOf(
             Quality(
-                id = "best",
-                title = "Best",
-                summary = "Most accurate. Uses about 1 GB of memory while recording.",
-                refiner = enParakeetLarge,
+                id = "light",
+                title = "Standard",
+                summary = "Accurate and quick to download. Right for most phones.",
+                refiner = enParakeetSmall,
             ),
             Quality(
-                id = "light",
-                title = "Lighter",
-                summary = "A third of the size, slightly less accurate.",
-                refiner = enParakeetSmall,
+                id = "best",
+                title = "Best",
+                summary = "Most accurate. Three times the download and about 1 GB of memory while recording.",
+                refiner = enParakeetLarge,
             ),
         ),
     )

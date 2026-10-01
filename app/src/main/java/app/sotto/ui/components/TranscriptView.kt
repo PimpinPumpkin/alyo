@@ -1,5 +1,10 @@
 package app.sotto.ui.components
 
+import app.sotto.ui.theme.onSpeakerTag
+import app.sotto.ui.theme.speakerTag
+import androidx.compose.foundation.background
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -280,13 +285,14 @@ private fun ParagraphBlock(
             val speaker = paragraph.speaker
             if (speaker != null && speakerName != null) {
                 // Each voice keeps one color through the transcript, so a back-and-forth can be followed by eye.
-                val tint = listOf(colors.primary, colors.tertiary, colors.secondary, colors.error)[speaker % 4]
                 Spacer(Modifier.width(10.dp))
                 Text(
                     speakerName(speaker),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = tint,
-                    modifier = Modifier.clip(CircleShape).clickable { onSpeakerTap(paragraph) }.padding(horizontal = 6.dp, vertical = 2.dp),
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = onSpeakerTag,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.clip(CircleShape).background(speakerTag(speaker)).clickable { onSpeakerTap(paragraph) }.padding(horizontal = 12.dp, vertical = 4.dp),
                 )
             }
         }
