@@ -43,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # Full history and tags: the changelog and the "has main moved" test both need them.
           fetch-depth: 0
@@ -66,20 +66,20 @@ jobs:
           fi
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
           # No emulator: this job only builds and runs JVM tests. The platform is named because
           # the Material 3 Expressive alphas compile against 37, newer than runners ship with.
           packages: platform-tools platforms;android-37.0
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Decode release keystore (optional)
         # Without the secret (a fork, say) the APK is debug-signed: fine for testing, but it
@@ -120,7 +120,7 @@ jobs:
           -PappVersionCode=${{ steps.ver.outputs.code }}
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sotto-recorder-apk
           path: app/build/outputs/apk/release/*.apk
