@@ -1,26 +1,38 @@
 <div align="center">
 
-<img src="docs/logo.svg" width="110" alt="Sotto Recorder logo">
+<img src="docs/logo.svg" width="110" alt="Alyo logo">
 
-# Sotto Recorder
+# Alyo
 
-**A voice recorder that writes down what is said as you speak. Everything stays on the phone.**
+**Speech for your phone, without Google: voice typing and a recorder that transcribes as you talk.**
 
-[<img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" alt="Get it on Obtainium" height="54">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/PimpinPumpkin/sotto)&nbsp;&nbsp;[<img src="https://img.shields.io/badge/DOWNLOAD%20APK-1A73E8?style=for-the-badge&logo=android&logoColor=white" alt="Download the APK" height="54">](https://github.com/PimpinPumpkin/sotto/releases/latest)
+[<img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" alt="Get it on Obtainium" height="54">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/PimpinPumpkin/alyo)&nbsp;&nbsp;[<img src="https://img.shields.io/badge/DOWNLOAD%20APK-1A73E8?style=for-the-badge&logo=android&logoColor=white" alt="Download the APK" height="54">](https://github.com/PimpinPumpkin/alyo/releases/latest)
 
 Android 10 or later, 64-bit. No account, no cloud, no Google services.
 
 </div>
 
-| Library | Live transcript | Music and speech | Speakers | Summary |
+| Alyo | Voice typing | Recorder | Live transcript | Speakers |
 |:-:|:-:|:-:|:-:|:-:|
-| <img src="docs/screenshots/01-home.png" width="150"> | <img src="docs/screenshots/02-live-transcript.png" width="150"> | <img src="docs/screenshots/03-music.png" width="150"> | <img src="docs/screenshots/04-speakers.png" width="150"> | <img src="docs/screenshots/07-summary.png" width="150"> |
+| <img src="docs/screenshots/00-alyo.png" width="150"> | <img src="docs/screenshots/11-voice-typing.png" width="150"> | <img src="docs/screenshots/01-home.png" width="150"> | <img src="docs/screenshots/02-live-transcript.png" width="150"> | <img src="docs/screenshots/04-speakers.png" width="150"> |
 
-| Playback | Search | Settings | Dark: library | Dark: transcript |
+| Music and speech | Summary | Playback | Search | Dark |
 |:-:|:-:|:-:|:-:|:-:|
-| <img src="docs/screenshots/05-playback.png" width="150"> | <img src="docs/screenshots/06-search.png" width="150"> | <img src="docs/screenshots/08-settings.png" width="150"> | <img src="docs/screenshots/09-home-dark.png" width="150"> | <img src="docs/screenshots/10-speakers-dark.png" width="150"> |
+| <img src="docs/screenshots/03-music.png" width="150"> | <img src="docs/screenshots/07-summary.png" width="150"> | <img src="docs/screenshots/05-playback.png" width="150"> | <img src="docs/screenshots/06-search.png" width="150"> | <img src="docs/screenshots/10-speakers-dark.png" width="150"> |
 
-## Features
+Alyo is one app with two jobs. Turn on either or both; what you leave off stays out of your way.
+Both use the same speech models, so they are downloaded and kept only once.
+
+## Voice typing
+
+- **Type by talking, in any app.** The microphone key on your keyboard opens it.
+- **Words appear as you speak**, not after you stop.
+- **Punctuation and capitals** are added for you, or say "comma", "period", "new line".
+- **Undo the last sentence** or backspace a word, without leaving the panel.
+- **Hands the keyboard back** after a few seconds of silence.
+- **Works for apps that ask Android for speech**, such as a search box with a microphone.
+
+## Recorder
 
 - **Live transcript.** Words appear while you talk, and each sentence is tidied up when you pause.
 - **Tap a word to hear it.** The word being played is highlighted.
@@ -32,14 +44,18 @@ Android 10 or later, 64-bit. No account, no cloud, no Google services.
 - **Summaries**, written on the phone, ready to copy or share. Optional.
 - **Import audio files** and transcribe them.
 - **Export** audio, text, subtitles or word timings.
-- **English, German, French and Spanish.**
 - **Background playback**, lock screen controls, a widget and a quick settings tile.
 - **Back up and restore** the whole library.
-- **Private.** Nothing you record or say leaves the phone.
+- **Its own icon.** With the recorder on, a "Recorder" icon opens straight into it.
 
-Sotto Recorder is a free-software take on Google's Recorder app, and is not affiliated with
-Google. It is new, so expect a bug or two;
-[open an issue](https://github.com/PimpinPumpkin/sotto/issues) if you find one.
+## Both
+
+- **Private.** Nothing you say leaves the phone.
+- **English, German, French and Spanish** in the recorder. Voice typing is English for now.
+
+The recorder is a free-software take on Google's Recorder app. Alyo is not affiliated with Google.
+It is new, so expect a bug or two; [open an issue](https://github.com/PimpinPumpkin/alyo/issues)
+if you find one.
 
 ---
 
@@ -69,25 +85,24 @@ update.
 
 <br>
 
-Every Sotto Recorder APK, from any channel, is signed with the same key. Its certificate
-fingerprint is:
+Every Alyo APK, from any channel, is signed with the same key. Its certificate fingerprint is:
 
 ```
-SHA-256  6B:46:17:27:C0:0D:04:FC:20:60:45:55:2D:A9:5C:36:7F:AB:37:A3:21:EA:37:CF:E4:81:86:BC:D0:EC:D3:FE
+SHA-256  CB:9E:B9:4D:CD:F0:3B:A7:D6:B4:52:FE:64:E5:4C:DA:39:FB:DF:90:AE:94:72:02:FE:3D:1A:E9:BF:F2:FA:EB
 ```
 
 Check a downloaded file against it before installing:
 
 ```bash
-apksigner verify --print-certs sotto-recorder-*.apk
+apksigner verify --print-certs alyo-*.apk
 ```
 
 On the phone, [App Verifier](https://github.com/soupslurpr/AppVerifier) checks the same thing. It
 wants the package name on the first line and the fingerprint on the second:
 
 ```
-app.sotto
-6B:46:17:27:C0:0D:04:FC:20:60:45:55:2D:A9:5C:36:7F:AB:37:A3:21:EA:37:CF:E4:81:86:BC:D0:EC:D3:FE
+app.alyo
+CB:9E:B9:4D:CD:F0:3B:A7:D6:B4:52:FE:64:E5:4C:DA:39:FB:DF:90:AE:94:72:02:FE:3D:1A:E9:BF:F2:FA:EB
 ```
 
 Android enforces this for you after the first install: an update signed with a different key is
@@ -96,22 +111,43 @@ refused.
 </details>
 
 <details>
+<summary><b>Setting up voice typing</b></summary>
+
+<br>
+
+Alyo is a keyboard with no keys: it only listens. Your own keyboard stays as it is, and its
+microphone key switches to Alyo.
+
+1. Download the speech model.
+2. Allow the microphone.
+3. Turn on "Alyo voice typing" in the phone's keyboard list.
+
+The app walks you through these and has a box to try it in. Two things can get in the way, and the
+app tells you when it sees them:
+
+- **Another voice typing app is also turned on.** The microphone key goes to whichever one the
+  system picks. Switch the other off in the keyboard list.
+- **Your keyboard answers its own microphone key.** FUTO Keyboard does this until its built-in
+  voice input is turned off in its settings.
+
+</details>
+
+<details>
 <summary><b>Models and download sizes</b></summary>
 
 <br>
 
-Nothing is transcribed until a speech model is on the phone. The app offers to download one on
-first launch.
+Nothing is turned into text until a speech model is on the phone. The app offers to download one
+on first launch.
 
 | Language | Standard (default) | Best |
 | --- | --- | --- |
-| English | 346 MB | 899 MB |
-| German, French | 172 MB | 842 MB |
-| Spanish | 257 MB | 927 MB |
+| English | 249 MB | 802 MB |
+| German, French | 75 MB | 745 MB |
+| Spanish | 160 MB | 830 MB |
 
-- Best uses about 1.1 GB of memory while recording.
-- The sizes include the 97 MB voice model behind speaker labels. Turn speaker labels off and it
-  is not downloaded.
+- Best uses about 1.1 GB of memory while it is working.
+- With the recorder on and speaker labels left on, add 97 MB for the voice model.
 - Summaries need a separate model: Quick (676 MB) or Thorough (1.1 GB). Any other GGUF chat model
   can be imported instead.
 
@@ -129,17 +165,18 @@ When a later version moves to a newer model, the one you have keeps working unti
 
 | What you do | Who hears about it |
 | --- | --- |
-| Record, transcribe, label speakers, summarize, search | **Nobody.** All of it runs on the phone |
+| Dictate, record, transcribe, label speakers, summarize, search | **Nobody.** All of it runs on the phone |
 | Download a model | **GitHub or Hugging Face**, which see a file download and nothing else |
 | Import a model from files instead | **Nobody** |
 | Export or share a recording | **Whichever app you send it to** |
 
 No analytics, no crash reporting, no accounts. Model downloads are the only time the app uses the
-network. On a system that lets you withhold the network permission from an app, Sotto runs fine
+network. On a system that lets you withhold the network permission from an app, Alyo runs fine
 without it once its models are in place.
 
-Recordings are kept in the app's private storage. Other apps see one only when you export it,
-share it, or pick it in the system file picker.
+Voice typing listens only while its panel is open. Recordings are kept in the app's private
+storage; other apps see one only when you export it, share it, or pick it in the system file
+picker.
 
 </details>
 
@@ -148,7 +185,7 @@ share it, or pick it in the system file picker.
 
 <br>
 
-Transcription is two passes, both on the CPU through
+Speech is turned into text in two passes, both on the CPU through
 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx):
 
 1. A streaming model produces the words you see appear.
@@ -160,7 +197,8 @@ Transcription is two passes, both on the CPU through
 | English | NVIDIA FastConformer | Parakeet TDT 110M (Standard) or 0.6B v2 (Best) |
 | German, French, Spanish | Kroko streaming Zipformer | None (Standard) or Parakeet TDT 0.6B v3 (Best) |
 
-The Kroko models punctuate as they go, so their text can stand as the transcript.
+The recorder and the keyboard share one engine and one copy of the models. After you dictate, the
+models stay in memory for a few minutes so the next sentence starts at once.
 
 - **Sounds**: CED tiny, inside the APK, tags music, applause and laughter.
 - **Speakers**: pyannote segmentation finds where the voice changes, and NVIDIA TitaNet groups
@@ -172,7 +210,7 @@ The Kroko models punctuate as they go, so their text can stand as the transcript
   Cropping copies audio frames without re-encoding.
 
 Each version of the app pins the exact model files it uses by SHA-256. They are fetched from the
-[`models` release](https://github.com/PimpinPumpkin/sotto/releases/tag/models) here, which holds
+[`models` release](https://github.com/PimpinPumpkin/alyo/releases/tag/models) here, which holds
 unmodified copies, and from the original publisher if that fails.
 
 </details>
@@ -182,10 +220,12 @@ unmodified copies, and from the original publisher if that fails.
 
 <br>
 
-- Four languages. Adding one needs a good open streaming model, and few languages have one.
+- Reading text aloud is planned and not built yet.
+- Voice typing is English only. The recorder has four languages; adding one needs a good open
+  streaming model, and few languages have one.
 - The app's own text is English only.
-- The Bluetooth microphone option and pausing for phone calls have not been tested on real
-  hardware.
+- The Bluetooth microphone option and pausing a recording for phone calls have not been tested on
+  real hardware.
 - Not on F-Droid yet. See [docs/FDROID.md](docs/FDROID.md).
 
 </details>
@@ -207,15 +247,21 @@ tag. Pass `-PllamaSrc=<checkout>` to build llama.cpp from a local copy.
 ./gradlew testDebugUnitTest
 ```
 
-runs the tests: word timing, transcript edits and cuts, speaker changes, resampling and audio
-framing.
+runs the tests: word timing, transcript edits and cuts, speaker changes, the text logic of voice
+typing (spacing, capitals, spoken punctuation, undo), resampling and audio framing.
 
-Debug builds can record from a WAV file (16-bit mono, 16 or 48 kHz) instead of the microphone:
+Debug builds can work from audio files instead of the microphone:
 
 ```bash
+# Record from a WAV file (16-bit mono, 16 or 48 kHz)
 adb push clip.wav /data/local/tmp/clip.wav
-adb shell run-as app.sotto cp /data/local/tmp/clip.wav files/clip.wav
-adb shell am start -n app.sotto/.MainActivity --es wav /data/user/0/app.sotto/files/clip.wav
+adb shell run-as app.alyo cp /data/local/tmp/clip.wav files/clip.wav
+adb shell am start -n app.alyo/.MainActivity --es wav /data/user/0/app.alyo/files/clip.wav
+
+# Dictate files/test.wav (16-bit mono, 16 kHz) whenever the voice typing panel opens
+adb shell run-as app.alyo cp /data/local/tmp/clip.wav files/test.wav
+adb shell ime enable app.alyo/.ime.AlyoIme
+adb shell ime set app.alyo/.ime.AlyoIme
 ```
 
 After adding a model, rerun `scripts/build-onnxruntime.sh`: the bundled runtime only carries the

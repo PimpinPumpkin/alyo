@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds the ONNX Runtime the app ships: the same version the sherpa-onnx AAR was built against,
-# with only the operators Sotto's models use. The stock library carries every operator and is
+# with only the operators Alyo's models use. The stock library carries every operator and is
 # twice the size.
 #
 #   scripts/build-onnxruntime.sh                 build with scripts/onnxruntime-ops.config
@@ -14,7 +14,7 @@
 # Needs: ANDROID_HOME with an NDK, python3 with `pip install cmake ninja onnx onnxruntime`.
 # Output: build/onnxruntime/libonnxruntime.so. To ship it, copy it to
 # app/libs/onnxruntime/arm64-v8a/, test, then upload it to the `models` release under the name
-# app/build.gradle.kts fetches, with the sottoN suffix raised by one.
+# app/build.gradle.kts fetches, with the alyoN suffix raised by one.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -45,7 +45,7 @@ for path in sys.argv[1:3]:
             domain, opset, names = line.split(";")
             ops[(domain, int(opset))] |= set(names.split(","))
 with open(sys.argv[3], "w") as out:
-    out.write("# Operators the models Sotto ships or downloads need, as published and after\n")
+    out.write("# Operators the models Alyo ships or downloads need, as published and after\n")
     out.write("# ONNX Runtime has optimized them. Regenerate with\n")
     out.write("# scripts/build-onnxruntime.sh <dir holding every model>\n")
     out.write("# whenever a model is added to ModelCatalog.kt.\n")

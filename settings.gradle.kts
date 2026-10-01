@@ -20,6 +20,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Sotto"
+rootProject.name = "Alyo"
 
 include(":app")

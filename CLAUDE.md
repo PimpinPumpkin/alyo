@@ -1,6 +1,8 @@
-# Sotto Recorder
+# Alyo
 
-Android voice recorder with on-device transcription. README.md covers how it works.
+Speech for Android without Google, in one app: a voice-only keyboard that types while you talk,
+and a recorder that transcribes as it records. Both run on one on-device engine and one set of
+models. README.md covers how it works.
 
 ## Rules
 
@@ -13,6 +15,15 @@ once per clone.
 - Commit subjects are the changelog. Release notes use them as written, so make each one a plain
   sentence about what changed for the user. Prefix documentation-only commits with `Docs:`.
 
+## Layout
+
+- `asr/` the shared engine: model catalog and downloads, live and second-pass transcription.
+- `dictation/`, `ime/`, `recognition/`, `text/` voice typing.
+- `audio/`, `data/`, `playback/`, `export/`, `llm/`, `service/` the recorder.
+- `data/Settings.kt` holds `Feature`: each feature lists the manifest components it owns. They are
+  disabled in the manifest and enabled when the user turns the feature on, so a new feature's
+  components must be added there or they will never appear.
+
 ## Releases
 
 - Work on `canary`. Every push rebuilds the `canary` release.
@@ -24,10 +35,17 @@ once per clone.
 - The APK ships a trimmed ONNX Runtime. After adding any model, rerun
   `scripts/build-onnxruntime.sh <dir with every model>` or the new model may fail to load.
 
-## Building
+## Building and testing
 
 `./gradlew assembleDebug` with JDK 17 and Android SDK platform 37. Signing reads
-`SOTTO_KEYSTORE_PATH`, `SOTTO_KEYSTORE_PASSWORD` and `SOTTO_KEY_ALIAS`, and falls back to the
-debug key.
+`ALYO_KEYSTORE_PATH`, `ALYO_KEYSTORE_PASSWORD` and `ALYO_KEY_ALIAS`, and falls back to the debug
+key. `./gradlew testDebugUnitTest` runs the unit tests.
 
-Debug builds take `--es wav <path>` to record from a file and `--es theme light|dark`.
+Debug builds, and release builds made with `-PtestHooks`:
+
+- `--es wav <path>` on MainActivity records from a WAV file, and `--es theme light|dark` shows
+  the other theme.
+- Voice typing dictates `test.wav` (16-bit mono, 16 kHz) in place of the microphone if that file
+  is in the app's files folder or its external files folder. To drive the keyboard:
+  `adb shell ime enable app.alyo/.ime.AlyoIme`, focus a text field, then
+  `adb shell ime set app.alyo/.ime.AlyoIme`.

@@ -6,8 +6,8 @@
         android:shortcutId="record"
         android:shortcutShortLabel="@string/shortcut_record">
         <intent
-            android:action="app.sotto.action.RECORD"
-            android:targetClass="app.sotto.MainActivity"
-            android:targetPackage="app.sotto" />
+            android:action="app.alyo.action.RECORD"
+            android:targetClass="app.alyo.MainActivity"
+            android:targetPackage="app.alyo" />
     </shortcut>
 </shortcuts>

@@ -1,4 +1,4 @@
-// The whole of Sotto's bridge to llama.cpp: load a GGUF chat model, count tokens, and answer one
+// The whole of Alyo's bridge to llama.cpp: load a GGUF chat model, count tokens, and answer one
 // system + user prompt, streaming the reply back a piece at a time.
 #include <jni.h>
 #include <android/log.h>
@@ -8,7 +8,7 @@
 
 #include "llama.h"
 
-#define TAG "sotto-llm"
+#define TAG "alyo-llm"
 
 namespace {
 
@@ -56,7 +56,7 @@ std::string chat_prompt(const Session *s, const std::string &system, const std::
 extern "C" {
 
 JNIEXPORT jlong JNICALL
-Java_app_sotto_llm_Llama_nativeLoad(JNIEnv *env, jclass, jstring path, jint n_ctx, jint n_threads) {
+Java_app_alyo_llm_Llama_nativeLoad(JNIEnv *env, jclass, jstring path, jint n_ctx, jint n_threads) {
     static bool started = false;
     if (!started) {
         llama_log_set(quiet_log, nullptr);
@@ -87,14 +87,14 @@ Java_app_sotto_llm_Llama_nativeLoad(JNIEnv *env, jclass, jstring path, jint n_ct
 }
 
 JNIEXPORT jint JNICALL
-Java_app_sotto_llm_Llama_nativeCountTokens(JNIEnv *env, jclass, jlong handle, jstring text) {
+Java_app_alyo_llm_Llama_nativeCountTokens(JNIEnv *env, jclass, jlong handle, jstring text) {
     auto *s = (Session *) handle;
     return (jint) tokenize(s, to_string(env, text), false).size();
 }
 
 // Returns 0 on a normal finish, 1 if stopped by the caller, negative on failure.
 JNIEXPORT jint JNICALL
-Java_app_sotto_llm_Llama_nativeGenerate(JNIEnv *env, jclass, jlong handle, jstring system, jstring user,
+Java_app_alyo_llm_Llama_nativeGenerate(JNIEnv *env, jclass, jlong handle, jstring system, jstring user,
                                         jstring opening, jstring grammar, jint max_tokens, jobject sink) {
     auto *s = (Session *) handle;
     s->cancel = false;
@@ -161,12 +161,12 @@ Java_app_sotto_llm_Llama_nativeGenerate(JNIEnv *env, jclass, jlong handle, jstri
 }
 
 JNIEXPORT void JNICALL
-Java_app_sotto_llm_Llama_nativeCancel(JNIEnv *, jclass, jlong handle) {
+Java_app_alyo_llm_Llama_nativeCancel(JNIEnv *, jclass, jlong handle) {
     ((Session *) handle)->cancel = true;
 }
 
 JNIEXPORT void JNICALL
-Java_app_sotto_llm_Llama_nativeFree(JNIEnv *, jclass, jlong handle) {
+Java_app_alyo_llm_Llama_nativeFree(JNIEnv *, jclass, jlong handle) {
     auto *s = (Session *) handle;
     llama_free(s->ctx);
     llama_model_free(s->model);

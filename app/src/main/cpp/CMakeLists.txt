@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22.1)
-project(sotto_llm C CXX)
+project(alyo_llm C CXX)
 
 # llama.cpp runs the summary model. It is built from source at a pinned release, so there is no
 # prebuilt binary in the app. Pass -DLLAMA_SRC=<checkout> to build from a local copy instead of
@@ -37,6 +37,6 @@ else()
     endif()
 endif()
 
-add_library(sotto-llm SHARED llm_jni.cpp)
-target_compile_features(sotto-llm PRIVATE cxx_std_17)
-target_link_libraries(sotto-llm PRIVATE llama log)
+add_library(alyo-llm SHARED llm_jni.cpp)
+target_compile_features(alyo-llm PRIVATE cxx_std_17)
+target_link_libraries(alyo-llm PRIVATE llama log)

@@ -1,6 +1,6 @@
 # F-Droid
 
-What stands between Sotto and F-Droid's main repository.
+What stands between Alyo and F-Droid's main repository.
 
 ## Fine already
 

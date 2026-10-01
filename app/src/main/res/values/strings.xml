@@ -1,7 +1,10 @@
 <resources>
-    <string name="app_name">Sotto</string>
-    <!-- The launcher label when "Show as Recorder" is on. -->
-    <string name="app_name_plain">Recorder</string>
+    <string name="app_name">Alyo</string>
+    <!-- The second icon, which opens straight into the recordings. -->
+    <string name="recorder_name">Recorder</string>
+    <!-- The name shown in the phone's keyboard list. -->
+    <string name="ime_name">Alyo voice typing</string>
+    <string name="subtype_voice">Voice (English)</string>
     <string name="tile_label">Record</string>
     <string name="widget_label">Record</string>
     <string name="widget_description">Start recording with one tap</string>

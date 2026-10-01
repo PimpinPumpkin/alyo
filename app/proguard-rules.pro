@@ -2,6 +2,6 @@
 -keep class com.k2fsa.sherpa.onnx.** { *; }
 
 # Called from native code by name.
--keep class app.sotto.llm.Llama { *; }
--keep interface app.sotto.llm.Llama$Sink { *; }
--keepclassmembers class * implements app.sotto.llm.Llama$Sink { *; }
+-keep class app.alyo.llm.Llama { *; }
+-keep interface app.alyo.llm.Llama$Sink { *; }
+-keepclassmembers class * implements app.alyo.llm.Llama$Sink { *; }

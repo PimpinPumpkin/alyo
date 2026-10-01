@@ -8,17 +8,24 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <!-- Used for exactly one thing: downloading speech models the first time. Nothing is ever uploaded. -->
+    <!-- Used for exactly one thing: downloading speech models. Nothing is ever uploaded. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- So the app can see which other voice typing apps are turned on, and say so. -->
+    <queries>
+        <intent>
+            <action android:name="android.view.InputMethod" />
+        </intent>
+    </queries>
+
     <application
-        android:name=".SottoApp"
+        android:name=".AlyoApp"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Sotto">
+        android:theme="@style/Theme.Alyo">
 
         <activity
             android:name=".MainActivity"
@@ -27,15 +34,28 @@
             android:windowSoftInputMode="adjustResize" />
 
         <!--
-            The launcher entry is one of these two aliases, never the activity itself, so its
-            label can be switched from Settings: enabling one and disabling the other is the only
-            way Android lets an app change the name under its own icon.
+            Two icons, one app. "Alyo" is always there. "Recorder" opens straight into the
+            recordings and exists only while the recorder is turned on: it starts disabled, like
+            everything else that belongs to one feature, and Settings enables it.
         -->
         <activity-alias
-            android:name=".LauncherNamed"
-            android:enabled="true"
+            android:name=".Launcher"
             android:exported="true"
             android:label="@string/app_name"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".RecorderLauncher"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_recorder"
+            android:roundIcon="@mipmap/ic_recorder"
+            android:label="@string/recorder_name"
             android:targetActivity=".MainActivity">
             <meta-data
                 android:name="android.app.shortcuts"
@@ -46,17 +66,48 @@
             </intent-filter>
         </activity-alias>
 
-        <activity-alias
-            android:name=".LauncherPlain"
+        <!-- The keyboard. Voice only: other keyboards' microphone keys switch to it. -->
+        <service
+            android:name=".ime.AlyoIme"
             android:enabled="false"
             android:exported="true"
-            android:label="@string/app_name_plain"
-            android:targetActivity=".MainActivity">
+            android:label="@string/ime_name"
+            android:permission="android.permission.BIND_INPUT_METHOD">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="android.view.InputMethod" />
             </intent-filter>
-        </activity-alias>
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/method" />
+        </service>
+
+        <!-- Speech recognition for apps that ask Android for it without showing a keyboard. -->
+        <service
+            android:name=".recognition.AlyoRecognitionService"
+            android:enabled="false"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.speech.RecognitionService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.speech"
+                android:resource="@xml/recognition" />
+        </service>
+
+        <!-- The same, for apps that ask for the standard speech prompt. -->
+        <activity
+            android:name=".recognition.RecognizeActivity"
+            android:enabled="false"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Alyo.Sheet">
+            <intent-filter>
+                <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
 
         <service
             android:name=".service.RecordingService"
@@ -75,8 +126,9 @@
         <!-- Quick settings tile: one tap from the shade to start or stop recording. -->
         <service
             android:name=".service.RecordTile"
+            android:enabled="false"
             android:exported="true"
-            android:icon="@drawable/ic_stat_sotto"
+            android:icon="@drawable/ic_stat_alyo"
             android:label="@string/tile_label"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
@@ -89,6 +141,7 @@
 
         <receiver
             android:name=".service.RecordWidget"
+            android:enabled="false"
             android:exported="true"
             android:label="@string/widget_label">
             <intent-filter>
@@ -108,6 +161,7 @@
         <provider
             android:name=".export.LibraryProvider"
             android:authorities="${applicationId}.library"
+            android:enabled="false"
             android:exported="true"
             android:grantUriPermissions="true"
             android:permission="android.permission.MANAGE_DOCUMENTS">

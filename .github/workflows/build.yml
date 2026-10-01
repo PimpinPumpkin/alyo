@@ -88,10 +88,10 @@ jobs:
         # Without the secret (a fork, say) the APK is debug-signed: fine for testing, but it
         # cannot update an install signed with the real key.
         env:
-          KEYSTORE_B64: ${{ secrets.SOTTO_KEYSTORE_BASE64 }}
+          KEYSTORE_B64: ${{ secrets.ALYO_KEYSTORE_BASE64 }}
         run: |
           if [ -n "$KEYSTORE_B64" ]; then
-            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/sotto-release.jks"
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/alyo-release.jks"
             echo "Decoded release keystore."
           else
             echo "No keystore secret: the release APK will be debug-signed."
@@ -106,7 +106,7 @@ jobs:
         run: |
           mkdir -p app/libs/onnxruntime/arm64-v8a
           gh release download models --repo "${{ github.repository }}" \
-            --pattern 'build.libonnxruntime-1.28.2-sotto2-arm64-v8a.so' \
+            --pattern 'build.libonnxruntime-1.28.2-alyo2-arm64-v8a.so' \
             --output app/libs/onnxruntime/arm64-v8a/libonnxruntime.so || echo "Not available; using the AAR's copy."
 
       - name: Unit tests
@@ -136,9 +136,9 @@ jobs:
 
       - name: Build release APKs
         env:
-          SOTTO_KEYSTORE_PATH: ${{ runner.temp }}/sotto-release.jks
-          SOTTO_KEYSTORE_PASSWORD: ${{ secrets.SOTTO_KEYSTORE_PASSWORD }}
-          SOTTO_KEY_ALIAS: ${{ secrets.SOTTO_KEY_ALIAS }}
+          ALYO_KEYSTORE_PATH: ${{ runner.temp }}/alyo-release.jks
+          ALYO_KEYSTORE_PASSWORD: ${{ secrets.ALYO_KEYSTORE_PASSWORD }}
+          ALYO_KEY_ALIAS: ${{ secrets.ALYO_KEY_ALIAS }}
         run: >
           ./gradlew :app:assembleRelease --no-daemon
           -PappVersionName=${{ steps.ver.outputs.name }}
@@ -147,7 +147,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: sotto-recorder-apk
+          name: alyo-apk
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
@@ -160,12 +160,12 @@ jobs:
         run: |
           VER="${{ steps.ver.outputs.name }}"
           CODE="${{ steps.ver.outputs.code }}"
-          cp app/build/outputs/apk/release/app-release.apk sotto-recorder-canary.apk
+          cp app/build/outputs/apk/release/app-release.apk alyo-canary.apk
           SUBJ="$(bash scripts/changelog.sh --latest HEAD)"
           [ -z "$SUBJ" ] && SUBJ="$(git log -1 --no-merges --pretty=%s)"
           NOTES="$(printf 'Canary branch.\n\nversionName: %s\nversionCode: %s\n\nLatest change: %s\n' "$VER" "$CODE" "$SUBJ")"
           gh release delete canary --yes --cleanup-tag 2>/dev/null || true
-          gh release create canary --prerelease --target "$GITHUB_SHA" --title "Sotto Recorder $VER" --notes "$NOTES" sotto-recorder-canary.apk
+          gh release create canary --prerelease --target "$GITHUB_SHA" --title "Alyo $VER" --notes "$NOTES" alyo-canary.apk
 
       - name: Publish nightly (prerelease)
         if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
@@ -180,7 +180,7 @@ jobs:
             exit 0
           fi
           VER="${{ steps.ver.outputs.name }}"
-          cp app/build/outputs/apk/release/app-release.apk "sotto-recorder-v${VER}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "alyo-v${VER}.apk"
           # Commit subjects are written as plain changelog lines, so this reads as release notes.
           if [ -n "$LAST" ]; then
             LOG="$(bash scripts/changelog.sh "${LAST}..HEAD")"
@@ -192,11 +192,11 @@ jobs:
           [ -z "$LOG" ] && LOG="- Maintenance and internal changes"
           NOTES="$(printf 'Nightly build.\n\nWhat'\''s changed in %s\n\n%s\n\n%s\n' "$VER" "$LOG" "$COMPARE")"
           gh release create "v${VER}" \
-            --title "Sotto Recorder $VER nightly" \
+            --title "Alyo $VER nightly" \
             --target "$GITHUB_SHA" \
             --prerelease \
             --notes "$NOTES" \
-            "sotto-recorder-v${VER}.apk"
+            "alyo-v${VER}.apk"
 
       - name: Prune old nightlies (stables are kept for good)
         # Thirty nightlies is a month of bisect range. The v0.* filter is load bearing: `canary`

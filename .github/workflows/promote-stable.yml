@@ -65,7 +65,7 @@ jobs:
           NOTES="$(printf 'What'\''s changed in %s\n\n%s\n\n%s\n' "$VER" "$LOG" "$COMPARE")"
           # Drop the "nightly" from the title: the same release is the stable now.
           gh release edit "$NIGHTLY" \
-            --title "Sotto Recorder $VER" \
+            --title "Alyo $VER" \
             --prerelease=false \
             --latest \
             --notes "$NOTES"

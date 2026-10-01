@@ -9,7 +9,7 @@ plugins {
 // Files the build needs that are too big for git. Each is tried from this project's own `models`
 // release first, which keeps copies so the build does not depend on another project's release
 // page staying as it is, and then from where it was originally published.
-val mirror = "https://github.com/PimpinPumpkin/sotto/releases/download/models"
+val mirror = "https://github.com/PimpinPumpkin/alyo/releases/download/models"
 fun fetch(target: File, upstream: String) {
     target.parentFile.mkdirs()
     val tmp = File(target.parentFile, target.name + ".part")
@@ -35,14 +35,14 @@ if (!sherpaAar.exists()) {
     fetch(sherpaAar, "https://github.com/k2-fsa/sherpa-onnx/releases/download/v$sherpaVersion/sherpa-onnx-$sherpaVersion.aar")
 }
 
-// ONNX Runtime, rebuilt with only the operators Sotto's models use: half the size of the one in
+// ONNX Runtime, rebuilt with only the operators Alyo's models use: half the size of the one in
 // the AAR, which carries every operator there is. scripts/build-onnxruntime.sh builds it, and
 // the result is kept on the `models` release. It takes the place of the AAR's copy at packaging
 // (see pickFirsts below). If it cannot be fetched the build still works, with the larger one.
 val ortSlim = layout.projectDirectory.file("libs/onnxruntime/arm64-v8a/libonnxruntime.so").asFile
 if (!ortSlim.exists()) {
     try {
-        fetch(ortSlim, "$mirror/libonnxruntime-1.28.2-sotto2-arm64-v8a.so")
+        fetch(ortSlim, "$mirror/libonnxruntime-1.28.2-alyo2-arm64-v8a.so")
     } catch (e: java.io.IOException) {
         logger.warn("Trimmed ONNX Runtime not available (${e.message}); packaging the full one from the AAR.")
     }
@@ -84,11 +84,11 @@ if (!File(speakersDir, "model.int8.onnx").exists()) {
 }
 
 android {
-    namespace = "app.sotto"
+    namespace = "app.alyo"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "app.sotto"
+        applicationId = "app.alyo"
         minSdk = 29
         targetSdk = 35
         // CI passes -PappVersionCode / -PappVersionName, derived from the workflow run number so
@@ -116,15 +116,15 @@ android {
     // Release signing comes from the environment (CI secrets, or keystore.properties exported by
     // hand). Without it the release build falls back to the debug key, which still installs for
     // testing but cannot update a properly signed copy.
-    //   SOTTO_KEYSTORE_PATH / SOTTO_KEYSTORE_PASSWORD / SOTTO_KEY_ALIAS
+    //   ALYO_KEYSTORE_PATH / ALYO_KEYSTORE_PASSWORD / ALYO_KEY_ALIAS
     signingConfigs {
         create("releaseFromEnv") {
-            val path = System.getenv("SOTTO_KEYSTORE_PATH")
+            val path = System.getenv("ALYO_KEYSTORE_PATH")
             if (!path.isNullOrBlank() && File(path).exists()) {
                 storeFile = File(path)
-                storePassword = System.getenv("SOTTO_KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("SOTTO_KEY_ALIAS") ?: "sotto"
-                keyPassword = System.getenv("SOTTO_KEYSTORE_PASSWORD")
+                storePassword = System.getenv("ALYO_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ALYO_KEY_ALIAS") ?: "alyo"
+                keyPassword = System.getenv("ALYO_KEYSTORE_PASSWORD")
             }
         }
     }
