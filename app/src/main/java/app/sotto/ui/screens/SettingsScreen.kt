@@ -1,5 +1,15 @@
 package app.sotto.ui.screens
 
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
+import app.sotto.R
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.draw.scale
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.Image
 import app.sotto.export.LibraryProvider
 import androidx.compose.material.icons.rounded.Contrast
 import androidx.compose.material.icons.rounded.FolderShared
@@ -87,25 +97,62 @@ import kotlinx.coroutines.withContext
 @Composable
 fun SetupScreen(app: SottoApp, onDone: () -> Unit) {
     val colors = MaterialTheme.colorScheme
-    Box(Modifier.fillMaxSize().background(colors.surface), contentAlignment = Alignment.BottomCenter) {
-    // Pinned to the bottom when there is room; scrolls when there is not (a phone on its side).
-    Column(
-        Modifier.fillMaxHeight().widthIn(max = 640.dp).statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),
-        verticalArrangement = Arrangement.Bottom,
-    ) {
-        Text("Transcribe as you speak", style = MaterialTheme.typography.headlineLarge)
-        Spacer(Modifier.height(10.dp))
-        Text(
-            "Speech is turned into text on this phone, never sent anywhere. It needs a speech model first.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = colors.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(24.dp))
-        ModelChooser(app, onReady = onDone, readyLabel = "Start recording")
-        TextButton(onClick = onDone, modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 8.dp)) {
-            Text("Not now, just record audio")
+    BoxWithConstraints(Modifier.fillMaxSize().background(colors.surface).statusBarsPadding().navigationBarsPadding(), contentAlignment = Alignment.TopCenter) {
+        val screen = maxHeight
+        // Tall screens get the mark stacked over the name; short ones get the two side by side,
+        // which costs a fraction of the height. The page is as tall as the screen whenever its
+        // contents fit, so it only scrolls where there is truly no room (a phone on its side).
+        val tall = screen >= 660.dp
+        Column(
+            Modifier.widthIn(max = 560.dp).verticalScroll(rememberScrollState()).heightIn(min = screen).padding(horizontal = 24.dp),
+            verticalArrangement = LogoThenRest,
+        ) {
+            if (tall) {
+                val mark = (screen * 0.2f).coerceIn(120.dp, 176.dp)
+                Column(Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    SottoMark(mark)
+                    Text("Sotto", style = MaterialTheme.typography.displayLarge.copy(fontSize = 64.sp, lineHeight = 72.sp))
+                }
+            } else {
+                Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                    SottoMark(56.dp)
+                    Spacer(Modifier.width(4.dp))
+                    Text("Sotto", style = MaterialTheme.typography.displaySmall.copy(fontSize = 40.sp, lineHeight = 48.sp))
+                }
+            }
+            Column {
+                Text("Transcribe as you speak", style = if (tall) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineSmall)
+                Spacer(Modifier.height(if (tall) 8.dp else 4.dp))
+                Text(
+                    "Speech is turned into text on this phone, never sent anywhere. It needs a speech model first.",
+                    style = if (tall) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(if (tall) 20.dp else 12.dp))
+                ModelChooser(app, onReady = onDone, readyLabel = "Start recording")
+                TextButton(onClick = onDone, modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 4.dp)) {
+                    Text("Not now, just record audio")
+                }
+            }
         }
     }
+}
+
+/** The app icon's artwork. It keeps its drawing in the middle of the canvas, so it is scaled up to fill [size]. */
+@Composable
+private fun SottoMark(size: Dp) {
+    Image(painterResource(R.drawable.ic_launcher_foreground), null, Modifier.size(size).scale(1.9f))
+}
+
+/** Centers the first child in whatever height is left over and stacks the rest at the bottom. */
+private object LogoThenRest : Arrangement.Vertical {
+    override fun Density.arrange(totalSize: Int, sizes: IntArray, outPositions: IntArray) {
+        val free = (totalSize - sizes.sum()).coerceAtLeast(0)
+        var y = free
+        for (i in sizes.indices) {
+            outPositions[i] = if (i == 0) free / 2 else y
+            y += sizes[i]
+        }
     }
 }
 
@@ -197,7 +244,7 @@ fun SettingsScreen(app: SottoApp, onDone: () -> Unit, onLicenses: () -> Unit, on
                     SheetRow(
                         Icons.Rounded.Badge,
                         "Show as \"Recorder\"",
-                        detail = "Use the plain name on the home screen",
+                        detail = "Instead of \"Sotto\" on the home screen",
                         trailing = { Switch(checked = plainName, onCheckedChange = null) },
                         onClick = { app.settings.setPlainName(!plainName) },
                     ),
@@ -279,7 +326,10 @@ private fun ModelChooser(app: SottoApp, onReady: (() -> Unit)?, readyLabel: Stri
     val qualityId by app.settings.quality.collectAsState()
     val pack = app.settings.pack
     val quality = pack.qualities.firstOrNull { it.id == qualityId } ?: pack.qualities.first()
-    val needed: List<ModelSpec> = listOf(pack.live, quality.refiner)
+    val speakerLabels by app.settings.speakerLabels.collectAsState()
+    // The small voice model rides along with the speech models, so speaker labels work from the
+    // first recording rather than being something to discover and turn on later.
+    val needed: List<ModelSpec> = listOf(pack.live, quality.refiner) + listOfNotNull(ModelCatalog.speakers.takeIf { speakerLabels && BuildConfig.NETWORK })
     fun state(spec: ModelSpec) = states[spec.id] ?: InstallState.Missing
     val missing = needed.filter { state(it) != InstallState.Installed }
     val downloading = needed.any { state(it) is InstallState.Downloading }
@@ -306,7 +356,7 @@ private fun ModelChooser(app: SottoApp, onReady: (() -> Unit)?, readyLabel: Stri
         SheetGroup(
             pack.qualities.map { option ->
                 val installed = state(pack.live) == InstallState.Installed && state(option.refiner) == InstallState.Installed
-                val size = formatBytes(pack.live.source.downloadBytes + option.refiner.source.downloadBytes)
+                val size = formatBytes(pack.live.source.downloadBytes + option.refiner.source.downloadBytes + if (ModelCatalog.speakers in needed) ModelCatalog.speakers.source.downloadBytes else 0L)
                 SheetRow(
                     icon = if (option.id == "best") Icons.Rounded.HighQuality else Icons.Rounded.Speed,
                     label = option.title,
@@ -414,7 +464,9 @@ private fun SummaryModelChooser(app: SottoApp) {
     fun state(spec: ModelSpec) = states[spec.id] ?: InstallState.Missing
     // The imported slot only appears once something has been imported into it.
     val options = ModelCatalog.summarizers + listOfNotNull(ModelCatalog.importedSummarizer.takeIf { state(it) == InstallState.Installed })
-    val chosen = options.firstOrNull { it.id == chosenId } ?: options.first()
+    // Until the user picks one, the choice shown is the one that would actually be used: whatever
+    // is installed, and failing that the better model as the one to get.
+    val chosen = options.firstOrNull { it.id == chosenId } ?: options.firstOrNull { state(it) == InstallState.Installed } ?: ModelCatalog.summarizers.last()
     val chosenState = state(chosen)
     var importing by remember { mutableStateOf(false) }
 

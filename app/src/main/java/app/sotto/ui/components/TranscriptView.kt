@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import app.sotto.data.Segment
 import app.sotto.data.Word
 import app.sotto.ui.formatStamp
+import app.sotto.ui.theme.LocalSottoColors
 
 /**
  * A paragraph on screen: one or more sentences run together. Sentences are short (they end at
@@ -203,6 +204,8 @@ fun TranscriptView(
     speakerName: ((Int) -> String)? = null,
     onSpeakerTap: (Paragraph) -> Unit = {},
     onLongPress: (Segment) -> Unit = {},
+    /** Shown above the first paragraph and scrolls away with it: where the summary lives. */
+    header: (@Composable () -> Unit)? = null,
 ) {
     val livePartial = remember(partial) { if (partial.isEmpty()) null else Paragraph(listOf(Segment(Long.MAX_VALUE, partial)), live = true) }
     // Each sound marker sits above the first paragraph that starts after it; the rest go at the end.
@@ -210,6 +213,7 @@ fun TranscriptView(
         sounds.groupBy { sound -> paragraphs.indexOfFirst { it.startMs >= sound.startMs }.let { if (it < 0) paragraphs.size else it } }
     }
     LazyColumn(modifier, state = listState, contentPadding = contentPadding) {
+        if (header != null) item(key = "header") { header() }
         itemsIndexed(paragraphs, key = { _, p -> p.key }) { index, paragraph ->
             before[index]?.forEach { SoundMarker(it, onSoundTap) }
             ParagraphBlock(paragraph, positionMs, editing, query, selection, onWordTap, onEditSegment, onSelectionDrag, speakerName, onSpeakerTap, onLongPress)
@@ -397,11 +401,12 @@ private fun ParagraphBlock(
 @Composable
 private fun SoundMarker(sound: SoundSpan, onTap: (SoundSpan) -> Unit) {
     val colors = MaterialTheme.colorScheme
+    val tint = LocalSottoColors.current.sound(sound.kind)
     Surface(
         onClick = { onTap(sound) },
         shape = CircleShape,
-        color = colors.tertiaryContainer,
-        contentColor = colors.onTertiaryContainer,
+        color = tint.copy(alpha = 0.18f),
+        contentColor = tint,
         modifier = Modifier.padding(start = GUTTER, bottom = 20.dp),
     ) {
         Row(Modifier.padding(start = 12.dp, end = 16.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {

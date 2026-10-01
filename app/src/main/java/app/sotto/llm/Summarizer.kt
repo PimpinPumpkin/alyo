@@ -100,10 +100,9 @@ class Summarizer(
             }
 
             val words = parts.sumOf { it.count { c -> c == ' ' } + 1 }
-            // How much there is to say depends on how much was said. A short memo gets a title and
-            // nothing else: summarizing three sentences only produces a longer version of them.
+            // How much there is to say depends on how much was said. (Very short recordings never
+            // get here: the Summarize button is not offered for them.)
             val points = when {
-                words < SHORT_WORDS -> 0..0
                 words < 300 -> 1..2
                 words < 1200 -> 2..4
                 else -> 3..5
@@ -164,9 +163,6 @@ class Summarizer(
         private const val NOTE_TOKENS = 160
         private const val OPENING = "Title:"
         private const val MAX_TITLE_WORDS = 8
-
-        /** Below this many words a recording is only given a title. */
-        private const val SHORT_WORDS = 80
 
         private fun system(points: IntRange): String =
             "You label transcripts of voice recordings. Reply with a title of two to six words that says what the recording is about" +

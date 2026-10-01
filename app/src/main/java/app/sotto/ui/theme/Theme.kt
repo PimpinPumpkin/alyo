@@ -27,7 +27,22 @@ import app.sotto.R
 
 /** Colors Material's scheme has no role for: the record red is the same on every wallpaper. */
 @Immutable
-data class SottoColors(val record: Color, val onRecord: Color, val recordContainer: Color, val dark: Boolean = false)
+data class SottoColors(
+    val record: Color,
+    val onRecord: Color,
+    val recordContainer: Color,
+    val dark: Boolean = false,
+    /**
+     * What the waveform is drawn in for each kind of sound. These are fixed rather than taken from
+     * the wallpaper's palette, whose colors are chosen to sit well together and so are too alike
+     * to tell speech from music at a glance. Blue for talk, amber for music, green for the rest.
+     */
+    val speech: Color = Color(0xFF4285F4),
+    val music: Color = Color(0xFFF29900),
+    val otherSound: Color = Color(0xFF34A853),
+) {
+    fun sound(kind: String): Color = if (kind == "Music") music else otherSound
+}
 
 val LocalSottoColors = staticCompositionLocalOf { SottoColors(Color(0xFFEA4335), Color.White, Color(0xFFFCE8E6)) }
 
@@ -132,7 +147,13 @@ fun SottoTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () ->
         else -> LightFallback
     }
     // Coral disc, maroon dot: the same in both themes, as on the original.
-    val extra = SottoColors(record = Color(0xFFEC6A5E), onRecord = Color(0xFF5F1410), recordContainer = Color(0xFFFCE8E6), dark = dark)
+    val extra = SottoColors(
+        record = Color(0xFFEC6A5E), onRecord = Color(0xFF5F1410), recordContainer = Color(0xFFFCE8E6), dark = dark,
+        // Lighter tints on a dark background, where the saturated ones glare.
+        speech = if (dark) Color(0xFF8AB4F8) else Color(0xFF1A73E8),
+        music = if (dark) Color(0xFFFDD663) else Color(0xFFE37400),
+        otherSound = if (dark) Color(0xFF81C995) else Color(0xFF188038),
+    )
     CompositionLocalProvider(LocalSottoColors provides extra) {
         MaterialExpressiveTheme(
             colorScheme = scheme,

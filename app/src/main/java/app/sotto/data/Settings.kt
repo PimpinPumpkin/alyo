@@ -36,16 +36,16 @@ class Settings(context: Context) {
         _autoTitle.value = on
     }
 
-    private val _summarizer = MutableStateFlow(prefs.getString(SUMMARIZER, null) ?: ModelCatalog.summarizers.last().id)
-    /** Id of the model the user wants summaries written by. */
-    val summarizer: StateFlow<String> = _summarizer
+    private val _summarizer = MutableStateFlow(prefs.getString(SUMMARIZER, null))
+    /** Id of the model the user picked to write summaries, or null if they have not picked: then whichever is installed is used. */
+    val summarizer: StateFlow<String?> = _summarizer
 
     fun setSummarizer(id: String) {
         prefs.edit { putString(SUMMARIZER, id) }
         _summarizer.value = id
     }
 
-    private val _speakerLabels = MutableStateFlow(prefs.getBoolean(SPEAKERS, false))
+    private val _speakerLabels = MutableStateFlow(prefs.getBoolean(SPEAKERS, true))
     /** Tell voices apart and label who is speaking. Needs a small extra model. */
     val speakerLabels: StateFlow<Boolean> = _speakerLabels
 
@@ -106,7 +106,7 @@ class Settings(context: Context) {
     private val plain = ComponentName(context, "app.sotto.LauncherPlain")
 
     private val _plainName = MutableStateFlow(packages.getComponentEnabledSetting(plain) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
-    /** Whether the launcher shows the app as plain "Recorder" instead of "Sotto Recorder". */
+    /** Whether the launcher shows the app as plain "Recorder" instead of "Sotto". */
     val plainName: StateFlow<Boolean> = _plainName
 
     /** Swaps which launcher entry exists. Launchers can take a few seconds to notice. */

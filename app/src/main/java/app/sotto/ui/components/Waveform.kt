@@ -35,6 +35,7 @@ import app.sotto.audio.AudioSpec
 import app.sotto.audio.Peaks
 import app.sotto.data.SoundSpan
 import app.sotto.ui.formatStamp
+import app.sotto.ui.theme.LocalSottoColors
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -69,15 +70,15 @@ fun TapeWaveform(
     peakCount: Int,
     positionMs: () -> Long,
     modifier: Modifier = Modifier,
-    barColor: Color = MaterialTheme.colorScheme.primary,
+    barColor: Color = LocalSottoColors.current.speech,
     silenceColor: Color = MaterialTheme.colorScheme.onSurface,
     playheadColor: Color = MaterialTheme.colorScheme.onSurface,
     onScrub: ((deltaMs: Long) -> Unit)? = null,
     selection: (() -> Pair<Long, Long>)? = null,
     onSelection: (startMs: Long, endMs: Long) -> Unit = { _, _ -> },
     sounds: List<SoundSpan> = emptyList(),
-    soundColor: Color = MaterialTheme.colorScheme.tertiary,
 ) {
+    val palette = LocalSottoColors.current
     val frameColor = MaterialTheme.colorScheme.inverseSurface
     val gripColor = MaterialTheme.colorScheme.inverseOnSurface
     val scrub = rememberUpdatedState(onScrub)
@@ -135,7 +136,7 @@ fun TapeWaveform(
                 val middle = bar * BAR_MS + BAR_MS / 2
                 drawRoundRect(
                     // Music and other non-speech sound gets its own color, so it reads at a glance.
-                    color = if (sounds.any { middle >= it.startMs && middle < it.endMs }) soundColor else barColor,
+                    color = sounds.firstOrNull { middle >= it.startMs && middle < it.endMs }?.let { palette.sound(it.kind) } ?: barColor,
                     topLeft = Offset(barX - barWidth / 2f, centerY - height / 2f),
                     size = Size(barWidth, height),
                     cornerRadius = CornerRadius(barWidth / 2f),
@@ -189,6 +190,7 @@ fun SeekBar(
     sounds: List<SoundSpan> = emptyList(),
 ) {
     val colors = MaterialTheme.colorScheme
+    val palette = LocalSottoColors.current
     val measurer = rememberTextMeasurer()
     val bubbleStyle = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum")
     val seek = rememberUpdatedState(onSeek)
@@ -270,7 +272,7 @@ fun SeekBar(
         val (from, to) = zoom ?: (0L to durationMs)
         fun x(ms: Long) = inset + ((ms - from).toFloat() / (to - from)).coerceIn(0f, 1f) * (size.width - inset * 2)
 
-        drawSpeechTrack(peaks, inset, size.width - inset, trackY, colors.primary, colors.outlineVariant, from, to, durationMs, thickness = (4f + 4f * magnify).dp.toPx(), sounds = sounds, sound = colors.tertiary)
+        drawSpeechTrack(peaks, inset, size.width - inset, trackY, palette.speech, colors.outlineVariant, from, to, durationMs, thickness = (4f + 4f * magnify).dp.toPx(), sounds = sounds, sound = palette::sound)
 
         selection?.invoke()?.let { (start, end) ->
             drawSelectionFrame(x(start), x(end), trackY - 20.dp.toPx(), trackY + 20.dp.toPx(), colors.inverseSurface, colors.inverseOnSurface, handle = 10.dp.toPx())
@@ -321,7 +323,7 @@ private fun DrawScope.drawSpeechTrack(
     durationMs: Long = 1,
     thickness: Float = 4.dp.toPx(),
     sounds: List<SoundSpan> = emptyList(),
-    sound: Color = speech,
+    sound: (String) -> Color = { speech },
 ) {
     drawLine(silence, Offset(left, y), Offset(right, y), strokeWidth = thickness, cap = StrokeCap.Round)
     if (peaks.size == 0) return
@@ -348,16 +350,17 @@ private fun DrawScope.drawSpeechTrack(
     for (span in sounds) {
         if (durationMs <= 1 || span.endMs <= fromMs || span.startMs >= toMs) continue
         fun x(ms: Long) = left + ((ms - fromMs).toFloat() / (toMs - fromMs)).coerceIn(0f, 1f) * (right - left)
-        drawLine(sound, Offset(x(span.startMs.toLong()), y), Offset(x(span.endMs.toLong()), y), strokeWidth = thickness, cap = StrokeCap.Butt)
+        drawLine(sound(span.kind), Offset(x(span.startMs.toLong()), y), Offset(x(span.endMs.toLong()), y), strokeWidth = thickness, cap = StrokeCap.Butt)
     }
 }
 
 /** The speech-and-silence line on its own, as shown on each recording in the library. */
 @Composable
 fun SpeechBar(peaks: Peaks?, modifier: Modifier = Modifier, sounds: List<SoundSpan> = emptyList(), durationMs: Long = 1) {
-    val speech = MaterialTheme.colorScheme.primary
+    val palette = LocalSottoColors.current
+    val speech = palette.speech
     val silence = MaterialTheme.colorScheme.outlineVariant
-    val sound = MaterialTheme.colorScheme.tertiary
+    val sound = palette::sound
     Canvas(modifier.fillMaxWidth().height(8.dp)) {
         val inset = 2.dp.toPx()
         if (peaks == null) {

@@ -172,7 +172,6 @@ fun PlayerScreen(
     var renaming by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var sharing by remember { mutableStateOf(false) }
-    var summarizing by remember { mutableStateOf(false) }
     var namingSpeaker by remember { mutableStateOf<Int?>(null) }
     var speakerOf by remember { mutableStateOf<Paragraph?>(null) }
     val jobs by app.jobs.active.collectAsState()
@@ -217,18 +216,6 @@ fun PlayerScreen(
             }
 
             AdaptivePane(content = {
-            if (!transcript.isEmpty && !busy) {
-                SummaryChip(
-                    app, id,
-                    onClick = {
-                        // With a model in place and nothing written yet, one tap starts it.
-                        if (app.store.summary(id).value == null && app.summarizer.running.value[id] == null && app.summarizer.model() != null) app.summarizer.start(id)
-                        summarizing = true
-                    },
-                    modifier = Modifier.padding(start = 16.dp, bottom = 10.dp),
-                )
-            }
-
             ContentCard(Modifier.weight(1f)) {
                 AnimatedContent(showTranscript, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "tab") { showingTranscript ->
                     if (!showingTranscript) {
@@ -273,7 +260,8 @@ fun PlayerScreen(
                             // Keep the spoken paragraph in view while playing, without fighting a reader who is scrolling.
                             LaunchedEffect(activeParagraph, player.isPlaying) {
                                 if (activeParagraph >= 0 && player.isPlaying && !listState.isScrollInProgress) {
-                                    listState.animateScrollToItem(activeParagraph, scrollOffset = -80)
+                                    // The summary, when shown, is the list's first item.
+                                    listState.animateScrollToItem(activeParagraph + if (busy || searching) 0 else 1, scrollOffset = -80)
                                 }
                             }
                             TranscriptView(
@@ -289,6 +277,8 @@ fun PlayerScreen(
                                 speakerName = if (transcript.hasSpeakers) transcript::speakerName else null,
                                 onSpeakerTap = { speakerOf = it },
                                 onLongPress = { segment -> if (!busy) { player.pause(); editingSegment = segment } },
+                                // The summary sits above the transcript and scrolls with it.
+                                header = if (busy || searching) null else ({ SummaryCard(app, id, transcript, onGetModel = { player.pause(); onSettings() }, modifier = Modifier.padding(horizontal = 14.dp)) }),
                                 modifier = Modifier.weight(1f).fillMaxWidth(),
                             )
                             if (editing) EditBar(onDone = { editing = false })
@@ -402,7 +392,6 @@ fun PlayerScreen(
     }
     if (deleting) DeleteDialog(meta.title, onDismiss = { deleting = false }) { deleting = false; player.pause(); app.store.delete(id); onBack() }
     if (sharing) ShareSheet(app, meta, onDismiss = { sharing = false })
-    if (summarizing) SummarySheet(app, id, onDismiss = { summarizing = false }, onGetModel = { summarizing = false; player.pause(); onSettings() })
 }
 
 /** Find-in-transcript: a field, a "2 of 5" count, and arrows that jump playback to each match. */

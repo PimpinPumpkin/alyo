@@ -130,13 +130,19 @@ fun RecordScreen(app: SottoApp, session: RecordingSession, onMinimize: () -> Uni
         AdaptivePane(content = {
         ContentCard(Modifier.weight(1f)) {
             AnimatedContent(showTranscript, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "tab") { transcript ->
-                if (transcript) LiveTranscript(session.hasTranscript, segments, partial) else LiveWaveform(session, paused)
+                if (transcript) {
+                    LiveTranscript(session.hasTranscript, segments, partial)
+                } else {
+                    Box(Modifier.fillMaxSize()) {
+                        LiveWaveform(session, paused)
+                        HearingLabel(session, paused, Modifier.align(Alignment.TopCenter).padding(top = 28.dp))
+                    }
+                }
             }
         }
 
         }, controls = {
         ViewToggle(showTranscript, { showTranscript = it }, Modifier.align(Alignment.CenterHorizontally).padding(top = 16.dp, bottom = 8.dp))
-        HearingLabel(session, paused)
         Timer(session, paused)
         val interrupted by session.interruption.collectAsState()
         if (interrupted) {
@@ -291,26 +297,22 @@ private fun LiveWaveform(session: RecordingSession, paused: Boolean) {
         peaks = session.peaks,
         peakCount = peakCount,
         positionMs = { session.elapsedMs.value },
-        barColor = if (paused) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
+        barColor = if (paused) MaterialTheme.colorScheme.outline else LocalSottoColors.current.speech,
         playheadColor = LocalSottoColors.current.record,
         modifier = Modifier.fillMaxSize(),
     )
 }
 
-/** Names what is being heard this second, in the color the waveform is drawn in for it. */
+/** Names what is being heard this second, above the waveform and in the color the waveform is drawn in for it. */
 @Composable
 private fun HearingLabel(session: RecordingSession, paused: Boolean, modifier: Modifier = Modifier) {
     val hearing by session.hearing.collectAsState()
-    val colors = MaterialTheme.colorScheme
-    val speech = hearing == SoundTagger.SPEECH
-    Text(
-        if (paused) "" else hearing.orEmpty(),
-        style = MaterialTheme.typography.titleMedium,
-        color = if (speech) colors.primary else colors.tertiary,
-        textAlign = TextAlign.Center,
-        // Always takes its line, so the timer below does not jump as the label comes and goes.
-        modifier = modifier.fillMaxWidth(),
-    )
+    val palette = LocalSottoColors.current
+    val heard = hearing?.takeIf { !paused } ?: return
+    val tint = if (heard == SoundTagger.SPEECH) palette.speech else palette.sound(heard)
+    Surface(shape = CircleShape, color = tint.copy(alpha = 0.16f), contentColor = tint, modifier = modifier) {
+        Text(heard, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
+    }
 }
 
 @Composable
