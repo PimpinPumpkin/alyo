@@ -1,5 +1,10 @@
 package app.sotto.ui.screens
 
+import app.sotto.data.withSpeakerFrom
+import app.sotto.data.Word
+import androidx.compose.material.icons.rounded.RecordVoiceOver
+import androidx.compose.material.icons.rounded.Merge
+import androidx.compose.material.icons.rounded.ContentCut
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -178,7 +183,11 @@ fun PlayerScreen(
     var speakerOf by remember { mutableStateOf<Paragraph?>(null) }
     val jobs by app.jobs.active.collectAsState()
     val job = jobs.firstOrNull { it.recordingId == id }
-    val busy = meta.pendingRefine > 0
+    val labeling by app.store.labeling.collectAsState()
+    val busy = meta.pendingRefine > 0 || id in labeling
+    // Set while the user is choosing the word where a different speaker takes over.
+    var pickingSpeakerStart by remember { mutableStateOf(false) }
+    var speakerFrom by remember { mutableStateOf<Pair<Paragraph, Word>?>(null) }
     val listState = rememberLazyListState()
 
     Box(Modifier.fillMaxSize().background(colors.surface)) {
@@ -205,6 +214,13 @@ fun PlayerScreen(
                 IconButton(onClick = { menuOpen = true }) { Icon(Icons.Rounded.MoreVert, "More") }
             }
 
+            AnimatedVisibility(pickingSpeakerStart) {
+                Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Tap the first word the other person says", style = MaterialTheme.typography.labelLarge, color = colors.primary, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { pickingSpeakerStart = false }) { Text("Cancel") }
+                }
+            }
+
             AnimatedVisibility(busy) {
                 Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                     LoadingIndicator(Modifier.size(22.dp))
@@ -212,7 +228,9 @@ fun PlayerScreen(
                     Text(
                         when {
                             job?.progress != null -> "Transcribing  ${(job.progress * 100).toInt()}%"
-                            else -> "Polishing the transcript"
+                            meta.pendingRefine == 1 -> "Polishing the transcript  ·  last sentence"
+                            meta.pendingRefine > 1 -> "Polishing the transcript  ·  ${meta.pendingRefine} sentences to go"
+                            else -> "Working out who is speaking"
                         },
                         style = MaterialTheme.typography.labelLarge,
                         color = colors.primary,
@@ -286,7 +304,14 @@ fun PlayerScreen(
                                 editing = editing,
                                 query = if (searching) query else "",
                                 listState = listState,
-                                onWordTap = { word -> player.seekTo(word.startMs - LEAD_IN_MS) },
+                                onWordTap = { word ->
+                                    if (pickingSpeakerStart) {
+                                        pickingSpeakerStart = false
+                                        paragraphs.firstOrNull { p -> p.segments.any { word in it.words } }?.let { speakerFrom = it to word }
+                                    } else {
+                                        player.seekTo(word.startMs - LEAD_IN_MS)
+                                    }
+                                },
                                 onEditSegment = { segment -> player.pause(); editingSegment = segment },
                                 sounds = sounds,
                                 onSoundTap = { player.seekTo(it.startMs.toLong()); player.play() },
@@ -344,6 +369,11 @@ fun PlayerScreen(
                     player.pause()
                     app.jobs.retranscribe(id)
                 },
+                SheetRow(Icons.Rounded.RecordVoiceOver, "Mark a change of speaker", detail = "Pick the word where someone else starts", enabled = !busy && !transcript.isEmpty) {
+                    menuOpen = false
+                    showTranscript = true
+                    pickingSpeakerStart = true
+                },
                 SheetRow(Icons.Rounded.EditNote, "Edit transcript", enabled = !busy && !transcript.isEmpty) {
                     menuOpen = false
                     showTranscript = true
@@ -375,12 +405,34 @@ fun PlayerScreen(
             },
         )
     }
+    speakerFrom?.let { (paragraph, word) ->
+        val current = paragraph.speaker ?: 0
+        val known = (transcript.segments.mapNotNull { it.speaker } + current).distinct().sorted()
+        fun assign(speaker: Int) {
+            app.store.updateTranscript(id) { it.withSpeakerFrom(paragraph.segments.map { s -> s.id }, word, speaker) }
+            speakerFrom = null
+        }
+        ModalBottomSheet(onDismissRequest = { speakerFrom = null }, containerColor = colors.surfaceContainerLow) {
+            Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
+                Text("From \u201C${word.text}\u201D onward", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 12.dp, bottom = 4.dp))
+                Text("To the end of this paragraph. Do it again further on to hand back to the first speaker.", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 16.dp))
+                SheetGroup(
+                    known.filter { it != current }.map { other -> SheetRow(Icons.Rounded.Person, transcript.speakerName(other)) { assign(other) } } +
+                        SheetRow(Icons.Rounded.PersonAdd, "Someone else") { assign((known.maxOrNull() ?: 0) + 1) },
+                )
+            }
+        }
+    }
     speakerOf?.let { paragraph ->
         val current = paragraph.speaker ?: 0
         val known = transcript.segments.mapNotNull { it.speaker }.distinct().sorted()
         fun assign(speaker: Int) {
             val ids = paragraph.segments.map { it.id }.toSet()
             app.store.updateTranscript(id) { t -> t.copy(segments = t.segments.map { if (it.id in ids) it.copy(speaker = speaker) else it }) }
+            speakerOf = null
+        }
+        fun mergeInto(speaker: Int) {
+            app.store.updateTranscript(id) { t -> t.copy(segments = t.segments.map { if (it.speaker == current) it.copy(speaker = speaker) else it }) }
             speakerOf = null
         }
         ModalBottomSheet(onDismissRequest = { speakerOf = null }, containerColor = colors.surfaceContainerLow) {
@@ -390,8 +442,13 @@ fun PlayerScreen(
                 Text("This part was said by", style = MaterialTheme.typography.titleSmall, color = colors.primary, modifier = Modifier.padding(start = 12.dp, top = 20.dp, bottom = 10.dp))
                 SheetGroup(
                     known.filter { it != current }.map { other -> SheetRow(Icons.Rounded.Person, transcript.speakerName(other)) { assign(other) } } +
-                        SheetRow(Icons.Rounded.PersonAdd, "Someone else") { assign((known.maxOrNull() ?: 0) + 1) },
+                        SheetRow(Icons.Rounded.PersonAdd, "Someone else") { assign((known.maxOrNull() ?: 0) + 1) } +
+                        SheetRow(Icons.Rounded.ContentCut, "Only part of it", detail = "Pick the word where someone else takes over") { speakerOf = null; pickingSpeakerStart = true },
                 )
+                if (known.size > 1) {
+                    Text("${transcript.speakerName(current)} is the same person as", style = MaterialTheme.typography.titleSmall, color = colors.primary, modifier = Modifier.padding(start = 12.dp, top = 20.dp, bottom = 10.dp))
+                    SheetGroup(known.filter { it != current }.map { other -> SheetRow(Icons.Rounded.Merge, transcript.speakerName(other), detail = "Merges the two everywhere") { mergeInto(other) } })
+                }
             }
         }
     }

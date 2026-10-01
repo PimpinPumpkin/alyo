@@ -57,6 +57,11 @@ data class ModelSpec(
      * deleted. So upgrading a model is: give the new one a new [id], and move the old spec here.
      */
     val replaces: List<ModelSpec> = emptyList(),
+    /**
+     * For voice models: how different two voices must be to count as two people. It is a distance
+     * in the model's own terms, so each model has its own. Lower finds more speakers.
+     */
+    val speakerThreshold: Float = 0f,
 )
 
 /** How good the finished transcript is, traded against download size and memory. */
@@ -304,13 +309,14 @@ object ModelCatalog {
         source = ModelSource.Files(emptyList()),
     )
 
-    /** The download behind speaker labels. Language does not matter to it: a voice is a voice. */
-    val speakers = ModelSpec(
+    /** The voice model Sotto first shipped. It split one person into several too readily. */
+    private val speakersCampplus = ModelSpec(
         id = "speakers-campplus-voxceleb",
         kind = ModelKind.SPEAKER_EMBEDDING,
         title = "Speaker labels",
         summary = "3D-Speaker CAM++ voice model",
         encoder = "speakers.onnx",
+        speakerThreshold = 0.5f,
         source = ModelSource.Files(
             listOf(
                 ModelFile(
@@ -318,6 +324,31 @@ object ModelCatalog {
                     "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx",
                     29_596_978,
                     "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b",
+                ),
+            ),
+        ),
+    )
+
+    /**
+     * The download behind speaker labels. Language does not matter to it: a voice is a voice.
+     * Chosen by counting speakers in recordings where the answer is known: of the six models
+     * tried, this was the only one right on all of them across a range of thresholds.
+     */
+    val speakers = ModelSpec(
+        id = "speakers-titanet-large",
+        kind = ModelKind.SPEAKER_EMBEDDING,
+        title = "Speaker labels",
+        summary = "NVIDIA TitaNet Large voice model",
+        encoder = "speakers.onnx",
+        speakerThreshold = 0.85f,
+        replaces = listOf(speakersCampplus),
+        source = ModelSource.Files(
+            listOf(
+                ModelFile(
+                    "speakers.onnx",
+                    "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/nemo_en_titanet_large.onnx",
+                    101_405_493,
+                    "d51abcf31717ef28162f26acb9d44dd4127c3d44c9b8624f699f3425daca8e77",
                 ),
             ),
         ),

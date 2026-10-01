@@ -1,5 +1,6 @@
 package app.sotto.data
 
+import app.sotto.asr.SpeakerTurn
 import app.sotto.audio.Span
 
 /**
@@ -97,3 +98,88 @@ fun List<SoundSpan>.keeping(keep: List<Span>): List<SoundSpan> {
     }
     return out
 }
+
+/**
+ * Hands the rest of a paragraph to another speaker, starting at [word]. The paragraph is the run
+ * of segments [paragraph]; the segment holding [word] is cut in two there, since a segment has one
+ * speaker. A transcript with no speakers yet gets one first, so the change has something to
+ * differ from.
+ */
+fun Transcript.withSpeakerFrom(paragraph: List<Long>, word: Word, speaker: Int): Transcript {
+    var nextId = (segments.maxOfOrNull { it.id } ?: 0L) + 1
+    var passed = false
+    val changed = segments.flatMap { segment ->
+        val base = if (segment.speaker == null) segment.copy(speaker = 0) else segment
+        when {
+            segment.id !in paragraph -> listOf(base)
+            passed -> listOf(base.copy(speaker = speaker))
+            else -> {
+                val at = segment.words.indexOf(word)
+                when {
+                    at < 0 -> listOf(base)
+                    at == 0 -> listOf(base.copy(speaker = speaker)).also { passed = true }
+                    else -> listOf(base.copy(words = segment.words.take(at)), base.copy(id = nextId++, words = segment.words.drop(at), speaker = speaker)).also { passed = true }
+                }
+            }
+        }
+    }
+    return copy(segments = changed)
+}
+
+/**
+ * Labels the transcript with who spoke when. Segments are cut where the speaker pauses, not where
+ * the speaker changes, so one segment can hold a question and its answer. Each sentence in it is
+ * given to whoever did most of the talking while it was said, and the segment is split wherever
+ * that changes. Sentences, not words: where two voices overlap the turns flicker between them
+ * several times a second, and following that would shred the text.
+ *
+ * Speakers are renumbered from 0 in order of first appearance.
+ */
+fun Transcript.withSpeakers(turns: List<SpeakerTurn>): Transcript {
+    if (turns.isEmpty()) return this
+    fun speakerOf(words: List<Word>): Int? {
+        val heard = HashMap<Int, Int>()
+        for (word in words) {
+            for (turn in turns) {
+                val shared = minOf(word.endMs, turn.endMs) - maxOf(word.startMs, turn.startMs)
+                if (shared > 0) heard[turn.speaker] = (heard[turn.speaker] ?: 0) + shared
+            }
+        }
+        return heard.maxByOrNull { it.value }?.key
+    }
+    val order = LinkedHashMap<Int, Int>()
+    var nextId = (segments.maxOfOrNull { it.id } ?: 0L) + 1
+    val labeled = segments.flatMap { segment ->
+        // The segment as sentences: [first word, last word, speaker or -1 when nobody was heard].
+        val runs = ArrayList<IntArray>()
+        var start = 0
+        segment.words.forEachIndexed { i, word ->
+            if (word.text.lastOrNull() in SENTENCE_END || i == segment.words.lastIndex) {
+                runs += intArrayOf(start, i, speakerOf(segment.words.subList(start, i + 1)) ?: -1)
+                start = i + 1
+            }
+        }
+        // A sentence nobody was heard saying goes with its neighbor, and neighbors by the same
+        // speaker are one run.
+        val known = runs.firstOrNull { it[2] >= 0 }?.get(2) ?: return@flatMap listOf(segment.copy(speaker = null))
+        var previous = known
+        for (run in runs) {
+            if (run[2] < 0) run[2] = previous
+            previous = run[2]
+        }
+        val merged = ArrayList<IntArray>()
+        for (run in runs) {
+            if (merged.isNotEmpty() && merged.last()[2] == run[2]) merged.last()[1] = run[1] else merged += run
+        }
+        merged.mapIndexed { index, run ->
+            segment.copy(
+                id = if (index == 0) segment.id else nextId++,
+                words = segment.words.subList(run[0], run[1] + 1),
+                speaker = order.getOrPut(run[2]) { order.size },
+            )
+        }
+    }
+    return copy(segments = labeled)
+}
+
+private val SENTENCE_END = setOf('.', '?', '!', '\u2026', '\u3002')

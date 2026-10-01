@@ -115,7 +115,10 @@ class MainActivity : ComponentActivity() {
      * and `--es theme light|dark` shows the other theme without touching the phone's own setting.
      */
     private fun readDebugIntent(intent: Intent?) {
-        if (!BuildConfig.DEBUG) return
+        if (!BuildConfig.DEBUG && !BuildConfig.TEST_HOOKS) return
+        // A release build cannot be reached with run-as, so its test audio goes in the app's
+        // external files folder, which has to exist (and be the app's own) before adb can fill it.
+        getExternalFilesDir(null)
         intent?.getStringExtra("theme")?.let { debugDark.value = it == "dark" }
         val path = intent?.getStringExtra("wav") ?: return
         intent.removeExtra("wav")

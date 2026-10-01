@@ -4,6 +4,9 @@ import app.sotto.audio.Span
 import app.sotto.data.Segment
 import app.sotto.data.Transcript
 import app.sotto.data.Word
+import app.sotto.asr.SpeakerTurn
+import app.sotto.data.withSpeakerFrom
+import app.sotto.data.withSpeakers
 import app.sotto.data.keeping
 import app.sotto.data.withText
 import org.junit.Assert.assertEquals
@@ -111,5 +114,27 @@ class TopicTest {
     @Test
     fun `says nothing when nothing stands out`() {
         assertNull(app.sotto.data.Titles.topic(transcript("Hello there, this is just a quick test.")))
+    }
+
+    @Test
+    fun aSpeakerChangeMidSentenceSplitsTheSegmentThere() {
+        val words = listOf(Word("So", 0, 200), Word("yes.", 200, 500), Word("Right,", 600, 900), Word("exactly.", 900, 1400))
+        val transcript = Transcript(segments = listOf(Segment(0, words, speaker = 0), Segment(1, listOf(Word("And", 2000, 2300)), speaker = 0), Segment(2, listOf(Word("later", 5000, 5300)), speaker = 0)))
+        val changed = transcript.withSpeakerFrom(listOf(0L, 1L), words[2], speaker = 1)
+        assertEquals(listOf("So yes.", "Right, exactly.", "And", "later"), changed.segments.map { it.text })
+        assertEquals(listOf(0, 1, 1, 0), changed.segments.map { it.speaker })
+        assertEquals(4, changed.segments.map { it.id }.distinct().size)
+    }
+
+    @Test
+    fun aSentenceTwoPeopleShareIsSplitWhereTheVoiceChanges() {
+        val words = listOf(Word("Ready?", 0, 400), Word("Yes,", 900, 1200), Word("ready.", 1200, 1700), Word("Good.", 2300, 2700))
+        val transcript = Transcript(segments = listOf(Segment(7, words)))
+        val turns = listOf(SpeakerTurn(3, 0, 500), SpeakerTurn(1, 850, 1750), SpeakerTurn(3, 2250, 2800))
+        val labeled = transcript.withSpeakers(turns)
+        assertEquals(listOf("Ready?", "Yes, ready.", "Good."), labeled.segments.map { it.text })
+        assertEquals(listOf(0, 1, 0), labeled.segments.map { it.speaker })
+        assertEquals(7L, labeled.segments.first().id)
+        assertEquals(3, labeled.segments.map { it.id }.distinct().size)
     }
 }

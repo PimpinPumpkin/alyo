@@ -252,7 +252,7 @@ class RecordingSession(
                 t.release()
             }
             // Who said what, from the same spooled audio, before it is thrown away.
-            diarize?.let { run -> runCatching { store.applySpeakers(id, run(store.spool(id))) }.onFailure { Log.e(TAG, "Speaker labels failed", it) } }
+            diarize?.let { run -> runCatching { store.labelSpeakers(id) { run(store.spool(id)) } }.onFailure { Log.e(TAG, "Speaker labels failed", it) } }
             store.setPendingRefine(id, 0)
             store.spool(id).delete()
             // Name it after its subject, unless the user has already given it a name of their own.

@@ -172,7 +172,7 @@ class LibraryJobs(
             // Names the user gave speakers survive; the words they were attached to do not.
             store.updateTranscript(id) { Transcript(language = pack.code, segments = transcriber.segments.value, speakerNames = it.speakerNames) }
             store.saveSounds(id, sounds.spans.value)
-            if (settings.speakerLabels.value && diarizer.isReady()) store.applySpeakers(id, diarizer.turns(spool))
+            if (settings.speakerLabels.value && diarizer.isReady()) store.labelSpeakers(id) { diarizer.turns(spool) }
         } finally {
             transcriber.cancel()
             sounds.finish()

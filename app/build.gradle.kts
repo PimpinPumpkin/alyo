@@ -42,7 +42,7 @@ if (!sherpaAar.exists()) {
 val ortSlim = layout.projectDirectory.file("libs/onnxruntime/arm64-v8a/libonnxruntime.so").asFile
 if (!ortSlim.exists()) {
     try {
-        fetch(ortSlim, "$mirror/libonnxruntime-1.28.2-sotto1-arm64-v8a.so")
+        fetch(ortSlim, "$mirror/libonnxruntime-1.28.2-sotto2-arm64-v8a.so")
     } catch (e: java.io.IOException) {
         logger.warn("Trimmed ONNX Runtime not available (${e.message}); packaging the full one from the AAR.")
     }
@@ -101,6 +101,9 @@ android {
         ndk {
             abiFilters += ((project.findProperty("abis") as String?) ?: "arm64-v8a").split(",")
         }
+        // -PtestHooks lets a release build take the debug-only launch options (record from a
+        // file), so the optimized build is the one that gets profiled. Never set for a published build.
+        buildConfigField("boolean", "TEST_HOOKS", project.hasProperty("testHooks").toString())
         externalNativeBuild {
             cmake {
                 arguments += "-DANDROID_STL=c++_static"

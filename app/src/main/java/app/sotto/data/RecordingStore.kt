@@ -134,6 +134,20 @@ class RecordingStore(context: Context) {
         _recordings.update { list -> list.filterNot { it.id == id } }
     }
 
+    private val _labeling = MutableStateFlow<Set<String>>(emptySet())
+    /** Recordings whose speakers are being told apart right now. Not saved: it is over when the app is. */
+    val labeling: StateFlow<Set<String>> = _labeling
+
+    /** Tells speakers apart with [diarize] and writes the result, showing as [labeling] meanwhile. */
+    fun labelSpeakers(id: String, diarize: () -> List<SpeakerTurn>) {
+        _labeling.update { it + id }
+        try {
+            applySpeakers(id, diarize())
+        } finally {
+            _labeling.update { it - id }
+        }
+    }
+
     fun setPendingRefine(id: String, pending: Int) {
         val current = meta(id) ?: return
         if (current.pendingRefine != pending) putMeta(current.copy(pendingRefine = pending))
@@ -158,20 +172,7 @@ class RecordingStore(context: Context) {
      */
     fun applySpeakers(id: String, turns: List<SpeakerTurn>) {
         if (turns.isEmpty()) return
-        val order = LinkedHashMap<Int, Int>()
-        updateTranscript(id) { transcript ->
-            transcript.copy(
-                segments = transcript.segments.map { segment ->
-                    val overlap = HashMap<Int, Int>()
-                    for (turn in turns) {
-                        val shared = minOf(segment.endMs, turn.endMs) - maxOf(segment.startMs, turn.startMs)
-                        if (shared > 0) overlap[turn.speaker] = (overlap[turn.speaker] ?: 0) + shared
-                    }
-                    val raw = overlap.maxByOrNull { it.value }?.key
-                    segment.copy(speaker = raw?.let { order.getOrPut(it) { order.size } })
-                },
-            )
-        }
+        updateTranscript(id) { it.withSpeakers(turns) }
     }
 
     /**

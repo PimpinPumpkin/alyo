@@ -1,6 +1,8 @@
 package app.sotto.asr
 
 import android.content.Context
+import android.os.Process
+import android.util.Log
 import app.sotto.audio.AudioSpec
 import com.k2fsa.sherpa.onnx.FastClusteringConfig
 import com.k2fsa.sherpa.onnx.OfflineSpeakerDiarization
@@ -35,6 +37,12 @@ class Diarizer(private val context: Context, private val models: ModelManager) {
         val samples = read(spool)
         if (samples.size < AudioSpec.ASR_SAMPLE_RATE * 2) return emptyList()
         val spec = spec ?: return emptyList()
+        // This is minutes of flat-out work on a long recording, and the user is likely playing
+        // the recording back meanwhile. It gives way to everything else. The thread is borrowed
+        // from a pool, so its priority is put back afterwards.
+        val tid = Process.myTid()
+        val priority = Process.getThreadPriority(tid)
+        Process.setThreadPriority(BACKGROUND_PRIORITY)
         val diarization = OfflineSpeakerDiarization(
             null,
             OfflineSpeakerDiarizationConfig(
@@ -44,15 +52,17 @@ class Diarizer(private val context: Context, private val models: ModelManager) {
                 ),
                 embedding = SpeakerEmbeddingExtractorConfig(model = File(models.dir(spec), spec.encoder).path, numThreads = 2),
                 // The number of people is not known in advance, so voices are merged by similarity.
-                clustering = FastClusteringConfig(numClusters = -1, threshold = 0.5f),
+                clustering = FastClusteringConfig(numClusters = -1, threshold = spec.speakerThreshold),
                 minDurationOn = 0.3f,
                 minDurationOff = 0.5f,
             ),
         )
         return try {
             diarization.process(samples).map { SpeakerTurn(it.speaker, (it.start * 1000).toInt(), (it.end * 1000).toInt()) }
+                .also { turns -> Log.i("Diarizer", "${turns.size} turns, ${turns.map { it.speaker }.distinct().size} speakers in ${samples.size / AudioSpec.ASR_SAMPLE_RATE} s") }
         } finally {
             diarization.release()
+            Process.setThreadPriority(tid, priority)
         }
     }
 
@@ -75,6 +85,8 @@ class Diarizer(private val context: Context, private val models: ModelManager) {
     private companion object {
         // 45 minutes of 16 kHz audio. Beyond that the whole recording no longer fits comfortably
         // in memory as floats, which is how the library needs it.
+        const val BACKGROUND_PRIORITY = 8
+
         const val MAX_BYTES = 45L * 60 * AudioSpec.ASR_SAMPLE_RATE * 2
     }
 }

@@ -337,6 +337,7 @@ private fun RecordingCard(
     }
     val activeJobs by app.jobs.active.collectAsState()
     val job = activeJobs.firstOrNull { it.recordingId == meta.id }
+    val labeling by app.store.labeling.collectAsState()
     val sounds by produceState(emptyList<SoundSpan>(), meta.id, meta.durationMs, meta.pendingRefine) {
         value = withContext(Dispatchers.IO) { app.store.sounds(meta.id) }
     }
@@ -354,11 +355,11 @@ private fun RecordingCard(
             }
             Row(Modifier.padding(end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(shortDate(meta.createdAt), style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant)
-                if (meta.pendingRefine > 0) {
+                if (meta.pendingRefine > 0 || meta.id in labeling) {
                     Spacer(Modifier.width(12.dp))
                     LoadingIndicator(Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text(if (job?.progress != null) "Transcribing ${(job.progress * 100).toInt()}%" else "Polishing transcript", style = MaterialTheme.typography.bodySmall, color = colors.primary)
+                    Text(if (job?.progress != null) "Transcribing ${(job.progress * 100).toInt()}%" else if (meta.pendingRefine > 0) "Polishing transcript" else "Labeling speakers", style = MaterialTheme.typography.bodySmall, color = colors.primary)
                 }
                 Spacer(Modifier.weight(1f))
                 Text(formatStamp(meta.durationMs), style = MaterialTheme.typography.bodyLarge.copy(fontFeatureSettings = "tnum"), color = colors.onSurfaceVariant)
