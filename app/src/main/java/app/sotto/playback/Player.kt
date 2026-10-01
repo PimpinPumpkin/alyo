@@ -1,6 +1,7 @@
 package app.sotto.playback
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -39,7 +40,22 @@ class Player(context: Context) {
     var speed by mutableFloatStateOf(1f)
         private set
 
-    val positionMs: Long get() = exo.currentPosition.coerceIn(0, maxOf(durationMs, 0))
+    // ExoPlayer only refreshes its reported position about once a second for audio. Between
+    // refreshes the clock is carried forward here, so anything following playback moves smoothly.
+    private var reported = 0L
+    private var reportedAt = 0L
+
+    val positionMs: Long
+        get() {
+            val raw = exo.currentPosition
+            val now = SystemClock.elapsedRealtime()
+            if (raw != reported || !exo.isPlaying) {
+                reported = raw
+                reportedAt = now
+            }
+            val carried = if (exo.isPlaying) ((now - reportedAt) * speed).toLong().coerceAtMost(MAX_CARRY_MS) else 0L
+            return (raw + carried).coerceIn(0, maxOf(durationMs, 0))
+        }
 
     /** Bumped on every jump, so the UI knows to re-read [positionMs] even while paused. */
     var seekCount by mutableIntStateOf(0)
@@ -81,4 +97,8 @@ class Player(context: Context) {
     }
 
     fun release() = exo.release()
+
+    private companion object {
+        const val MAX_CARRY_MS = 1500L
+    }
 }

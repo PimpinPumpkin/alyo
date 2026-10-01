@@ -101,6 +101,11 @@ without the index that is only written at the end.
 Cropping and cutting copy AAC frames between containers without decoding, so there is no quality
 loss and it is near-instant. Cuts land on frame boundaries (21 ms).
 
+Someone who talks for a long time without pausing is not cut off at a fixed length. Once a
+sentence has run past ten seconds, the quietest quarter second in it (the breath) is found and
+the split is made there, and if the next piece opens with a word like "because" or "which" the
+two are punctuated as one sentence.
+
 ## Not there yet
 
 - Transcribing a recording after the fact (imported audio, or one made before the model was downloaded).

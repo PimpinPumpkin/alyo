@@ -48,3 +48,14 @@ fun dayLabel(millis: Long, now: Long = System.currentTimeMillis()): String {
 }
 
 fun timeOfDay(millis: Long): String = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(millis))
+
+/** The heading recordings are filed under: "September", or "September 2025" for an earlier year. */
+fun monthLabel(millis: Long, now: Long = System.currentTimeMillis()): String {
+    val then = Calendar.getInstance().apply { timeInMillis = millis }
+    val today = Calendar.getInstance().apply { timeInMillis = now }
+    val pattern = if (then[Calendar.YEAR] == today[Calendar.YEAR]) "MMMM" else "MMMM yyyy"
+    return SimpleDateFormat(pattern, Locale.getDefault()).format(Date(millis))
+}
+
+/** "Sep 3" */
+fun shortDate(millis: Long): String = SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(millis))

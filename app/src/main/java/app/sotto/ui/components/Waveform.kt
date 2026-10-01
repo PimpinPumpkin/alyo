@@ -217,37 +217,8 @@ fun SeekBar(
         if (durationMs <= 0) return@Canvas
         val inset = 12.dp.toPx()
         val trackY = size.height - 24.dp.toPx()
-        val width = size.width - inset * 2
 
-        // Track, in short runs coloured by whether anyone is speaking there.
-        val step = 3.dp.toPx()
-        val runs = (width / step).toInt().coerceAtLeast(1)
-        val perRun = peaks.size / runs.toFloat()
-        var runStart = 0
-        var runSpeech = false
-        fun flush(until: Int) {
-            if (until <= runStart) return
-            drawLine(
-                if (runSpeech) colors.primary else colors.outlineVariant,
-                Offset(inset + runStart * step, trackY),
-                Offset(inset + until * step, trackY),
-                strokeWidth = 4.dp.toPx(),
-                cap = StrokeCap.Round,
-            )
-        }
-        for (run in 0 until runs) {
-            var level = 0f
-            val first = (run * perRun).toInt()
-            for (p in first until maxOf(first + 1, ((run + 1) * perRun).toInt())) level = maxOf(level, peaks.level(p))
-            val speech = level >= SILENCE
-            if (run == 0) runSpeech = speech
-            if (speech != runSpeech) {
-                flush(run)
-                runStart = run
-                runSpeech = speech
-            }
-        }
-        flush(runs)
+        drawSpeechTrack(peaks, inset, size.width - inset, trackY, colors.primary, colors.outlineVariant)
 
         selection?.invoke()?.let { (start, end) ->
             drawSelectionFrame(
@@ -290,3 +261,42 @@ private fun xAt(ms: Long, width: Float, inset: Float, durationMs: Long): Float =
 
 private fun msAt(x: Float, width: Float, inset: Float, durationMs: Long): Long =
     (((x - inset) / (width - inset * 2)).coerceIn(0f, 1f) * durationMs).toLong()
+
+/** A line from [left] to [right], bright over the stretches where someone is speaking and dim over silence. */
+private fun DrawScope.drawSpeechTrack(peaks: Peaks, left: Float, right: Float, y: Float, speech: Color, silence: Color) {
+    val stroke = 4.dp.toPx()
+    drawLine(silence, Offset(left, y), Offset(right, y), strokeWidth = stroke, cap = StrokeCap.Round)
+    if (peaks.size == 0) return
+    val step = 3.dp.toPx()
+    val runs = ((right - left) / step).toInt().coerceAtLeast(1)
+    val perRun = peaks.size / runs.toFloat()
+    var runStart = -1
+    for (run in 0..runs) {
+        var level = 0f
+        if (run < runs) {
+            val first = (run * perRun).toInt()
+            for (p in first until maxOf(first + 1, ((run + 1) * perRun).toInt())) level = maxOf(level, peaks.level(p))
+        }
+        val speaking = run < runs && level >= SILENCE
+        if (speaking && runStart < 0) runStart = run
+        if (!speaking && runStart >= 0) {
+            drawLine(speech, Offset(left + runStart * step, y), Offset(minOf(right, left + run * step), y), strokeWidth = stroke, cap = StrokeCap.Butt)
+            runStart = -1
+        }
+    }
+}
+
+/** The speech-and-silence line on its own, as shown on each recording in the library. */
+@Composable
+fun SpeechBar(peaks: Peaks?, modifier: Modifier = Modifier) {
+    val speech = MaterialTheme.colorScheme.primary
+    val silence = MaterialTheme.colorScheme.outlineVariant
+    Canvas(modifier.fillMaxWidth().height(8.dp)) {
+        val inset = 2.dp.toPx()
+        if (peaks == null) {
+            drawLine(silence, Offset(inset, size.height / 2f), Offset(size.width - inset, size.height / 2f), strokeWidth = 4.dp.toPx(), cap = StrokeCap.Round)
+        } else {
+            drawSpeechTrack(peaks, inset, size.width - inset, size.height / 2f, speech, silence)
+        }
+    }
+}

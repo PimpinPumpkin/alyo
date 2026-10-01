@@ -60,7 +60,7 @@ class RecorderController(
             scope = scope,
             openSource = openSource,
             transcriberFactory = if (!models.isInstalled(pack.live)) null else { onRefined ->
-                LiveTranscriber(engine, pack.live, refiner, store.spool(id), scope, onRefined)
+                LiveTranscriber(engine, pack.live, refiner, pack.continuers, store.spool(id), scope, onRefined)
             },
         )
         _session.value = session

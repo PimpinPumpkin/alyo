@@ -41,3 +41,32 @@ class WordsTest {
         assertTrue(wordsFromTokens(emptyArray(), FloatArray(0), null, 0, 1000).isEmpty())
     }
 }
+
+class PauseFinderTest {
+    private fun tone(ms: Int, level: Float) = FloatArray(ms * 16) { if (it % 2 == 0) level else -level }
+
+    @Test
+    fun `finds the breath in a run of speech`() {
+        val finder = app.sotto.asr.PauseFinder()
+        finder.add(tone(6000, 0.3f))
+        finder.add(tone(300, 0.005f)) // the breath, 6.0 s to 6.3 s
+        finder.add(tone(5000, 0.3f))
+        val pause = finder.quietest(0, 11_300L * 16)!!
+        assertTrue("found at ${pause.sample / 16} ms", pause.sample / 16 in 6050..6250)
+        assertTrue("depth ${pause.depth}", pause.depth < 0.05f)
+    }
+
+    @Test
+    fun `reports a shallow dip when there is no pause`() {
+        val finder = app.sotto.asr.PauseFinder()
+        finder.add(tone(8000, 0.3f))
+        assertTrue(finder.quietest(0, 8000L * 16)!!.depth > 0.9f)
+    }
+
+    @Test
+    fun `needs room for a window`() {
+        val finder = app.sotto.asr.PauseFinder()
+        finder.add(tone(300, 0.3f))
+        assertEquals(null, finder.quietest(0, 300L * 16))
+    }
+}

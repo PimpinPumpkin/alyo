@@ -131,11 +131,8 @@ fun SottoTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () ->
         dark -> DarkFallback
         else -> LightFallback
     }
-    val extra = if (dark) {
-        SottoColors(record = Color(0xFFF2685C), onRecord = Color(0xFF410002), recordContainer = Color(0xFF5C1A15), dark = true)
-    } else {
-        SottoColors(record = Color(0xFFEA4335), onRecord = Color.White, recordContainer = Color(0xFFFCE8E6))
-    }
+    // Coral disc, maroon dot: the same in both themes, as on the original.
+    val extra = SottoColors(record = Color(0xFFEC6A5E), onRecord = Color(0xFF5F1410), recordContainer = Color(0xFFFCE8E6), dark = dark)
     CompositionLocalProvider(LocalSottoColors provides extra) {
         MaterialExpressiveTheme(
             colorScheme = scheme,

@@ -42,8 +42,9 @@ class AsrEngine(private val models: ModelManager) {
                 rule1 = EndpointRule(false, 2.4f, 0f),
                 // A pause after speech ends the sentence and hands it to the second pass.
                 rule2 = EndpointRule(true, 0.9f, 0f),
-                // Someone talking without a breath: cut anyway so refinement never lags far behind.
-                rule3 = EndpointRule(false, 0f, 20f),
+                // Long unbroken speech is split at breaths by LiveTranscriber, which can pick the
+                // moment; this blunt cut is only a backstop so the hypothesis cannot grow forever.
+                rule3 = EndpointRule(false, 0f, 120f),
             ),
             enableEndpoint = true,
             decodingMethod = "greedy_search",

@@ -35,6 +35,7 @@ class LiveTranscriber(
     private val engine: AsrEngine,
     private val liveSpec: ModelSpec,
     private val refinerSpec: ModelSpec?,
+    private val continuers: Set<String>,
     private val spool: File,
     scope: CoroutineScope,
     /** Called for every sentence pass two finishes, on the refine thread. */
@@ -63,7 +64,8 @@ class LiveTranscriber(
 
     @Volatile private var cancelled = false
 
-    private class RefineJob(val id: Long, val fromSample: Long, val toSample: Long)
+    /** @param continues true when this piece was split off mid-flow rather than begun after a pause */
+    private class RefineJob(val id: Long, val fromSample: Long, val toSample: Long, val continues: Boolean)
 
     init {
         scope.launch(liveThread.asCoroutineDispatcher()) {
@@ -127,8 +129,14 @@ class LiveTranscriber(
         // times count from the first chunk it has not consumed yet. Counting steps is therefore
         // what pins a sentence to the right place on the recording's timeline.
         var consumed = 0L
-        var segmentStart = 0L
+        // Where the recognizer's clock was last reset, and where the audio not yet handed to pass
+        // two begins. They differ after a split, which moves the second without touching the first.
+        var timeBase = 0L
+        var audioStart = 0L
+        // Words of the recognizer's current hypothesis that already went out in an earlier segment.
+        var claimed = 0
         var nextId = 0L
+        val pauses = PauseFinder()
 
         fun decodeReady() {
             while (recognizer.isReady(stream)) {
@@ -139,28 +147,69 @@ class LiveTranscriber(
 
         fun currentWords(): List<Word> {
             val result = recognizer.getResult(stream)
-            val start = sampleToMs(segmentStart)
+            val start = sampleToMs(timeBase)
             return wordsFromTokens(result.tokens, result.timestamps, null, start - liveSpec.lagMs, sampleToMs(fed))
                 .map { if (it.startMs >= start) it else it.copy(startMs = start, endMs = maxOf(it.endMs, start + 1)) }
+                .drop(claimed)
         }
 
-        fun closeSegment(words: List<Word>) {
-            val end = minOf(consumed, fed)
+        // Whether the next piece follows straight on from a split, with no pause in between.
+        var afterSplit = false
+
+        /** Publishes [words] as a finished sentence whose audio runs from [audioStart] to [until]. */
+        fun emit(words: List<Word>, until: Long) {
             if (words.isNotEmpty()) {
                 val id = nextId++
                 _segments.update { it + Segment(id, words) }
-                _partial.value = emptyList()
                 if (refinerSpec != null) {
                     out.flush()
                     // Give pass two a little air either side of the speech and none of the dead silence.
-                    val from = maxOf(segmentStart, msToSample(words.first().startMs) - PAD_BEFORE)
-                    val to = minOf(end, msToSample(words.last().endMs) + PAD_AFTER)
+                    val from = maxOf(audioStart, msToSample(words.first().startMs) - PAD_BEFORE)
+                    val to = minOf(until, msToSample(words.last().endMs) + PAD_AFTER)
                     _pending.update { it + 1 }
-                    refineQueue.trySend(RefineJob(id, from, maxOf(to, from)))
+                    refineQueue.trySend(RefineJob(id, from, maxOf(to, from), continues = afterSplit))
                 }
             }
+            audioStart = until
+        }
+
+        /** The speaker paused: close the sentence and start the recognizer afresh. */
+        fun closeSegment(words: List<Word>) {
+            val end = minOf(consumed, fed)
+            emit(words, end)
+            _partial.value = emptyList()
             recognizer.reset(stream)
-            segmentStart = end
+            timeBase = end
+            claimed = 0
+            afterSplit = false
+        }
+
+        /**
+         * Someone talking without a real pause would otherwise leave pass two waiting indefinitely,
+         * or force a cut mid-word. Once a sentence has run long, look back for the breath in it
+         * (the quietest quarter second) and split there. The recognizer is left running: only the
+         * bookkeeping moves, so nothing it has heard is disturbed.
+         *
+         * @return the words left over after the split, or [words] unchanged if it is not time yet
+         */
+        fun splitIfLong(words: List<Word>): List<Word> {
+            if (words.size < 2) return words
+            val spoken = words.last().endMs - words.first().startMs
+            if (spoken < SPLIT_AFTER_MS) return words
+            // Search from a few seconds in (so the head is worth refining on its own) up to where
+            // pass one's words are settled.
+            val from = msToSample(words.first().startMs + SPLIT_MIN_HEAD_MS)
+            val to = consumed - msToSample(liveSpec.lagMs + 300)
+            val pause = pauses.quietest(from, to) ?: return words
+            // Insist on a real dip, unless it has gone on so long that any dip will have to do.
+            if (pause.depth > PAUSE_DEPTH && spoken < SPLIT_FORCE_MS) return words
+            val cutMs = sampleToMs(pause.sample)
+            val head = words.takeWhile { (it.startMs + it.endMs) / 2 < cutMs }
+            if (head.isEmpty() || head.size == words.size) return words
+            emit(head, pause.sample)
+            afterSplit = true
+            claimed += head.size
+            return words.drop(head.size)
         }
 
         try {
@@ -169,12 +218,13 @@ class LiveTranscriber(
                 bytes.clear()
                 for (s in chunk) bytes.putShort((s * 32767f).toInt().coerceIn(-32768, 32767).toShort())
                 out.write(bytes.array(), 0, bytes.position())
+                pauses.add(chunk)
 
                 stream.acceptWaveform(chunk, AudioSpec.ASR_SAMPLE_RATE)
                 fed += chunk.size
                 decodeReady()
                 val words = currentWords()
-                if (recognizer.isEndpoint(stream)) closeSegment(words) else _partial.value = words
+                if (recognizer.isEndpoint(stream)) closeSegment(words) else _partial.value = splitIfLong(words)
             }
             // Flush: the model needs trailing context before it will commit to the final word.
             stream.acceptWaveform(FloatArray(AudioSpec.ASR_SAMPLE_RATE * 3 / 5), AudioSpec.ASR_SAMPLE_RATE)
@@ -214,7 +264,8 @@ class LiveTranscriber(
                     )
                     val current = _segments.value.firstOrNull { it.id == job.id }
                     // An empty second opinion on something pass one heard is more likely a miss than a correction.
-                    val refined = Segment(job.id, words.ifEmpty { current?.words.orEmpty() }, refined = true)
+                    var refined = Segment(job.id, words.ifEmpty { current?.words.orEmpty() }, refined = true)
+                    if (job.continues) stitch(job.id, refined)?.let { refined = it }
                     _segments.update { list -> list.map { if (it.id == job.id) refined else it } }
                     onRefined(refined)
                 }
@@ -224,6 +275,23 @@ class LiveTranscriber(
                 _pending.update { maxOf(0, it - 1) }
             }
         }
+    }
+
+    /**
+     * Undoes the false sentence break at a split: if [segment] opens with a continuing word, that
+     * word loses its capital and the full stop ending the piece before it becomes a comma.
+     *
+     * @return [segment] with its first word lowered, or null if the two do not belong together
+     */
+    private fun stitch(id: Long, segment: Segment): Segment? {
+        val first = segment.words.firstOrNull() ?: return null
+        if (first.text.lowercase().trim { !it.isLetter() } !in continuers) return null
+        val previous = _segments.value.firstOrNull { it.id == id - 1 }?.takeIf { it.refined } ?: return null
+        val last = previous.words.lastOrNull()?.takeIf { it.text.endsWith(".") } ?: return null
+        val joined = previous.copy(words = previous.words.dropLast(1) + last.copy(text = last.text.dropLast(1) + ","))
+        _segments.update { list -> list.map { if (it.id == joined.id) joined else it } }
+        onRefined(joined)
+        return segment.copy(words = listOf(first.copy(text = first.text.replaceFirstChar { it.lowercase() })) + segment.words.drop(1))
     }
 
     private fun readSpool(fromSample: Long, toSample: Long): FloatArray {
@@ -253,5 +321,11 @@ class LiveTranscriber(
         const val PAD_BEFORE = AudioSpec.ASR_SAMPLE_RATE * 1L
         const val PAD_AFTER = AudioSpec.ASR_SAMPLE_RATE * 8 / 10L
         const val MIN_REFINE_SAMPLES = AudioSpec.ASR_SAMPLE_RATE / 5
+
+        // A sentence is split at a breath once it passes 10 s, and at the best available dip by 24 s.
+        const val SPLIT_AFTER_MS = 10_000
+        const val SPLIT_MIN_HEAD_MS = 4_000
+        const val SPLIT_FORCE_MS = 24_000
+        const val PAUSE_DEPTH = 0.12f
     }
 }

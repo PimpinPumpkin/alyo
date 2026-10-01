@@ -179,14 +179,14 @@ fun SheetGroup(rows: List<SheetRow>, modifier: Modifier = Modifier) {
 enum class RecordGlyph { RECORD, PAUSE }
 
 /**
- * The record button: a pale disc holding the red dot. Pressing squeezes the disc and squares the
- * dot off, the springy shape change Material 3 Expressive uses for its primary actions.
+ * The record button: a red disc with a dark dot. Pressing squeezes the disc and squares the dot
+ * off, the springy shape change Material 3 Expressive uses for its primary actions.
  */
 @Composable
 fun RecordButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    size: Dp = 88.dp,
+    size: Dp = 104.dp,
     glyph: RecordGlyph = RecordGlyph.RECORD,
     description: String = "Record",
 ) {
@@ -194,24 +194,22 @@ fun RecordButton(
     val pressed by interaction.collectIsPressedAsState()
     val motion = MaterialTheme.motionScheme
     val scale by animateFloatAsState(if (pressed) 0.9f else 1f, motion.fastSpatialSpec(), label = "scale")
-    val corner by animateDpAsState(if (pressed) size * 0.11f else size * 0.2f, motion.fastSpatialSpec(), label = "corner")
-    val red = LocalSottoColors.current.record
+    val corner by animateDpAsState(if (pressed) size * 0.07f else size * 0.13f, motion.fastSpatialSpec(), label = "corner")
+    val sotto = LocalSottoColors.current
 
     Surface(
         onClick = onClick,
         modifier = modifier.size(size).scale(scale).semantics { contentDescription = description },
         shape = CircleShape,
-        // The disc has to stand off the page: the brightest surface in light theme, a raised one in dark.
-        color = if (LocalSottoColors.current.dark) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerLowest,
+        color = sotto.record,
         shadowElevation = 6.dp,
-        tonalElevation = 0.dp,
         interactionSource = interaction,
     ) {
         Box(contentAlignment = Alignment.Center) {
             when (glyph) {
-                RecordGlyph.RECORD -> Box(Modifier.size(size * 0.4f).background(red, RoundedCornerShape(corner)))
+                RecordGlyph.RECORD -> Box(Modifier.size(size * 0.26f).background(sotto.onRecord, RoundedCornerShape(corner)))
                 RecordGlyph.PAUSE -> Row(horizontalArrangement = Arrangement.spacedBy(size * 0.09f)) {
-                    repeat(2) { Box(Modifier.size(width = size * 0.11f, height = size * 0.36f).background(red, RoundedCornerShape(50))) }
+                    repeat(2) { Box(Modifier.size(width = size * 0.1f, height = size * 0.32f).background(sotto.onRecord, RoundedCornerShape(50))) }
                 }
             }
         }

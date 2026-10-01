@@ -101,6 +101,15 @@ import kotlinx.coroutines.launch
 
 private val SPEEDS = listOf(1f, 1.25f, 1.5f, 2f, 0.5f, 0.75f)
 
+private fun nextSpeed(current: Float): Float = SPEEDS[(SPEEDS.indexOf(current) + 1).mod(SPEEDS.size)]
+
+/**
+ * Word times mark where the model first recognised a word, which is a touch after its onset, so
+ * jumping to exactly that time clips the first sound. Jumps land this much early, and the
+ * highlight runs the same amount ahead so the tapped word is still the one lit.
+ */
+private const val LEAD_IN_MS = 180L
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PlayerScreen(
@@ -215,12 +224,12 @@ fun PlayerScreen(
                                     onQuery = { query = it },
                                     paragraphs = paragraphs,
                                     listState = listState,
-                                    onJump = { ms -> player.seekTo(ms) },
+                                    onJump = { ms -> player.seekTo(ms - LEAD_IN_MS) },
                                     onClose = { searching = false; query = "" },
                                 )
                             }
                             val activeParagraph by remember(paragraphs) {
-                                derivedStateOf { paragraphs.indexOfFirst { position >= it.startMs && position < it.endMs } }
+                                derivedStateOf { paragraphs.indexOfFirst { position + LEAD_IN_MS >= it.startMs && position + LEAD_IN_MS < it.endMs } }
                             }
                             // Keep the spoken paragraph in view while playing, without fighting a reader who is scrolling.
                             LaunchedEffect(activeParagraph, player.isPlaying) {
@@ -230,11 +239,11 @@ fun PlayerScreen(
                             }
                             TranscriptView(
                                 paragraphs = paragraphs,
-                                positionMs = { position },
+                                positionMs = { position + LEAD_IN_MS },
                                 editing = editing,
                                 query = if (searching) query else "",
                                 listState = listState,
-                                onWordTap = { word -> player.seekTo(word.startMs.toLong()) },
+                                onWordTap = { word -> player.seekTo(word.startMs - LEAD_IN_MS) },
                                 onEditSegment = { segment -> player.pause(); editingSegment = segment },
                                 modifier = Modifier.weight(1f).fillMaxWidth(),
                             )
@@ -244,7 +253,21 @@ fun PlayerScreen(
                 }
             }
 
-            ViewToggle(showTranscript, { showTranscript = it }, Modifier.align(Alignment.CenterHorizontally).padding(vertical = 16.dp))
+            Box(Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
+                // Speed lives at the edge of the same row, one tap away rather than in the menu.
+                Surface(
+                    onClick = { player.changeSpeed(nextSpeed(player.speed)) },
+                    shape = CircleShape,
+                    color = if (player.speed == 1f) colors.surfaceContainerHighest else colors.primary,
+                    contentColor = if (player.speed == 1f) colors.onSurface else colors.onPrimary,
+                    modifier = Modifier.align(Alignment.CenterStart).padding(start = 20.dp).size(width = 72.dp, height = 56.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(speedLabel(player.speed), style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+                ViewToggle(showTranscript, { showTranscript = it }, Modifier.align(Alignment.Center))
+            }
             SeekBar(peaks, meta.durationMs, positionMs = { position }, onSeek = player::seekTo, modifier = Modifier.padding(horizontal = 12.dp))
             TimeLabels({ position }, meta.durationMs)
             TransportRow(player)
@@ -282,7 +305,7 @@ fun PlayerScreen(
                             Text(speedLabel(player.speed), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                         }
                     },
-                ) { player.changeSpeed(SPEEDS[(SPEEDS.indexOf(player.speed) + 1).mod(SPEEDS.size)]) },
+                ) { player.changeSpeed(nextSpeed(player.speed)) },
             ),
         )
     }
@@ -290,7 +313,7 @@ fun PlayerScreen(
         SegmentEditor(
             segment = segment,
             onDismiss = { editingSegment = null },
-            onListen = { player.seekTo(segment.startMs.toLong()); player.play() },
+            onListen = { player.seekTo(segment.startMs - LEAD_IN_MS); player.play() },
             onSave = { text ->
                 player.pause()
                 app.store.updateTranscript(id) { current ->

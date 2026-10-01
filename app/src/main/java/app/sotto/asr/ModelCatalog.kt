@@ -55,6 +55,13 @@ data class LanguagePack(
     val name: String,
     val live: ModelSpec,
     val qualities: List<Quality>,
+    /**
+     * Words that usually continue a sentence rather than begin one. When long speech is split at
+     * a breath, the second pass punctuates each piece as a sentence of its own; a piece opening
+     * with one of these is stitched back onto the one before ("…dynasty. Where…" becomes
+     * "…dynasty, where…"). Empty turns the stitching off.
+     */
+    val continuers: Set<String> = emptySet(),
 )
 
 object ModelCatalog {
@@ -115,6 +122,10 @@ object ModelCatalog {
         code = "en",
         name = "English",
         live = enLive,
+        continuers = setOf(
+            "and", "but", "or", "so", "because", "which", "where", "when", "while", "since", "that",
+            "although", "though", "if", "unless", "until", "whereas", "then", "who", "whose",
+        ),
         qualities = listOf(
             Quality(
                 id = "best",

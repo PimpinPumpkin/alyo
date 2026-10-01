@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -74,11 +75,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.sotto.SottoApp
 import app.sotto.asr.InstallState
+import app.sotto.audio.Peaks
 import app.sotto.audio.RecordingSession
 import app.sotto.data.RecordingMeta
 import app.sotto.ui.components.RecordButton
 import app.sotto.ui.components.RecordingDot
-import app.sotto.ui.dayLabel
+import app.sotto.ui.components.SpeechBar
+import app.sotto.ui.formatStamp
+import app.sotto.ui.monthLabel
+import app.sotto.ui.shortDate
 import app.sotto.ui.formatClock
 import app.sotto.ui.theme.LocalSottoColors
 import app.sotto.ui.timeOfDay
@@ -109,7 +114,7 @@ fun HomeScreen(
     val shown by produceState(all, all, query) {
         value = if (query.isBlank()) all else withContext(Dispatchers.IO) { app.store.search(query) }
     }
-    val groups = remember(shown) { shown.groupBy { dayLabel(it.createdAt) }.toList() }
+    val groups = remember(shown) { shown.groupBy { monthLabel(it.createdAt) }.toList() }
     val qualityId by app.settings.quality.collectAsState()
     val setup = remember(modelStates, qualityId) {
         val pack = app.settings.pack
@@ -137,14 +142,14 @@ fun HomeScreen(
 
     // Focusable so that when a dialog closes, focus comes back here and not to the search field,
     // which would pop the keyboard up over the list.
-    Box(Modifier.fillMaxSize().background(colors.surfaceContainer).focusable()) {
+    Box(Modifier.fillMaxSize().background(colors.surface).focusable()) {
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = 16.dp,
                 end = 16.dp,
-                top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 84.dp,
-                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 148.dp,
+                top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 72.dp,
+                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 160.dp,
             ),
         ) {
             if (setup != SetupState.Ready && query.isBlank()) {
@@ -154,23 +159,19 @@ fun HomeScreen(
                 item(key = "h-$label") {
                     Text(
                         label,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = colors.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 12.dp, top = 20.dp, bottom = 10.dp),
+                        style = MaterialTheme.typography.headlineLarge,
+                        modifier = Modifier.padding(start = 8.dp, top = 28.dp, bottom = 16.dp),
                     )
                 }
-                items.forEachIndexed { index, meta ->
-                    item(key = meta.id) {
-                        RecordingRow(
-                            meta = meta,
-                            first = index == 0,
-                            last = index == items.lastIndex,
-                            onClick = { onOpen(meta.id, false) },
-                            onPlay = { onOpen(meta.id, true) },
-                            onLongClick = { menuFor = meta },
-                            modifier = Modifier.animateItem(),
-                        )
-                    }
+                items(items, key = { it.id }) { meta ->
+                    RecordingCard(
+                        app = app,
+                        meta = meta,
+                        onClick = { onOpen(meta.id, false) },
+                        onPlay = { onOpen(meta.id, true) },
+                        onLongClick = { menuFor = meta },
+                        modifier = Modifier.animateItem(),
+                    )
                 }
             }
         }
@@ -183,9 +184,9 @@ fun HomeScreen(
         Box(
             Modifier
                 .fillMaxWidth()
-                .background(Brush.verticalGradient(0.7f to colors.surfaceContainer, 1f to Color.Transparent))
+                .background(Brush.verticalGradient(0.75f to colors.surface, 1f to Color.Transparent))
                 .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 8.dp, vertical = 8.dp),
         ) {
             SearchPill(query, onQuery = { query = it }, onSettings = onSettings)
         }
@@ -194,9 +195,8 @@ fun HomeScreen(
             Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .background(Brush.verticalGradient(0f to Color.Transparent, 0.55f to colors.surfaceContainer))
                 .navigationBarsPadding()
-                .padding(top = 40.dp, bottom = 28.dp),
+                .padding(bottom = 28.dp),
             contentAlignment = Alignment.Center,
         ) {
             val active = session
@@ -231,19 +231,20 @@ fun HomeScreen(
 private fun SearchPill(query: String, onQuery: (String) -> Unit, onSettings: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val focus = LocalFocusManager.current
-    Surface(shape = CircleShape, color = colors.surfaceContainerHighest, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 20.dp, end = 4.dp)) {
+    // No container: on the original the search row is just an icon and text on the page.
+    Box(Modifier.fillMaxWidth().height(56.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxSize().padding(start = 16.dp, end = 4.dp)) {
             Icon(Icons.Rounded.Search, null, tint = colors.onSurfaceVariant)
             Spacer(Modifier.width(14.dp))
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                 if (query.isEmpty()) {
-                    Text("Search your recordings", style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant)
+                    Text("Search your recordings", style = MaterialTheme.typography.titleLarge, color = colors.onSurfaceVariant)
                 }
                 BasicTextField(
                     value = query,
                     onValueChange = onQuery,
                     singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = colors.onSurface),
+                    textStyle = MaterialTheme.typography.titleLarge.copy(color = colors.onSurface),
                     cursorBrush = SolidColor(colors.primary),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     modifier = Modifier.fillMaxWidth(),
@@ -258,75 +259,47 @@ private fun SearchPill(query: String, onQuery: (String) -> Unit, onSettings: () 
     }
 }
 
+/** One recording: its title and a play button, the date and length, and a line showing where the speech is. */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun RecordingRow(
+private fun RecordingCard(
+    app: SottoApp,
     meta: RecordingMeta,
-    first: Boolean,
-    last: Boolean,
     onClick: () -> Unit,
     onPlay: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
-    // Rows of one day sit together as a single rounded block, split by hairline gaps.
-    val outer = 24.dp
-    val inner = 6.dp
-    val shape = RoundedCornerShape(
-        topStart = if (first) outer else inner,
-        topEnd = if (first) outer else inner,
-        bottomStart = if (last) outer else inner,
-        bottomEnd = if (last) outer else inner,
-    )
-    Surface(
-        shape = shape,
-        color = colors.surfaceBright,
-        modifier = modifier.fillMaxWidth().padding(bottom = 3.dp),
-    ) {
-        Row(
-            Modifier
-                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-                .padding(start = 20.dp, end = 12.dp, top = 16.dp, bottom = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(meta.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+    // Reloaded when the length changes, which is when the audio has been cut.
+    val peaks by produceState<Peaks?>(null, meta.id, meta.durationMs) {
+        value = withContext(Dispatchers.IO) { app.store.peaks(meta.id) }
+    }
+    Surface(shape = RoundedCornerShape(36.dp), color = colors.surfaceContainer, modifier = modifier.fillMaxWidth().padding(bottom = 12.dp)) {
+        Column(Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick).padding(start = 24.dp, end = 12.dp, top = 12.dp, bottom = 28.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    Text(meta.title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                     if (meta.starred) {
-                        Spacer(Modifier.width(6.dp))
-                        Icon(Icons.Rounded.Star, "Favourite", tint = colors.primary, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Icon(Icons.Rounded.Star, "Favourite", tint = colors.primary, modifier = Modifier.size(20.dp))
                     }
                 }
-                Spacer(Modifier.height(2.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "${timeOfDay(meta.createdAt)}  ·  ${formatClock(meta.durationMs)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.onSurfaceVariant,
-                    )
-                    if (meta.pendingRefine > 0) {
-                        Spacer(Modifier.width(10.dp))
-                        LoadingIndicator(Modifier.size(18.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("Polishing transcript", style = MaterialTheme.typography.bodySmall, color = colors.primary)
-                    }
-                }
-                if (meta.preview.isNotBlank()) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        meta.preview,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                IconButton(onClick = onPlay) { Icon(Icons.Rounded.PlayArrow, "Play ${meta.title}", Modifier.size(32.dp)) }
             }
-            Spacer(Modifier.width(12.dp))
-            FilledTonalIconButton(onClick = onPlay, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.Rounded.PlayArrow, "Play ${meta.title}")
+            Row(Modifier.padding(end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(shortDate(meta.createdAt), style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant)
+                if (meta.pendingRefine > 0) {
+                    Spacer(Modifier.width(12.dp))
+                    LoadingIndicator(Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Polishing transcript", style = MaterialTheme.typography.bodySmall, color = colors.primary)
+                }
+                Spacer(Modifier.weight(1f))
+                Text(formatStamp(meta.durationMs), style = MaterialTheme.typography.bodyLarge.copy(fontFeatureSettings = "tnum"), color = colors.onSurfaceVariant)
             }
+            Spacer(Modifier.height(20.dp))
+            SpeechBar(peaks, Modifier.padding(end = 12.dp))
         }
     }
 }
