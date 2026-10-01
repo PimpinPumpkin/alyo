@@ -3,6 +3,7 @@ package app.sotto.playback
 import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -40,6 +41,10 @@ class Player(context: Context) {
 
     val positionMs: Long get() = exo.currentPosition.coerceIn(0, maxOf(durationMs, 0))
 
+    /** Bumped on every jump, so the UI knows to re-read [positionMs] even while paused. */
+    var seekCount by mutableIntStateOf(0)
+        private set
+
     init {
         exo.addListener(object : Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
@@ -50,7 +55,7 @@ class Player(context: Context) {
                 if (state == STATE_READY) durationMs = exo.duration.coerceAtLeast(0)
                 if (state == STATE_ENDED) {
                     exo.pause()
-                    exo.seekTo(0)
+                    seekTo(0)
                 }
             }
         })
@@ -64,7 +69,10 @@ class Player(context: Context) {
     fun play() = exo.play()
     fun pause() = exo.pause()
     fun toggle() = if (exo.isPlaying) exo.pause() else exo.play()
-    fun seekTo(ms: Long) = exo.seekTo(ms.coerceIn(0, maxOf(durationMs, 0)))
+    fun seekTo(ms: Long) {
+        exo.seekTo(ms.coerceIn(0, maxOf(durationMs, 0)))
+        seekCount++
+    }
     fun seekBy(deltaMs: Long) = seekTo(exo.currentPosition + deltaMs)
 
     fun changeSpeed(value: Float) {

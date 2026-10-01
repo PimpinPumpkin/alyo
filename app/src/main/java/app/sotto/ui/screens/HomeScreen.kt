@@ -4,6 +4,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -55,6 +56,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -79,6 +81,8 @@ import app.sotto.ui.dayLabel
 import app.sotto.ui.formatClock
 import app.sotto.ui.theme.LocalSottoColors
 import app.sotto.ui.timeOfDay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -99,7 +103,10 @@ fun HomeScreen(
     var deleting by remember { mutableStateOf<RecordingMeta?>(null) }
 
     // The one being recorded right now is not in the library yet.
-    val shown = remember(all, query) { if (query.isBlank()) all else app.store.search(query) }
+    // Searching reads every transcript, so it runs off the main thread.
+    val shown by produceState(all, all, query) {
+        value = if (query.isBlank()) all else withContext(Dispatchers.IO) { app.store.search(query) }
+    }
     val groups = remember(shown) { shown.groupBy { dayLabel(it.createdAt) }.toList() }
     val qualityId by app.settings.quality.collectAsState()
     val setup = remember(modelStates, qualityId) {
@@ -126,7 +133,9 @@ fun HomeScreen(
     }
     val colors = MaterialTheme.colorScheme
 
-    Box(Modifier.fillMaxSize().background(colors.surfaceContainer)) {
+    // Focusable so that when a dialog closes, focus comes back here and not to the search field,
+    // which would pop the keyboard up over the list.
+    Box(Modifier.fillMaxSize().background(colors.surfaceContainer).focusable()) {
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(

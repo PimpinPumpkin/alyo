@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material3.Button
@@ -107,6 +108,8 @@ fun SettingsScreen(app: SottoApp, firstRun: Boolean, onDone: () -> Unit) {
                         sizeLabel = formatBytes(bytes),
                         enabled = downloading.isEmpty(),
                         onSelect = { app.settings.setQuality(option.id) },
+                        // The big second-pass model is the part worth reclaiming; the live model is shared.
+                        onRemove = { app.models.delete(option.refiner) }.takeIf { state(option.refiner) == InstallState.Installed },
                     )
                 }
             }
@@ -185,6 +188,7 @@ private fun QualityCard(
     sizeLabel: String,
     enabled: Boolean,
     onSelect: () -> Unit,
+    onRemove: (() -> Unit)?,
 ) {
     val colors = MaterialTheme.colorScheme
     val container by animateColorAsState(if (selected) colors.secondaryContainer else colors.surfaceContainer, label = "container")
@@ -218,6 +222,11 @@ private fun QualityCard(
                     color = if (installed) colors.primary else colors.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),
                 )
+            }
+            if (onRemove != null) {
+                IconButton(onClick = onRemove, enabled = enabled) {
+                    Icon(Icons.Rounded.DeleteOutline, "Remove the ${quality.title} download", tint = colors.onSurfaceVariant)
+                }
             }
         }
     }

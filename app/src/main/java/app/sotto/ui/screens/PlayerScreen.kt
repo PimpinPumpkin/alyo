@@ -1,5 +1,7 @@
 package app.sotto.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -31,6 +33,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.ContentCut
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DriveFileRenameOutline
@@ -132,8 +135,11 @@ fun PlayerScreen(
     }
 
     var position by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(player) {
-        while (isActive) {
+    // Follow playback frame by frame, but only while something is moving: a paused player
+    // should not keep the screen redrawing.
+    LaunchedEffect(player, player.isPlaying, player.seekCount, player.durationMs) {
+        position = player.positionMs
+        while (player.isPlaying && isActive) {
             withFrameNanos { }
             position = player.positionMs
         }
@@ -168,6 +174,16 @@ fun PlayerScreen(
                         leadingIcon = { Icon(Icons.Rounded.Edit, null) },
                         enabled = !busy && !transcript.isEmpty,
                         onClick = { menuOpen = false; editing = true; showTranscript = true },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Copy transcript") },
+                        leadingIcon = { Icon(Icons.Rounded.ContentCopy, null) },
+                        enabled = !transcript.isEmpty,
+                        onClick = {
+                            menuOpen = false
+                            val text = paragraphs.joinToString("\n\n") { it.text }
+                            context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText(meta.title, text))
+                        },
                     )
                     DropdownMenuItem(
                         text = { Text("Crop or cut audio") },

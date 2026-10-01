@@ -69,6 +69,8 @@ import app.sotto.ui.components.paragraphsOf
 import app.sotto.ui.formatClock
 import app.sotto.ui.theme.LocalSottoColors
 import app.sotto.ui.theme.TimerFont
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -79,10 +81,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun RecordScreen(app: SottoApp, session: RecordingSession, onMinimise: () -> Unit) {
     val colors = MaterialTheme.colorScheme
-    val red = LocalSottoColors.current.record
-    val elapsed by session.elapsedMs.collectAsState()
     val paused by session.paused.collectAsState()
-    val peakCount by session.peakCount.collectAsState()
     val segments by session.segments.collectAsState()
     val partial by session.partial.collectAsState()
     val title by session.title.collectAsState()
@@ -118,20 +117,13 @@ fun RecordScreen(app: SottoApp, session: RecordingSession, onMinimise: () -> Uni
                     LiveTranscript(session.hasTranscript, segments, partial)
                 } else {
                     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
-                        TapeWaveform(
-                            peaks = session.peaks,
-                            peakCount = peakCount,
-                            positionMs = { elapsed },
-                            playedColor = if (paused) colors.outline else colors.primary,
-                            playheadColor = red,
-                            modifier = Modifier.fillMaxWidth().height(240.dp),
-                        )
+                        LiveWaveform(session, paused)
                     }
                 }
             }
         }
 
-        Timer(elapsed, paused)
+        Timer(session, paused)
         failure?.let {
             Text(it, color = colors.error, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(8.dp))
         }
@@ -216,12 +208,27 @@ private fun Hint(title: String, body: String) {
     }
 }
 
+/** Collects the fast-changing bar count itself, so only the waveform recomposes as audio arrives. */
 @Composable
-private fun Timer(elapsedMs: Long, paused: Boolean) {
+private fun LiveWaveform(session: RecordingSession, paused: Boolean) {
+    val peakCount by session.peakCount.collectAsState()
+    TapeWaveform(
+        peaks = session.peaks,
+        peakCount = peakCount,
+        positionMs = { session.elapsedMs.value },
+        playedColor = if (paused) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
+        playheadColor = LocalSottoColors.current.record,
+        modifier = Modifier.fillMaxWidth().height(240.dp),
+    )
+}
+
+@Composable
+private fun Timer(session: RecordingSession, paused: Boolean) {
+    val seconds by remember(session) { session.elapsedMs.map { it / 1000 }.distinctUntilChanged() }.collectAsState(0L)
     val blink = rememberInfiniteTransition(label = "blink")
     val pulse by blink.animateFloat(1f, 0.35f, infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "alpha")
     Text(
-        formatClock(elapsedMs),
+        formatClock(seconds * 1000),
         style = MaterialTheme.typography.displayLarge.copy(
             fontFamily = TimerFont,
             fontSize = 72.sp,

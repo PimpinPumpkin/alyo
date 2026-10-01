@@ -110,11 +110,12 @@ fun TrimScreen(app: SottoApp, id: String, onClose: (resultId: String?) -> Unit) 
     var working by remember { mutableStateOf(false) }
 
     // Preview plays the selection and stops at its end.
-    LaunchedEffect(player) {
-        while (isActive) {
+    LaunchedEffect(player, player.isPlaying, player.seekCount) {
+        position = player.positionMs
+        while (player.isPlaying && isActive) {
             withFrameNanos { }
             position = player.positionMs
-            if (player.isPlaying && position >= end) {
+            if (position >= end) {
                 player.pause()
                 player.seekTo(start)
             }
