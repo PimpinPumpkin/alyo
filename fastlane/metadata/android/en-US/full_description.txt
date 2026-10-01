@@ -7,6 +7,11 @@ Sotto Recorder records audio and writes down what is said while you are still ta
 • Fix mistakes: tap a sentence to correct it. Words you leave alone stay locked to the audio.
 • Crop and remove: select by dragging across the words, the waveform or the seek bar, listen to the result, and save it as a copy.
 • Summaries: a small language model on the phone can write a title and the key points. Optional, and a separate download.
+• Speaker labels: tells voices apart and labels who is talking.
+• Music, applause and laughter are marked in the waveform and the transcript.
+• Import audio files and transcribe them, or transcribe a recording again.
+• Back up and restore the whole library.
+• Widget and quick settings tile to start recording in one tap.
 • Search across every transcript, and within one.
 • Export audio (M4A), transcript (TXT), subtitles (SRT) or per-word timings (JSON).
 • Background playback with lock screen controls.

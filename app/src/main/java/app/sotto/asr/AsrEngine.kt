@@ -15,7 +15,8 @@ import java.io.File
 
 /**
  * Owns the loaded speech models. Loading takes seconds and hundreds of megabytes, so each model is
- * loaded once and shared between overlapping recordings, and dropped when the last one is done.
+ * loaded once and shared by whatever is transcribing (a recording, an import), and dropped when
+ * nothing is.
  */
 class AsrEngine(private val models: ModelManager) {
     private var live: Pair<String, OnlineRecognizer>? = null
@@ -74,12 +75,18 @@ class AsrEngine(private val models: ModelManager) {
         return OfflineRecognizer(null, config).also { refiner = spec.id to it }
     }
 
-    /**
-     * Frees both models. Only safe when no transcriber is running; [app.sotto.service.RecorderController]
-     * calls it once the last recording has finished its second pass.
-     */
+    private var users = 0
+
+    /** Call before using the models, and [release] when done. They are freed when the last user leaves. */
     @Synchronized
-    fun releaseAll() {
+    fun retain() {
+        users++
+    }
+
+    @Synchronized
+    fun release() {
+        if (--users > 0) return
+        users = 0
         live?.second?.release()
         live = null
         refiner?.second?.release()

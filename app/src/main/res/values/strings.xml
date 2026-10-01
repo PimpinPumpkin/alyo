@@ -2,4 +2,8 @@
     <string name="app_name">Sotto Recorder</string>
     <!-- The launcher label when "Show as Recorder" is on. -->
     <string name="app_name_plain">Recorder</string>
+    <string name="tile_label">Record</string>
+    <string name="widget_label">Record</string>
+    <string name="widget_description">Start recording with one tap</string>
+    <string name="shortcut_record">New recording</string>
 </resources>

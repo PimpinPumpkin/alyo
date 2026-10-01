@@ -24,6 +24,8 @@ data class Segment(
     val words: List<Word>,
     val refined: Boolean = false,
     val edited: Boolean = false,
+    /** Which voice this is, numbered from 0 in order of first appearance; null when speakers were not told apart. */
+    val speaker: Int? = null,
 ) {
     val startMs: Int get() = words.firstOrNull()?.startMs ?: 0
     val endMs: Int get() = words.lastOrNull()?.endMs ?: 0
@@ -34,7 +36,11 @@ data class Segment(
 data class Transcript(
     val language: String = "en",
     val segments: List<Segment> = emptyList(),
+    /** Names the user has given speakers, by number. Unnamed ones show as "Speaker 1", "Speaker 2". */
+    val speakerNames: Map<Int, String> = emptyMap(),
 ) {
+    fun speakerName(speaker: Int): String = speakerNames[speaker] ?: "Speaker ${speaker + 1}"
+    val hasSpeakers: Boolean get() = segments.mapNotNull { it.speaker }.distinct().size > 1
     val text: String get() = segments.joinToString("\n\n") { it.text }
     val isEmpty: Boolean get() = segments.all { it.words.isEmpty() }
 }

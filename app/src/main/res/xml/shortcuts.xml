@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_record"
+        android:shortcutId="record"
+        android:shortcutShortLabel="@string/shortcut_record">
+        <intent
+            android:action="app.sotto.action.RECORD"
+            android:targetClass="app.sotto.MainActivity"
+            android:targetPackage="app.sotto" />
+    </shortcut>
+</shortcuts>

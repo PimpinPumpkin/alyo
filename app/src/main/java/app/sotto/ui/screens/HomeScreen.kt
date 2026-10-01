@@ -1,5 +1,12 @@
 package app.sotto.ui.screens
 
+import app.sotto.service.LibraryJobs
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material.icons.rounded.Add
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
+import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,8 +29,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -103,6 +114,18 @@ fun HomeScreen(
     onCrop: (RecordingMeta) -> Unit,
 ) {
     val all by app.store.recordings.collectAsState()
+    val context = LocalContext.current
+    val allJobs by app.jobs.active.collectAsState()
+    // A recording being transcribed again already has a card of its own, which shows the progress.
+    val jobs = allJobs.filter { it.recordingId == null }
+    val jobError by app.jobs.errors.collectAsState()
+    LaunchedEffect(jobError) {
+        jobError?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            app.jobs.clearError()
+        }
+    }
+    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris -> uris.forEach(app.jobs::import) }
     val session by app.recorder.session.collectAsState()
     val modelStates by app.models.states.collectAsState()
     var query by rememberSaveable { mutableStateOf("") }
@@ -144,8 +167,14 @@ fun HomeScreen(
     // Focusable so that when a dialog closes, focus comes back here and not to the search field,
     // which would pop the keyboard up over the list.
     Box(Modifier.fillMaxSize().background(colors.surface).focusable()) {
-        LazyColumn(
-            Modifier.fillMaxSize(),
+        val gridState = rememberLazyGridState()
+        // A new import appears at the top; bring it into view rather than leave it scrolled off.
+        LaunchedEffect(jobs.size) { if (jobs.isNotEmpty()) gridState.animateScrollToItem(0) }
+        LazyVerticalGrid(
+            state = gridState,
+            columns = GridCells.Adaptive(340.dp),
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(
                 start = 16.dp,
                 end = 16.dp,
@@ -154,10 +183,11 @@ fun HomeScreen(
             ),
         ) {
             if (setup != SetupState.Ready && query.isBlank()) {
-                item(key = "setup") { SetupCard(setup, onSettings) }
+                item(key = "setup", span = { GridItemSpan(maxLineSpan) }) { SetupCard(setup, onSettings) }
             }
+            items(jobs, key = { it.key }, span = { GridItemSpan(maxLineSpan) }) { job -> JobCard(job) }
             for ((label, items) in groups) {
-                item(key = "h-$label") {
+                item(key = "h-$label", span = { GridItemSpan(maxLineSpan) }) {
                     Text(
                         label,
                         style = MaterialTheme.typography.headlineLarge,
@@ -189,15 +219,18 @@ fun HomeScreen(
                 .statusBarsPadding()
                 .padding(horizontal = 8.dp, vertical = 8.dp),
         ) {
-            SearchPill(query, onQuery = { query = it }, onSettings = onSettings)
+            SearchPill(query, onQuery = { query = it }, onSettings = onSettings, onImport = { importer.launch(arrayOf("audio/*", "video/*")) })
         }
 
+        // Centered on a phone held upright; tucked into the corner when the screen is wide, where
+        // the middle of the bottom edge is the middle of the list.
+        val wide = isWide()
         Box(
             Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
+                .align(if (wide) Alignment.BottomEnd else Alignment.BottomCenter)
+                .then(if (wide) Modifier else Modifier.fillMaxWidth())
                 .navigationBarsPadding()
-                .padding(bottom = 28.dp),
+                .padding(bottom = if (wide) 20.dp else 28.dp, end = if (wide) 28.dp else 0.dp),
             contentAlignment = Alignment.Center,
         ) {
             val active = session
@@ -229,7 +262,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun SearchPill(query: String, onQuery: (String) -> Unit, onSettings: () -> Unit) {
+private fun SearchPill(query: String, onQuery: (String) -> Unit, onSettings: () -> Unit, onImport: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val focus = LocalFocusManager.current
     // No container: on the original the search row is just an icon and text on the page.
@@ -254,6 +287,7 @@ private fun SearchPill(query: String, onQuery: (String) -> Unit, onSettings: () 
             if (query.isNotEmpty()) {
                 IconButton(onClick = { onQuery(""); focus.clearFocus() }) { Icon(Icons.Rounded.Close, "Clear search") }
             } else {
+                IconButton(onClick = onImport) { Icon(Icons.Rounded.Add, "Import audio", tint = colors.onSurfaceVariant) }
                 IconButton(onClick = onSettings) { Icon(Icons.Rounded.Settings, "Settings", tint = colors.onSurfaceVariant) }
             }
         }
@@ -276,7 +310,9 @@ private fun RecordingCard(
     val peaks by produceState<Peaks?>(null, meta.id, meta.durationMs) {
         value = withContext(Dispatchers.IO) { app.store.peaks(meta.id) }
     }
-    val sounds by produceState(emptyList<SoundSpan>(), meta.id, meta.durationMs) {
+    val activeJobs by app.jobs.active.collectAsState()
+    val job = activeJobs.firstOrNull { it.recordingId == meta.id }
+    val sounds by produceState(emptyList<SoundSpan>(), meta.id, meta.durationMs, meta.pendingRefine) {
         value = withContext(Dispatchers.IO) { app.store.sounds(meta.id) }
     }
     Surface(shape = RoundedCornerShape(36.dp), color = colors.surfaceContainer, modifier = modifier.fillMaxWidth().padding(bottom = 12.dp)) {
@@ -297,13 +333,33 @@ private fun RecordingCard(
                     Spacer(Modifier.width(12.dp))
                     LoadingIndicator(Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Polishing transcript", style = MaterialTheme.typography.bodySmall, color = colors.primary)
+                    Text(if (job?.progress != null) "Transcribing ${(job.progress * 100).toInt()}%" else "Polishing transcript", style = MaterialTheme.typography.bodySmall, color = colors.primary)
                 }
                 Spacer(Modifier.weight(1f))
                 Text(formatStamp(meta.durationMs), style = MaterialTheme.typography.bodyLarge.copy(fontFeatureSettings = "tnum"), color = colors.onSurfaceVariant)
             }
             Spacer(Modifier.height(20.dp))
             SpeechBar(peaks, Modifier.padding(end = 12.dp), sounds = sounds, durationMs = meta.durationMs)
+        }
+    }
+}
+
+/** A file on its way into the library. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun JobCard(job: LibraryJobs.Job) {
+    val colors = MaterialTheme.colorScheme
+    Surface(shape = RoundedCornerShape(36.dp), color = colors.secondaryContainer, modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp)) {
+        Column(Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
+            Text(job.title, style = MaterialTheme.typography.titleLarge, color = colors.onSecondaryContainer, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                if (job.progress != null) "Importing and transcribing  ·  ${(job.progress * 100).toInt()}%" else "Finishing",
+                style = MaterialTheme.typography.bodyLarge,
+                color = colors.onSecondaryContainer,
+            )
+            Spacer(Modifier.height(14.dp))
+            val progress = job.progress
+            if (progress != null) LinearWavyProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth()) else LinearWavyProgressIndicator(Modifier.fillMaxWidth())
         }
     }
 }

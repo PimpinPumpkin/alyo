@@ -180,6 +180,7 @@ fun CropScreen(app: SottoApp, id: String, onClose: (copyId: String?) -> Unit) {
                 ) { Text("Save copy") }
             }
 
+            AdaptivePane(content = {
             ContentCard(Modifier.weight(1f)) {
                 Column(Modifier.fillMaxSize()) {
                     Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -240,6 +241,7 @@ fun CropScreen(app: SottoApp, id: String, onClose: (copyId: String?) -> Unit) {
                 }
             }
 
+            }, controls = {
             ViewToggle(showTranscript, { showTranscript = it }, Modifier.align(Alignment.CenterHorizontally).padding(top = 16.dp, bottom = 4.dp))
             SeekBar(
                 peaks = peaks,
@@ -253,6 +255,7 @@ fun CropScreen(app: SottoApp, id: String, onClose: (copyId: String?) -> Unit) {
             )
             TimeLabels({ position }, duration)
             TransportRow(player, fine = true, onPlayPause = ::playSelection)
+            })
         }
 
         if (saving || rendering) {

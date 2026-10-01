@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import app.sotto.audio.M4a
 import app.sotto.audio.Peaks
+import app.sotto.asr.SpeakerTurn
 import app.sotto.audio.Span
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -51,6 +52,9 @@ class RecordingStore(context: Context) {
         }
         _recordings.value = found.sortedByDescending { it.createdAt }
     }
+
+    /** Where recordings live; for backup and restore. */
+    val folder: File get() = root
 
     fun newId(): String = UUID.randomUUID().toString().also { dir(it).mkdirs() }
 
@@ -146,6 +150,28 @@ class RecordingStore(context: Context) {
     /** Swaps in the second pass's version of one sentence, unless the user has corrected it meanwhile. */
     fun applyRefined(id: String, segment: Segment) = updateTranscript(id) { transcript ->
         transcript.copy(segments = transcript.segments.map { if (it.id == segment.id && !it.edited) segment else it })
+    }
+
+    /**
+     * Labels each sentence with whoever was speaking for most of it. Speakers are renumbered in
+     * order of first appearance, so "Speaker 1" is always the first voice heard.
+     */
+    fun applySpeakers(id: String, turns: List<SpeakerTurn>) {
+        if (turns.isEmpty()) return
+        val order = LinkedHashMap<Int, Int>()
+        updateTranscript(id) { transcript ->
+            transcript.copy(
+                segments = transcript.segments.map { segment ->
+                    val overlap = HashMap<Int, Int>()
+                    for (turn in turns) {
+                        val shared = minOf(segment.endMs, turn.endMs) - maxOf(segment.startMs, turn.startMs)
+                        if (shared > 0) overlap[turn.speaker] = (overlap[turn.speaker] ?: 0) + shared
+                    }
+                    val raw = overlap.maxByOrNull { it.value }?.key
+                    segment.copy(speaker = raw?.let { order.getOrPut(it) { order.size } })
+                },
+            )
+        }
     }
 
     /**

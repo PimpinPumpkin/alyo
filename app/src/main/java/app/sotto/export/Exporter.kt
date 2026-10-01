@@ -81,7 +81,9 @@ class Exporter(private val context: Context, private val store: RecordingStore) 
             for (point in summary.points) append("- ").append(point).append('\n')
         }
         for (paragraph in paragraphsOf(transcript.segments)) {
-            append("\n[").append(formatClock(paragraph.startMs.toLong())).append("]\n")
+            append("\n[").append(formatClock(paragraph.startMs.toLong())).append("]")
+            if (transcript.hasSpeakers) paragraph.speaker?.let { append(' ').append(transcript.speakerName(it)) }
+            append('\n')
             append(paragraph.text).append('\n')
         }
     }

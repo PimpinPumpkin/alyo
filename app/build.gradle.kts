@@ -40,6 +40,25 @@ if (!File(soundsDir, "model.int8.onnx").exists()) {
     }
 }
 
+// The speaker-change model (pyannote segmentation 3.0, 1.5 MB) is bundled the same way. The larger
+// voice-fingerprint model it works with is downloaded only if speaker labels are turned on.
+val speakersDir = layout.projectDirectory.dir("src/main/assets/speakers").asFile
+if (!File(speakersDir, "model.int8.onnx").exists()) {
+    val name = "sherpa-onnx-pyannote-segmentation-3-0"
+    val url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/$name.tar.bz2"
+    logger.lifecycle("Downloading $url")
+    val archive = File(layout.buildDirectory.asFile.get(), "$name.tar.bz2").apply { parentFile.mkdirs() }
+    URI(url).toURL().openStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
+    copy {
+        from(tarTree(resources.bzip2(archive))) {
+            include("**/model.int8.onnx")
+            eachFile { path = this.name }
+            includeEmptyDirs = false
+        }
+        into(speakersDir)
+    }
+}
+
 android {
     namespace = "app.sotto"
     compileSdk = 37

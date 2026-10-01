@@ -123,6 +123,8 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
             val magic = ByteArray(4).also { input.read(it) }
             input.reset()
             if (String(magic, Charsets.US_ASCII) == "GGUF") return importGguf(input, staging)
+            // The speaker model is a bare ONNX file: recognized by matching its pinned hash.
+            if (magic[0] != 'B'.code.toByte() || magic[1] != 'Z'.code.toByte()) return importSpeakers(input, staging)
 
             var spec: ModelSpec? = null
             TarArchiveInputStream(BZip2CompressorInputStream(BufferedInputStream(input, 256 * 1024))).use { tar ->
@@ -160,6 +162,23 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
         } finally {
             staging.deleteRecursively()
         }
+    }
+
+    private fun importSpeakers(input: InputStream, staging: File): ModelSpec {
+        val spec = ModelCatalog.speakers
+        val wanted = (spec.source as ModelSource.Files).files.single()
+        val file = File(staging, wanted.name)
+        file.outputStream().use { input.copyTo(it, 1 shl 20) }
+        if (sha256(file) != wanted.sha256) throw IOException("This is not a model file Sotto Recorder uses.")
+        synchronized(this) {
+            jobs.remove(spec.id)?.cancel()
+            val dir = dir(spec).apply { deleteRecursively(); mkdirs() }
+            if (!file.renameTo(File(dir, wanted.name))) throw IOException("Could not save the model")
+            File(dir, DONE).createNewFile()
+            this.wanted = this.wanted - spec.id
+            set(spec, InstallState.Installed)
+        }
+        return spec
     }
 
     /** One of the listed summary models if the file is exactly that, otherwise kept as the user's own. */

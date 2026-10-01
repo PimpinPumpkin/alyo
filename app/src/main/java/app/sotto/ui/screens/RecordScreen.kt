@@ -109,14 +109,26 @@ fun RecordScreen(app: SottoApp, session: RecordingSession, onMinimize: () -> Uni
             Spacer(Modifier.width(48.dp))
         }
 
+        AdaptivePane(content = {
         ContentCard(Modifier.weight(1f)) {
             AnimatedContent(showTranscript, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "tab") { transcript ->
                 if (transcript) LiveTranscript(session.hasTranscript, segments, partial) else LiveWaveform(session, paused)
             }
         }
 
+        }, controls = {
         ViewToggle(showTranscript, { showTranscript = it }, Modifier.align(Alignment.CenterHorizontally).padding(top = 16.dp, bottom = 8.dp))
         Timer(session, paused)
+        val interrupted by session.interruption.collectAsState()
+        if (interrupted) {
+            Text(
+                "Paused for a call. Recording picks up again when it ends.",
+                color = colors.primary,
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp),
+            )
+        }
         failure?.let {
             Text(it, color = colors.error, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(8.dp))
         }
@@ -147,6 +159,7 @@ fun RecordScreen(app: SottoApp, session: RecordingSession, onMinimize: () -> Uni
                 }
             }
         }
+        })
     }
 
     if (confirmDelete) {

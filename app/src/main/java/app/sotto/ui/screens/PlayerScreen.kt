@@ -40,6 +40,7 @@ import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
@@ -167,6 +168,9 @@ fun PlayerScreen(
     var deleting by remember { mutableStateOf(false) }
     var sharing by remember { mutableStateOf(false) }
     var summarizing by remember { mutableStateOf(false) }
+    var namingSpeaker by remember { mutableStateOf<Int?>(null) }
+    val jobs by app.jobs.active.collectAsState()
+    val job = jobs.firstOrNull { it.recordingId == id }
     val busy = meta.pendingRefine > 0
     val listState = rememberLazyListState()
 
@@ -195,10 +199,18 @@ fun PlayerScreen(
                 Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                     LoadingIndicator(Modifier.size(22.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Polishing the transcript", style = MaterialTheme.typography.labelLarge, color = colors.primary)
+                    Text(
+                        when {
+                            job?.progress != null -> "Transcribing  ${(job.progress * 100).toInt()}%"
+                            else -> "Polishing the transcript"
+                        },
+                        style = MaterialTheme.typography.labelLarge,
+                        color = colors.primary,
+                    )
                 }
             }
 
+            AdaptivePane(content = {
             if (!transcript.isEmpty && !busy) {
                 SummaryChip(
                     app, id,
@@ -232,6 +244,10 @@ fun PlayerScreen(
                                 color = colors.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
                             )
+                            if (!busy && app.jobs.canTranscribe()) {
+                                Spacer(Modifier.height(20.dp))
+                                Button(onClick = { app.jobs.retranscribe(id) }) { Text("Transcribe now") }
+                            }
                         }
                     } else {
                         Column(Modifier.fillMaxSize()) {
@@ -264,6 +280,9 @@ fun PlayerScreen(
                                 onEditSegment = { segment -> player.pause(); editingSegment = segment },
                                 sounds = sounds,
                                 onSoundTap = { player.seekTo(it.startMs.toLong()); player.play() },
+                                speakerName = if (transcript.hasSpeakers) transcript::speakerName else null,
+                                onSpeakerTap = { namingSpeaker = it },
+                                onLongPress = { segment -> if (!busy) { player.pause(); editingSegment = segment } },
                                 modifier = Modifier.weight(1f).fillMaxWidth(),
                             )
                             if (editing) EditBar(onDone = { editing = false })
@@ -272,6 +291,7 @@ fun PlayerScreen(
                 }
             }
 
+            }, controls = {
             Box(Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
                 // Speed lives at the edge of the same row, one tap away rather than in the menu.
                 Surface(
@@ -290,6 +310,7 @@ fun PlayerScreen(
             SeekBar(peaks, meta.durationMs, positionMs = { position }, onSeek = player::seekTo, sounds = sounds, modifier = Modifier.padding(horizontal = 12.dp))
             TimeLabels({ position }, meta.durationMs)
             TransportRow(player)
+            })
         }
 
         if (renaming) {
@@ -310,6 +331,11 @@ fun PlayerScreen(
                     menuOpen = false
                     showTranscript = true
                     searching = true
+                },
+                SheetRow(Icons.Rounded.Refresh, "Transcribe again", detail = "Replaces the transcript, including your corrections", enabled = !busy && app.jobs.canTranscribe()) {
+                    menuOpen = false
+                    player.pause()
+                    app.jobs.retranscribe(id)
                 },
                 SheetRow(Icons.Rounded.EditNote, "Edit transcript", enabled = !busy && !transcript.isEmpty) {
                     menuOpen = false
@@ -341,6 +367,12 @@ fun PlayerScreen(
                 editingSegment = null
             },
         )
+    }
+    namingSpeaker?.let { speaker ->
+        NameDialog("Name this speaker", transcript.speakerName(speaker), onDismiss = { namingSpeaker = null }) { name ->
+            app.store.updateTranscript(id) { it.copy(speakerNames = it.speakerNames + (speaker to name.trim())) }
+            namingSpeaker = null
+        }
     }
     if (deleting) DeleteDialog(meta.title, onDismiss = { deleting = false }) { deleting = false; player.pause(); app.store.delete(id); onBack() }
     if (sharing) ShareSheet(app, meta, onDismiss = { sharing = false })

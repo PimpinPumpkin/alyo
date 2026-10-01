@@ -1,5 +1,11 @@
 package app.sotto.ui.screens
 
+import app.sotto.data.Settings
+import app.sotto.data.Backup
+import androidx.compose.material.icons.rounded.Unarchive
+import androidx.compose.material.icons.rounded.RecordVoiceOver
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Archive
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -11,6 +17,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -74,8 +84,12 @@ import kotlinx.coroutines.withContext
 @Composable
 fun SetupScreen(app: SottoApp, onDone: () -> Unit) {
     val colors = MaterialTheme.colorScheme
-    Column(Modifier.fillMaxSize().background(colors.surface).statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp)) {
-        Spacer(Modifier.weight(1f))
+    Box(Modifier.fillMaxSize().background(colors.surface), contentAlignment = Alignment.BottomCenter) {
+    // Pinned to the bottom when there is room; scrolls when there is not (a phone on its side).
+    Column(
+        Modifier.fillMaxHeight().widthIn(max = 640.dp).statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),
+        verticalArrangement = Arrangement.Bottom,
+    ) {
         Text("Transcribe as you speak", style = MaterialTheme.typography.headlineLarge)
         Spacer(Modifier.height(10.dp))
         Text(
@@ -88,6 +102,7 @@ fun SetupScreen(app: SottoApp, onDone: () -> Unit) {
         TextButton(onClick = onDone, modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 8.dp)) {
             Text("Not now, just record audio")
         }
+    }
     }
 }
 
@@ -103,7 +118,7 @@ fun SettingsScreen(app: SottoApp, onDone: () -> Unit, onLicenses: () -> Unit, on
             IconButton(onClick = onDone) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") }
             Text("Settings", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 8.dp))
         }
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
+        Column(Modifier.weight(1f).widthIn(max = 640.dp).align(Alignment.CenterHorizontally).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
             SectionTitle("Transcription")
             ModelChooser(app, onReady = null, readyLabel = "")
 
@@ -111,8 +126,43 @@ fun SettingsScreen(app: SottoApp, onDone: () -> Unit, onLicenses: () -> Unit, on
             SummaryModelChooser(app)
 
             SectionTitle("Recordings")
+            val speakerLabels by app.settings.speakerLabels.collectAsState()
+            val microphone by app.settings.microphone.collectAsState()
+            val states by app.models.states.collectAsState()
+            val speakerState = states[ModelCatalog.speakers.id] ?: InstallState.Missing
             SheetGroup(
                 listOf(
+                    SheetRow(
+                        Icons.Rounded.RecordVoiceOver,
+                        "Label speakers",
+                        detail = when {
+                            !speakerLabels -> "Tell voices apart in the transcript"
+                            speakerState == InstallState.Installed -> "On. Speakers are labeled when a recording finishes."
+                            speakerState is InstallState.Downloading -> "Downloading the voice model, ${(speakerState.fraction * 100).toInt()}%"
+                            speakerState is InstallState.Failed -> "Download failed. Tap twice to try again."
+                            BuildConfig.NETWORK -> "Downloading the voice model"
+                            else -> "Needs the voice model: import 3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx"
+                        },
+                        trailing = { Switch(checked = speakerLabels, onCheckedChange = null) },
+                        onClick = {
+                            app.settings.setSpeakerLabels(!speakerLabels)
+                            // Turning it on fetches the 30 MB voice model if it is not here yet.
+                            if (!speakerLabels && BuildConfig.NETWORK && speakerState != InstallState.Installed) app.models.install(ModelCatalog.speakers)
+                        },
+                    ),
+                    SheetRow(
+                        Icons.Rounded.Mic,
+                        "Microphone",
+                        detail = when (microphone) {
+                            Settings.MIC_PHONE -> "Always the phone's own"
+                            Settings.MIC_BLUETOOTH -> "Bluetooth headset when one is connected"
+                            else -> "Automatic: a plugged-in headset if there is one"
+                        },
+                        onClick = {
+                            val order = listOf(Settings.MIC_AUTO, Settings.MIC_PHONE, Settings.MIC_BLUETOOTH)
+                            app.settings.setMicrophone(order[(order.indexOf(microphone) + 1) % order.size])
+                        },
+                    ),
                     SheetRow(
                         Icons.Rounded.AutoAwesome,
                         "Name recordings by topic",
@@ -122,6 +172,9 @@ fun SettingsScreen(app: SottoApp, onDone: () -> Unit, onLicenses: () -> Unit, on
                     ),
                 ),
             )
+
+            SectionTitle("Backup")
+            BackupRows(app)
 
             SectionTitle("App")
             SheetGroup(
@@ -140,6 +193,54 @@ fun SettingsScreen(app: SottoApp, onDone: () -> Unit, onLicenses: () -> Unit, on
             )
         }
     }
+}
+
+/** Save every recording to one file, and bring them back from it. */
+@Composable
+private fun BackupRows(app: SottoApp) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var working by remember { mutableStateOf<String?>(null) }
+    val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        working = "Backing up"
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { context.contentResolver.openOutputStream(uri)!!.use { out -> Backup.write(app.store.folder, out) { done, total -> working = "Backing up $done of $total" } } }
+            }
+            working = null
+            Toast.makeText(context, result.fold({ "Backed up $it recordings" }, { "Backup failed: ${it.message}" }), Toast.LENGTH_LONG).show()
+        }
+    }
+    val open = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        working = "Restoring"
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { context.contentResolver.openInputStream(uri)!!.use { Backup.restore(app.store.folder, it) }.also { app.store.load() } }
+            }
+            working = null
+            Toast.makeText(context, result.fold({ if (it == 0) "Nothing new in that backup" else "Restored $it recordings" }, { "Restore failed: ${it.message}" }), Toast.LENGTH_LONG).show()
+        }
+    }
+    SheetGroup(
+        listOf(
+            SheetRow(
+                Icons.Rounded.Archive,
+                "Back up recordings",
+                detail = working ?: "Audio, transcripts and titles, as one zip file",
+                enabled = working == null,
+                onClick = { save.launch("sotto-backup-" + java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date()) + ".zip") },
+            ),
+            SheetRow(
+                Icons.Rounded.Unarchive,
+                "Restore from a backup",
+                detail = "Adds recordings this phone does not have",
+                enabled = working == null,
+                onClick = { open.launch(arrayOf("application/zip", "application/octet-stream")) },
+            ),
+        ),
+    )
 }
 
 @Composable
@@ -254,7 +355,7 @@ private fun ModelChooser(app: SottoApp, onReady: (() -> Unit)?, readyLabel: Stri
             }
         }
         if (!downloading && !importing && missing.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                 if (BuildConfig.NETWORK) TextButton(onClick = { picker.launch(arrayOf("*/*")) }) { Text("Import from files instead") }
                 TextButton(onClick = { showSources = true }) { Text("Where to get the files") }
             }

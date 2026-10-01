@@ -2,8 +2,11 @@ package app.sotto.service
 
 import android.content.Context
 import android.content.Intent
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import androidx.core.content.ContextCompat
 import app.sotto.asr.AsrEngine
+import app.sotto.asr.Diarizer
 import app.sotto.asr.LiveTranscriber
 import app.sotto.asr.ModelManager
 import app.sotto.asr.SoundTagger
@@ -33,6 +36,7 @@ class RecorderController(
     private val models: ModelManager,
     private val engine: AsrEngine,
     private val settings: Settings,
+    private val diarizer: Diarizer,
     private val scope: CoroutineScope,
 ) {
     private val _session = MutableStateFlow<RecordingSession?>(null)
@@ -52,7 +56,18 @@ class RecorderController(
         val pack = settings.pack
         val refiner = settings.chosenQuality.refiner.takeIf { models.isInstalled(it) }
             ?: pack.qualities.map { it.refiner }.firstOrNull { models.isInstalled(it) }
-        val openSource: () -> PcmSource = if (wav != null) ({ WavFileSource(wav) }) else ({ MicSource() })
+        val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        var mic: MicSource? = null
+        val openSource: () -> PcmSource = if (wav != null) ({ WavFileSource(wav) }) else ({
+            MicSource(context) { inputs ->
+                when (settings.microphone.value) {
+                    Settings.MIC_PHONE -> inputs.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }
+                    Settings.MIC_BLUETOOTH -> inputs.firstOrNull { it.type in MicSource.BLUETOOTH_TYPES }
+                    else -> null
+                }
+            }.also { mic = it }
+        })
+        engine.retain()
         val session = RecordingSession(
             id = id,
             startedAt = now,
@@ -62,6 +77,10 @@ class RecorderController(
             openSource = openSource,
             autoTitle = { settings.autoTitle.value },
             sounds = SoundTagger(context.assets, scope),
+            // A call shows up two ways: the phone's audio mode leaves "normal", and the system
+            // mutes what this app is recording. Either one means stop and wait.
+            interrupted = if (wav != null) ({ false }) else ({ audio.mode != AudioManager.MODE_NORMAL || mic?.isSilenced == true }),
+            diarize = diarizer.takeIf { settings.speakerLabels.value && it.isReady() }?.let { it::turns },
             transcriberFactory = if (!models.isInstalled(pack.live)) null else { onRefined ->
                 LiveTranscriber(engine, pack.live, refiner, pack.continuers, store.spool(id), scope, onRefined)
             },
@@ -91,6 +110,7 @@ class RecorderController(
             session.save(onSettled = {
                 settling.update { it - 1 }
                 refreshBusy()
+                engine.release()
             })
         }.await()
     }
@@ -105,6 +125,7 @@ class RecorderController(
             } finally {
                 settling.update { it - 1 }
                 refreshBusy()
+                engine.release()
             }
         }.await()
     }
@@ -112,11 +133,8 @@ class RecorderController(
     @Synchronized
     private fun takeSession(): RecordingSession? = _session.value.also { _session.value = null }
 
-    // Same lock as start(): the models may only be freed when no session exists or is being created.
     @Synchronized
     private fun refreshBusy() {
-        val busy = _session.value != null || settling.value > 0
-        _busy.value = busy
-        if (!busy) engine.releaseAll()
+        _busy.value = _session.value != null || settling.value > 0
     }
 }

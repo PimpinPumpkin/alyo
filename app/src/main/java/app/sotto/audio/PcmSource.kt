@@ -1,6 +1,10 @@
 package app.sotto.audio
 
 import android.annotation.SuppressLint
+import android.content.Context
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
+import android.os.Build
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
@@ -21,29 +25,79 @@ interface PcmSource {
     fun release()
 }
 
-class MicSource : PcmSource {
+/**
+ * @param choose picks the input to record from out of those connected, or null to let Android
+ *   route as it sees fit (which already prefers a wired or USB headset microphone)
+ */
+class MicSource(private val context: Context, private val choose: (List<AudioDeviceInfo>) -> AudioDeviceInfo? = { null }) : PcmSource {
     private val record: AudioRecord
+    private val manager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private var bluetooth = false
 
     init {
         val min = AudioRecord.getMinBufferSize(AudioSpec.SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
         // Half a second of headroom so a busy moment on the recorder thread never drops samples.
         val size = maxOf(min, AudioSpec.SAMPLE_RATE)
+        val device = choose(manager.getDevices(AudioManager.GET_DEVICES_INPUTS).toList())
+        bluetooth = device != null && device.type in BLUETOOTH_TYPES
+        // A Bluetooth headset microphone only carries sound over the call link, which has to be
+        // opened first and is the one case where the "communication" source is the right one.
+        if (bluetooth) openBluetoothLink(device!!)
         @SuppressLint("MissingPermission") // The service refuses to start without RECORD_AUDIO.
         record = AudioRecord(
             // Tuned for speech recognition: no aggressive noise gating that would clip word onsets.
-            MediaRecorder.AudioSource.VOICE_RECOGNITION,
+            if (bluetooth) MediaRecorder.AudioSource.VOICE_COMMUNICATION else MediaRecorder.AudioSource.VOICE_RECOGNITION,
             AudioSpec.SAMPLE_RATE,
             AudioFormat.CHANNEL_IN_MONO,
             AudioFormat.ENCODING_PCM_16BIT,
             size,
         )
         check(record.state == AudioRecord.STATE_INITIALIZED) { "Microphone unavailable" }
+        if (device != null) record.preferredDevice = device
+    }
+
+    /** What is actually being recorded from, in words: "Phone", "Headset", or the Bluetooth device's name. */
+    val inputName: String?
+        get() = record.routedDevice?.let { device ->
+            when (device.type) {
+                AudioDeviceInfo.TYPE_BUILTIN_MIC -> "Phone microphone"
+                AudioDeviceInfo.TYPE_WIRED_HEADSET, AudioDeviceInfo.TYPE_USB_HEADSET, AudioDeviceInfo.TYPE_USB_DEVICE -> "Headset microphone"
+                in BLUETOOTH_TYPES -> device.productName?.toString()?.takeIf { it.isNotBlank() } ?: "Bluetooth microphone"
+                else -> null
+            }
+        }
+
+    /** True when the system has muted this recording because something with priority (a call) has the microphone. */
+    val isSilenced: Boolean get() = record.activeRecordingConfiguration?.isClientSilenced == true
+
+    private fun openBluetoothLink(device: AudioDeviceInfo) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            manager.setCommunicationDevice(device)
+        } else {
+            @Suppress("DEPRECATION")
+            manager.startBluetoothSco()
+        }
     }
 
     override fun start() = record.startRecording()
     override fun stop() = record.stop()
     override fun read(buffer: ShortArray): Int = record.read(buffer, 0, buffer.size)
-    override fun release() = record.release()
+
+    override fun release() {
+        record.release()
+        if (bluetooth) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                manager.clearCommunicationDevice()
+            } else {
+                @Suppress("DEPRECATION")
+                manager.stopBluetoothSco()
+            }
+        }
+    }
+
+    companion object {
+        val BLUETOOTH_TYPES = setOf(AudioDeviceInfo.TYPE_BLUETOOTH_SCO, AudioDeviceInfo.TYPE_BLE_HEADSET)
+    }
 }
 
 /**

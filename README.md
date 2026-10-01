@@ -12,6 +12,11 @@ no cloud.
   transcript is trimmed to match.
 - **Export.** Audio (M4A), transcript with timestamps (TXT), subtitles (SRT), or per-word timings (JSON),
   through the share sheet or straight into `Download/Sotto`.
+- **Speaker labels.** Tells voices apart and labels who is talking; tap a label to give it a name.
+- **Import audio** from any file the phone can play, and transcribe a recording again at any time.
+- **Backup and restore** of the whole library as one zip.
+- **Widget, quick settings tile and launcher shortcut** to start recording in one tap.
+- **Pauses for phone calls** and resumes by itself afterwards.
 - **Marks music, applause and laughter** in the waveform and the transcript.
 - **Search** across titles and every word of every transcript, and within one transcript with
   jump-to-match.
@@ -145,11 +150,11 @@ two are punctuated as one sentence.
 
 ## Not there yet
 
-- Transcribing a recording after the fact (imported audio, or one made before the model was downloaded).
 - Languages other than English.
-- Speaker labels.
-- Model downloads do not run as a foreground service, so a very long download can be interrupted
-  if the app is swiped away. It resumes where it stopped the next time the app opens.
+- Speaker labels are skipped for recordings longer than 45 minutes, and a sentence two people
+  share is given to whoever spoke most of it.
+- The Bluetooth microphone option and pausing for calls are written to Android's documented
+  behavior but have not been tried against real hardware and real calls.
 
 ## Licenses
 
@@ -159,6 +164,8 @@ It builds on:
 
 - [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) and ONNX Runtime: Apache 2.0 and MIT
 - NVIDIA FastConformer and Parakeet TDT speech models: CC BY 4.0 (downloaded at run time, not bundled)
+- CED tiny (sounds), pyannote segmentation 3.0 and 3D-Speaker CAM++ (speakers): Apache 2.0 and MIT
+- Qwen2.5 (summaries): Apache 2.0, and llama.cpp: MIT
 - [Google Sans Flex](https://fonts.google.com/specimen/Google+Sans+Flex): SIL Open Font License 1.1,
   see [licenses/GoogleSansFlex-OFL.txt](licenses/GoogleSansFlex-OFL.txt)
 - AndroidX, Jetpack Compose, Media3, Apache Commons Compress: Apache 2.0

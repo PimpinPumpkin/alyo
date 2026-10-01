@@ -1,6 +1,12 @@
 package app.sotto.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -72,5 +78,30 @@ fun TransportRow(player: Player, fine: Boolean = false, onPlayPause: () -> Unit 
         } else {
             RoundControl(Icons.Rounded.Forward10, "Forward 10 seconds", onClick = { player.seekBy(10_000) })
         }
+    }
+}
+
+/** True when the window is wider than it is tall, or simply wide: a phone on its side, a tablet, a foldable opened. */
+@Composable
+fun isWide(): Boolean {
+    val config = LocalConfiguration.current
+    return config.screenWidthDp >= 840 || (config.screenWidthDp > config.screenHeightDp && config.screenWidthDp >= 560)
+}
+
+/**
+ * The two halves of the player, crop and record screens. On a tall screen [content] sits above
+ * [controls]; on a wide one they sit side by side, so the transcript keeps its height instead of
+ * being squeezed into a strip.
+ */
+@Composable
+fun ColumnScope.AdaptivePane(content: @Composable ColumnScope.() -> Unit, controls: @Composable ColumnScope.() -> Unit) {
+    if (isWide()) {
+        Row(Modifier.weight(1f).fillMaxWidth()) {
+            Column(Modifier.weight(1f).fillMaxHeight().padding(bottom = 12.dp), content = content)
+            Column(Modifier.width(400.dp).fillMaxHeight().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.Center, content = controls)
+        }
+    } else {
+        Column(Modifier.weight(1f).fillMaxWidth(), content = content)
+        controls()
     }
 }

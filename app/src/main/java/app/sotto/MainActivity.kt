@@ -58,15 +58,18 @@ import java.io.File
 class MainActivity : ComponentActivity() {
     private val debugWav = mutableStateOf<File?>(null)
     private val debugDark = mutableStateOf<Boolean?>(null)
+    // Set when the app is opened by the widget, the quick settings tile or the launcher shortcut.
+    private val recordRequested = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         readDebugIntent(intent)
+        if (savedInstanceState == null) readAction(intent)
         setContent {
             SottoTheme(dark = debugDark.value ?: isSystemInDarkTheme()) {
                 Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
-                    App(application as SottoApp, debugWav.value) { debugWav.value = null }
+                    App(application as SottoApp, debugWav.value, recordRequested.value, onRecordConsumed = { recordRequested.value = false }) { debugWav.value = null }
                 }
             }
         }
@@ -75,6 +78,19 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         readDebugIntent(intent)
+        readAction(intent)
+    }
+
+    private fun readAction(intent: Intent?) {
+        if (intent?.action == ACTION_RECORD) {
+            intent.action = null
+            recordRequested.value = true
+        }
+    }
+
+    companion object {
+        /** Open the app and start recording straight away. */
+        const val ACTION_RECORD = "app.sotto.action.RECORD"
     }
 
     /**
@@ -103,7 +119,7 @@ private object Routes {
 }
 
 @Composable
-private fun App(app: SottoApp, debugWav: File?, onDebugWavConsumed: () -> Unit) {
+private fun App(app: SottoApp, debugWav: File?, recordRequested: Boolean, onRecordConsumed: () -> Unit, onDebugWavConsumed: () -> Unit) {
     val context = LocalContext.current
     val stack: SnapshotStateList<String> = rememberSaveable(
         saver = listSaver(save = { it.toList() }, restore = { it.toMutableStateList() }),
@@ -175,6 +191,13 @@ private fun App(app: SottoApp, debugWav: File?, onDebugWavConsumed: () -> Unit) 
             pendingSource = wav
             context.getSharedPreferences("ui", Context.MODE_PRIVATE).edit { putBoolean("asked_notifications", true) }
             permissions.launch(needed.toTypedArray())
+        }
+    }
+
+    LaunchedEffect(recordRequested) {
+        if (recordRequested) {
+            if (session == null) startRecording()
+            onRecordConsumed()
         }
     }
 

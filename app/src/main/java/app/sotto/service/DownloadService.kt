@@ -21,14 +21,14 @@ import app.sotto.SottoApp
 import app.sotto.asr.InstallState
 import app.sotto.ui.formatBytes
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
 
 /**
- * Keeps a model download alive when the app is left or the screen sleeps. The download itself
- * lives in [app.sotto.asr.ModelManager]; this only holds the phone awake, keeps Wi-Fi up, and
- * shows progress. It stops itself when nothing is downloading.
+ * Keeps long background work alive when the app is left or the screen sleeps: model downloads,
+ * and importing or re-transcribing audio. The work itself lives elsewhere; this only holds the
+ * phone awake, keeps Wi-Fi up, and shows progress. It stops itself when there is nothing to do.
  */
 class DownloadService : LifecycleService() {
     private var wakeLock: PowerManager.WakeLock? = null
@@ -41,10 +41,10 @@ class DownloadService : LifecycleService() {
         if (started) return START_NOT_STICKY
         started = true
         getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(CHANNEL, "Downloads", NotificationManager.IMPORTANCE_LOW).apply { setShowBadge(false) },
+            NotificationChannel(CHANNEL, "Downloads and transcription", NotificationManager.IMPORTANCE_LOW).apply { setShowBadge(false) },
         )
         try {
-            ServiceCompat.startForeground(this, NOTIFICATION_ID, build(0, 0), ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            ServiceCompat.startForeground(this, NOTIFICATION_ID, build("Working", null, null), ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         } catch (e: Exception) {
             // Started from the background (a download resumed at launch by something other than
             // the user opening the app). The download still runs; it just is not protected.
@@ -56,10 +56,11 @@ class DownloadService : LifecycleService() {
         @Suppress("DEPRECATION") // The replacement constant needs API 29's low-latency mode, which is the wrong trade here.
         wifiLock = (applicationContext.getSystemService(WIFI_SERVICE) as WifiManager).createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "sotto:download").apply { acquire() }
 
-        val models = (application as SottoApp).models
+        val app = application as SottoApp
+        val work = combine(app.models.states, app.jobs.active) { states, jobs -> states.values.filterIsInstance<InstallState.Downloading>() to jobs }
         lifecycleScope.launch {
-            models.states.map { states -> states.values.filterIsInstance<InstallState.Downloading>() }.collectLatest { active ->
-                if (active.isEmpty()) {
+            work.collectLatest { (downloads, jobs) ->
+                if (downloads.isEmpty() && jobs.isEmpty()) {
                     release()
                     ServiceCompat.stopForeground(this@DownloadService, ServiceCompat.STOP_FOREGROUND_REMOVE)
                     stopSelf()
@@ -68,11 +69,17 @@ class DownloadService : LifecycleService() {
         }
         lifecycleScope.launch {
             // Once a second is plenty for a progress bar, and the system throttles faster updates anyway.
-            models.states.sample(1000).collectLatest { states ->
-                val active = states.values.filterIsInstance<InstallState.Downloading>()
-                if (active.isNotEmpty()) {
-                    getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, build(active.sumOf { it.doneBytes }, active.sumOf { it.totalBytes }))
+            work.sample(1000).collectLatest { (downloads, jobs) ->
+                val notification = when {
+                    downloads.isNotEmpty() -> {
+                        val done = downloads.sumOf { it.doneBytes }
+                        val total = downloads.sumOf { it.totalBytes }
+                        build("Downloading models", "${formatBytes(done)} of ${formatBytes(total)}", if (total > 0) done.toFloat() / total else null)
+                    }
+                    jobs.isNotEmpty() -> build("Transcribing", jobs.first().title, jobs.first().progress)
+                    else -> return@collectLatest
                 }
+                getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification)
             }
         }
         return START_NOT_STICKY
@@ -88,7 +95,8 @@ class DownloadService : LifecycleService() {
         super.onDestroy()
     }
 
-    private fun build(done: Long, total: Long): Notification {
+    /** @param fraction 0 to 1, or null for work whose end cannot be measured */
+    private fun build(title: String, text: String?, fraction: Float?): Notification {
         val open = PendingIntent.getActivity(
             this, 0,
             Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
@@ -96,9 +104,9 @@ class DownloadService : LifecycleService() {
         )
         return NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_sotto)
-            .setContentTitle("Downloading models")
-            .setContentText(if (total > 0) "${formatBytes(done)} of ${formatBytes(total)}" else null)
-            .setProgress(1000, if (total > 0) (done * 1000 / total).toInt() else 0, total <= 0)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setProgress(1000, ((fraction ?: 0f) * 1000).toInt(), fraction == null)
             .setContentIntent(open)
             .setOngoing(true)
             .setOnlyAlertOnce(true)

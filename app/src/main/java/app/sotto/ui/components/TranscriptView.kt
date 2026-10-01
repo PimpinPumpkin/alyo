@@ -4,7 +4,9 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.drag
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.draw.clip
 import app.sotto.data.SoundSpan
 import androidx.compose.ui.Alignment
 import androidx.compose.material3.Surface
@@ -71,6 +73,8 @@ class Paragraph(
     val startMs: Int = words.firstOrNull()?.startMs ?: 0
     val endMs: Int = words.lastOrNull()?.endMs ?: 0
     val key: Long = segments.firstOrNull()?.id ?: -1L
+    /** Who is speaking in this paragraph, if speakers were told apart. One paragraph is always one speaker. */
+    val speaker: Int? = segments.firstOrNull()?.speaker
 
     /** Character range of each word in [text], for mapping taps and highlights. */
     val offsets: IntArray = IntArray(words.size + 1)
@@ -150,7 +154,8 @@ fun paragraphsOf(segments: List<Segment>): List<Paragraph> {
     for (segment in segments) {
         if (segment.words.isEmpty()) continue
         val gap = if (current.isEmpty()) 0 else segment.startMs - current.last().endMs
-        if (current.isNotEmpty() && (gap > PARAGRAPH_GAP_MS || words >= PARAGRAPH_WORDS)) {
+        val speakerChanged = current.isNotEmpty() && segment.speaker != current.last().speaker
+        if (current.isNotEmpty() && (gap > PARAGRAPH_GAP_MS || words >= PARAGRAPH_WORDS || speakerChanged)) {
             out += Paragraph(current)
             current = ArrayList()
             words = 0
@@ -195,6 +200,9 @@ fun TranscriptView(
     onSelectionDrag: (startEdge: Boolean, word: Word) -> Unit = { _, _ -> },
     sounds: List<SoundSpan> = emptyList(),
     onSoundTap: (SoundSpan) -> Unit = {},
+    speakerName: ((Int) -> String)? = null,
+    onSpeakerTap: (Int) -> Unit = {},
+    onLongPress: (Segment) -> Unit = {},
 ) {
     val livePartial = remember(partial) { if (partial.isEmpty()) null else Paragraph(listOf(Segment(Long.MAX_VALUE, partial)), live = true) }
     // Each sound marker sits above the first paragraph that starts after it; the rest go at the end.
@@ -204,13 +212,13 @@ fun TranscriptView(
     LazyColumn(modifier, state = listState, contentPadding = contentPadding) {
         itemsIndexed(paragraphs, key = { _, p -> p.key }) { index, paragraph ->
             before[index]?.forEach { SoundMarker(it, onSoundTap) }
-            ParagraphBlock(paragraph, positionMs, editing, query, selection, onWordTap, onEditSegment, onSelectionDrag)
+            ParagraphBlock(paragraph, positionMs, editing, query, selection, onWordTap, onEditSegment, onSelectionDrag, speakerName, onSpeakerTap, onLongPress)
         }
         before[paragraphs.size]?.let { trailing ->
             item(key = "sounds-end") { trailing.forEach { SoundMarker(it, onSoundTap) } }
         }
         if (livePartial != null) {
-            item(key = "partial") { ParagraphBlock(livePartial, null, false, "", null, {}, {}, { _, _ -> }) }
+            item(key = "partial") { ParagraphBlock(livePartial, null, false, "", null, {}, {}, { _, _ -> }, null, {}, {}) }
         }
     }
 }
@@ -225,8 +233,12 @@ private fun ParagraphBlock(
     onWordTap: (Word) -> Unit,
     onEditSegment: (Segment) -> Unit,
     onSelectionDrag: (startEdge: Boolean, word: Word) -> Unit,
+    speakerName: ((Int) -> String)?,
+    onSpeakerTap: (Int) -> Unit,
+    onLongPress: (Segment) -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
+    val longPress = rememberUpdatedState(onLongPress)
     val dragSelection = rememberUpdatedState(onSelectionDrag)
     val currentSelection = rememberUpdatedState(selection)
     // Only this paragraph recomposes, and only when playback crosses into a different word.
@@ -255,12 +267,25 @@ private fun ParagraphBlock(
     val handleColor = colors.inverseSurface
 
     Column(Modifier.fillMaxWidth().padding(bottom = 20.dp)) {
-        Text(
-            if (paragraph.live) "" else formatStamp(paragraph.startMs.toLong()),
-            style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
-            color = colors.onSurfaceVariant,
-            modifier = Modifier.padding(start = GUTTER, bottom = 6.dp),
-        )
+        Row(Modifier.padding(start = GUTTER, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (paragraph.live) "" else formatStamp(paragraph.startMs.toLong()),
+                style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
+                color = colors.onSurfaceVariant,
+            )
+            val speaker = paragraph.speaker
+            if (speaker != null && speakerName != null) {
+                // Each voice keeps one color through the transcript, so a back-and-forth can be followed by eye.
+                val tint = listOf(colors.primary, colors.tertiary, colors.secondary, colors.error)[speaker % 4]
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    speakerName(speaker),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = tint,
+                    modifier = Modifier.clip(CircleShape).clickable { onSpeakerTap(speaker) }.padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
+        }
         Text(
             text,
             style = MaterialTheme.typography.bodyLarge.copy(fontSize = MaterialTheme.typography.bodyLarge.fontSize * 1.18f, lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.3f),
@@ -351,9 +376,12 @@ private fun ParagraphBlock(
                 }
                 .pointerInput(paragraph) {
                     if (paragraph.live) return@pointerInput
-                    detectTapGestures { position ->
-                        val result = layout ?: return@detectTapGestures
-                        val index = paragraph.wordAtChar(result.getOffsetForPosition(position - Offset(GUTTER.toPx(), 0f)))
+                    fun wordAt(position: Offset): Int = layout?.let { paragraph.wordAtChar(it.getOffsetForPosition(position - Offset(GUTTER.toPx(), 0f))) } ?: -1
+                    detectTapGestures(
+                        // Holding a sentence is the quick way to correct it, without going through the menu.
+                        onLongPress = { position -> wordAt(position).takeIf { it >= 0 }?.let { longPress.value(paragraph.segmentOfWord(it)) } },
+                    ) { position ->
+                        val index = wordAt(position)
                         if (index < 0) return@detectTapGestures
                         if (isEditing.value) edit.value(paragraph.segmentOfWord(index)) else tap.value(paragraph.words[index])
                     }

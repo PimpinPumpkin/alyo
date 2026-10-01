@@ -49,6 +49,24 @@ class Settings(context: Context) {
         _summarizer.value = id
     }
 
+    private val _speakerLabels = MutableStateFlow(prefs.getBoolean(SPEAKERS, false))
+    /** Tell voices apart and label who is speaking. Needs a small extra model. */
+    val speakerLabels: StateFlow<Boolean> = _speakerLabels
+
+    fun setSpeakerLabels(on: Boolean) {
+        prefs.edit { putBoolean(SPEAKERS, on) }
+        _speakerLabels.value = on
+    }
+
+    private val _microphone = MutableStateFlow(prefs.getString(MICROPHONE, MIC_AUTO)!!)
+    /** Which microphone to record from: [MIC_AUTO], [MIC_PHONE] or [MIC_BLUETOOTH]. */
+    val microphone: StateFlow<String> = _microphone
+
+    fun setMicrophone(choice: String) {
+        prefs.edit { putString(MICROPHONE, choice) }
+        _microphone.value = choice
+    }
+
     private val packages = context.packageManager
     private val named = ComponentName(context, "app.sotto.LauncherNamed")
     private val plain = ComponentName(context, "app.sotto.LauncherPlain")
@@ -73,10 +91,17 @@ class Settings(context: Context) {
     /** The large model wants about a gigabyte of headroom; phones sold as "6 GB" report roughly 5.5. */
     fun recommendedQuality(): String = if (totalRamBytes >= 5L * 1024 * 1024 * 1024) "best" else "light"
 
-    private companion object {
-        const val LANGUAGE = "language"
-        const val QUALITY = "quality"
-        const val AUTO_TITLE = "auto_title"
-        const val SUMMARIZER = "summarizer"
+    companion object {
+        /** Whatever Android routes to: a wired or USB headset microphone if one is plugged in, else the phone's. */
+        const val MIC_AUTO = "auto"
+        const val MIC_PHONE = "phone"
+        const val MIC_BLUETOOTH = "bluetooth"
+
+        private const val SPEAKERS = "speaker_labels"
+        private const val MICROPHONE = "microphone"
+        private const val LANGUAGE = "language"
+        private const val QUALITY = "quality"
+        private const val AUTO_TITLE = "auto_title"
+        private const val SUMMARIZER = "summarizer"
     }
 }

@@ -23,6 +23,9 @@ enum class ModelKind {
 
     /** Not a speech model: a small chat language model in GGUF form, used to write summaries. */
     CHAT_GGUF,
+
+    /** Turns a stretch of speech into a fingerprint of the voice, for telling speakers apart. */
+    SPEAKER_EMBEDDING,
 }
 
 data class ModelSpec(
@@ -192,8 +195,27 @@ object ModelCatalog {
         source = ModelSource.Files(emptyList()),
     )
 
+    /** The download behind speaker labels. Language does not matter to it: a voice is a voice. */
+    val speakers = ModelSpec(
+        id = "speakers-campplus-voxceleb",
+        kind = ModelKind.SPEAKER_EMBEDDING,
+        title = "Speaker labels",
+        summary = "3D-Speaker CAM++ voice model",
+        encoder = "speakers.onnx",
+        source = ModelSource.Files(
+            listOf(
+                ModelFile(
+                    "speakers.onnx",
+                    "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx",
+                    29_596_978,
+                    "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b",
+                ),
+            ),
+        ),
+    )
+
     val allModels: List<ModelSpec>
-        get() = languages.flatMap { pack -> listOf(pack.live) + pack.qualities.map { it.refiner } } + summarizers + importedSummarizer
+        get() = languages.flatMap { pack -> listOf(pack.live) + pack.qualities.map { it.refiner } } + summarizers + importedSummarizer + speakers
 
     /** Where the archive for [spec] can be fetched by hand, for importing into a build with no network. */
     fun archiveUrl(spec: ModelSpec): String = "$GH/${spec.archive}.tar.bz2"

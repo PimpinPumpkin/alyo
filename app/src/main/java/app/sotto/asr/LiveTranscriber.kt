@@ -19,6 +19,7 @@ import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Two-pass transcription of one recording, the same shape Google's recorder uses.
@@ -92,8 +93,13 @@ class LiveTranscriber(
 
     /** Hands over the next block of 16 kHz samples. Never blocks the caller. */
     fun accept(samples: FloatArray) {
+        backlog.addAndGet(samples.size.toLong())
         audio.trySend(samples)
     }
+
+    private val backlog = AtomicLong()
+    /** Seconds of audio handed over but not yet through pass one. A file can be fed faster than it is heard; this is how the feeder knows to wait. */
+    val backlogSeconds: Float get() = backlog.get().toFloat() / AudioSpec.ASR_SAMPLE_RATE
 
     /** No more audio is coming. Both passes drain what they have and then finish. */
     fun finish() {
@@ -214,6 +220,7 @@ class LiveTranscriber(
 
         try {
             for (chunk in audio) {
+                backlog.addAndGet(-chunk.size.toLong())
                 if (bytes.capacity() < chunk.size * 2) error("ASR chunk too large")
                 bytes.clear()
                 for (s in chunk) bytes.putShort((s * 32767f).toInt().coerceIn(-32768, 32767).toShort())

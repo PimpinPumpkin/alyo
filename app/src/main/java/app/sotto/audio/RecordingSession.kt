@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import app.sotto.asr.SpeakerTurn
+import java.io.File
 import java.io.FileOutputStream
 
 /**
@@ -34,6 +36,10 @@ class RecordingSession(
     private val openSource: () -> PcmSource,
     private val autoTitle: () -> Boolean,
     private val sounds: SoundTagger?,
+    /** True when something else has taken the microphone (a phone call). Recording pauses itself until it is false again. */
+    private val interrupted: () -> Boolean = { false },
+    /** Tells speakers apart once the transcript is final; given the spooled audio, returns who spoke when. */
+    private val diarize: ((File) -> List<SpeakerTurn>)? = null,
     transcriberFactory: ((onRefined: (Segment) -> Unit) -> LiveTranscriber)?,
 ) {
     val peaks = Peaks()
@@ -90,8 +96,20 @@ class RecordingSession(
     fun begin() = thread.start()
 
     fun setPaused(paused: Boolean) {
+        // The user's own choice overrides an automatic pause: it will not resume by itself after this.
+        autoPaused = false
+        _interruption.value = false
         _paused.value = paused
     }
+
+    @Volatile private var autoPaused = false
+    private val _interruption = MutableStateFlow(false)
+    /** True while recording is paused because a call or another app has the microphone. */
+    val interruption: StateFlow<Boolean> = _interruption
+
+    @Volatile private var activeSource: PcmSource? = null
+    /** Name of the microphone in use ("Phone", "Pixel Buds"), or null if unknown. */
+    val inputName: String? get() = (activeSource as? MicSource)?.inputName
 
     private fun capture() {
         var source: PcmSource? = null
@@ -99,6 +117,7 @@ class RecordingSession(
         var peaksOut: FileOutputStream? = null
         try {
             source = openSource()
+            activeSource = source
             encoder = AacWriter(store.adts(id))
             // The waveform is written as it grows for the same reason the audio is: so a recording
             // cut short by a crash comes back whole.
@@ -109,7 +128,28 @@ class RecordingSession(
             var samples = 0L
             var sinceFlush = 0
             var capturing = false
+            var checkedAt = 0L
             while (!stopRequested) {
+                // Twice a second: has a call taken the microphone, or given it back?
+                val now = System.currentTimeMillis()
+                if (now - checkedAt > 500) {
+                    checkedAt = now
+                    val taken = interrupted()
+                    if (taken && !_paused.value) {
+                        autoPaused = true
+                        _paused.value = true
+                    } else if (!taken && autoPaused && _paused.value) {
+                        autoPaused = false
+                        _paused.value = false
+                    }
+                    _interruption.value = autoPaused
+                }
+                // A file can be read far faster than it can be heard. Wait for the transcriber
+                // rather than queue the whole file in memory.
+                if (transcriber != null && transcriber.backlogSeconds > MAX_BACKLOG_SECONDS) {
+                    Thread.sleep(20)
+                    continue
+                }
                 if (_paused.value) {
                     if (capturing) {
                         source.stop()
@@ -199,6 +239,8 @@ class RecordingSession(
                 watcher.cancel()
                 t.release()
             }
+            // Who said what, from the same spooled audio, before it is thrown away.
+            diarize?.let { run -> runCatching { store.applySpeakers(id, run(store.spool(id))) }.onFailure { Log.e(TAG, "Speaker labels failed", it) } }
             store.setPendingRefine(id, 0)
             store.spool(id).delete()
             // Name it after its subject, unless the user has already given it a name of their own.
@@ -230,5 +272,6 @@ class RecordingSession(
         const val TAG = "RecordingSession"
         const val BLOCK_SAMPLES = 1920 // 40 ms
         const val MIN_DURATION_MS = 300L
+        const val MAX_BACKLOG_SECONDS = 20f
     }
 }
