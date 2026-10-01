@@ -164,7 +164,7 @@ private fun App(app: SottoApp, debugWav: File?, recordRequested: Boolean, onReco
     // First launch: offer the speech model before anything else.
     LaunchedEffect(Unit) {
         val prefs = context.getSharedPreferences("ui", Context.MODE_PRIVATE)
-        val modelMissing = app.models.states.value[app.settings.pack.live.id] != InstallState.Installed
+        val modelMissing = app.models.usable(app.settings.pack.live) == null
         if (modelMissing && !prefs.getBoolean("setup_seen", false) && stack.size == 1) {
             prefs.edit { putBoolean("setup_seen", true) }
             push(Routes.SETUP)

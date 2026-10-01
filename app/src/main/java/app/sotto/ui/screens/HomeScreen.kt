@@ -88,6 +88,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.sotto.SottoApp
 import app.sotto.asr.InstallState
+import app.sotto.asr.works
 import app.sotto.audio.Peaks
 import app.sotto.audio.RecordingSession
 import app.sotto.data.RecordingMeta
@@ -160,9 +161,10 @@ fun HomeScreen(
                 }
                 SetupState.Downloading(done.toFloat() / total)
             }
-            modelStates[pack.live.id] != InstallState.Installed -> SetupState.Off
+            !modelStates[pack.live.id].works -> SetupState.Off
             // Any installed second-pass model will do; the chosen one is only a preference.
-            pack.qualities.none { modelStates[it.refiner.id] == InstallState.Installed } -> SetupState.RoughOnly
+            pack.qualities.none { modelStates[it.refiner.id].works } -> SetupState.RoughOnly
+            needed.any { modelStates[it.id] == InstallState.Outdated } -> SetupState.Update
             else -> SetupState.Ready
         }
     }
@@ -442,6 +444,9 @@ private sealed interface SetupState {
     /** Live model only: text appears, but without the accurate second pass. */
     data object RoughOnly : SetupState
     data class Downloading(val fraction: Float) : SetupState
+
+    /** Everything works, on a model this version of the app has a newer one for. */
+    data object Update : SetupState
     data object Ready : SetupState
 }
 
@@ -453,6 +458,7 @@ private fun SetupCard(state: SetupState, onOpen: () -> Unit) {
         SetupState.Off -> "Turn on transcription" to "Download the speech model once and recordings are transcribed as you speak, offline."
         SetupState.RoughOnly -> "Finish setting up transcription" to "The accurate model is not downloaded yet, so transcripts come out rough and unpunctuated."
         is SetupState.Downloading -> "Downloading speech model" to "${(state.fraction * 100).toInt()}% done. You can keep using the app."
+        SetupState.Update -> "A newer speech model is available" to "Transcription keeps working with the one you have. Tap to update when you are on Wi-Fi."
         SetupState.Ready -> "" to ""
     }
     Surface(

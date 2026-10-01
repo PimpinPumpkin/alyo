@@ -82,6 +82,7 @@ import androidx.compose.ui.unit.dp
 import app.sotto.BuildConfig
 import app.sotto.SottoApp
 import app.sotto.asr.InstallState
+import app.sotto.asr.works
 import app.sotto.asr.ModelCatalog
 import app.sotto.asr.ModelKind
 import app.sotto.asr.ModelSource
@@ -188,17 +189,16 @@ fun SettingsScreen(app: SottoApp, onDone: () -> Unit, onLicenses: () -> Unit, on
                         "Label speakers",
                         detail = when {
                             !speakerLabels -> "Tell voices apart in the transcript"
-                            speakerState == InstallState.Installed -> "On. Speakers are labeled when a recording finishes."
+                            speakerState.works -> "On. Speakers are labeled when a recording finishes."
                             speakerState is InstallState.Downloading -> "Downloading the voice model, ${(speakerState.fraction * 100).toInt()}%"
                             speakerState is InstallState.Failed -> "Download failed. Tap twice to try again."
-                            BuildConfig.NETWORK -> "Downloading the voice model"
-                            else -> "Needs the voice model: import 3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx"
+                            else -> "Needs the voice model, which downloads with the speech model below."
                         },
                         trailing = { Switch(checked = speakerLabels, onCheckedChange = null) },
                         onClick = {
                             app.settings.setSpeakerLabels(!speakerLabels)
                             // Turning it on fetches the 30 MB voice model if it is not here yet.
-                            if (!speakerLabels && BuildConfig.NETWORK && speakerState != InstallState.Installed) app.models.install(ModelCatalog.speakers)
+                            if (!speakerLabels && speakerState != InstallState.Installed) app.models.install(ModelCatalog.speakers)
                         },
                     ),
                     SheetRow(
@@ -329,11 +329,13 @@ private fun ModelChooser(app: SottoApp, onReady: (() -> Unit)?, readyLabel: Stri
     val speakerLabels by app.settings.speakerLabels.collectAsState()
     // The small voice model rides along with the speech models, so speaker labels work from the
     // first recording rather than being something to discover and turn on later.
-    val needed: List<ModelSpec> = listOf(pack.live, quality.refiner) + listOfNotNull(ModelCatalog.speakers.takeIf { speakerLabels && BuildConfig.NETWORK })
+    val needed: List<ModelSpec> = listOf(pack.live, quality.refiner) + listOfNotNull(ModelCatalog.speakers.takeIf { speakerLabels })
     fun state(spec: ModelSpec) = states[spec.id] ?: InstallState.Missing
     val missing = needed.filter { state(it) != InstallState.Installed }
     val downloading = needed.any { state(it) is InstallState.Downloading }
     val failure = needed.firstNotNullOfOrNull { state(it) as? InstallState.Failed }
+    // Nothing is missing outright: each model wanted is here in an earlier version.
+    val updating = missing.isNotEmpty() && missing.all { state(it) == InstallState.Outdated }
     var importing by remember { mutableStateOf(false) }
     var showSources by remember { mutableStateOf(false) }
 
@@ -355,7 +357,7 @@ private fun ModelChooser(app: SottoApp, onReady: (() -> Unit)?, readyLabel: Stri
     Column {
         SheetGroup(
             pack.qualities.map { option ->
-                val installed = state(pack.live) == InstallState.Installed && state(option.refiner) == InstallState.Installed
+                val installed = state(pack.live).works && state(option.refiner).works
                 val size = formatBytes(pack.live.source.downloadBytes + option.refiner.source.downloadBytes + if (ModelCatalog.speakers in needed) ModelCatalog.speakers.source.downloadBytes else 0L)
                 SheetRow(
                     icon = if (option.id == "best") Icons.Rounded.HighQuality else Icons.Rounded.Speed,
@@ -364,7 +366,7 @@ private fun ModelChooser(app: SottoApp, onReady: (() -> Unit)?, readyLabel: Stri
                     enabled = !downloading,
                     trailing = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (state(option.refiner) == InstallState.Installed && onReady == null) {
+                            if (state(option.refiner).works && onReady == null) {
                                 IconButton(onClick = { app.models.delete(option.refiner) }) {
                                     Icon(Icons.Rounded.DeleteOutline, "Remove the ${option.title} download", tint = colors.onSurfaceVariant)
                                 }
@@ -404,24 +406,24 @@ private fun ModelChooser(app: SottoApp, onReady: (() -> Unit)?, readyLabel: Stri
             }
             else -> {
                 failure?.let { Text(it.message, style = MaterialTheme.typography.bodyMedium, color = colors.error, modifier = Modifier.padding(bottom = 8.dp)) }
-                if (BuildConfig.NETWORK) {
-                    Button(onClick = { missing.forEach(app.models::install) }, modifier = Modifier.fillMaxWidth().height(60.dp)) {
-                        Icon(Icons.Rounded.Download, null)
-                        Spacer(Modifier.width(10.dp))
-                        Text((if (failure != null) "Try again" else "Download") + "  ·  " + formatBytes(missing.sumOf { it.source.downloadBytes }), style = MaterialTheme.typography.titleMedium)
+                if (updating) {
+                    Text("A newer model is available. The one you have keeps working until it is replaced.", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))
+                }
+                Button(onClick = { missing.forEach(app.models::install) }, modifier = Modifier.fillMaxWidth().height(60.dp)) {
+                    Icon(Icons.Rounded.Download, null)
+                    Spacer(Modifier.width(10.dp))
+                    val verb = when {
+                        failure != null -> "Try again"
+                        updating -> "Update"
+                        else -> "Download"
                     }
-                } else {
-                    Button(onClick = { picker.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth().height(60.dp)) {
-                        Icon(Icons.Rounded.FolderOpen, null)
-                        Spacer(Modifier.width(10.dp))
-                        Text("Import model files", style = MaterialTheme.typography.titleMedium)
-                    }
+                    Text(verb + "  ·  " + formatBytes(missing.sumOf { it.source.downloadBytes }), style = MaterialTheme.typography.titleMedium)
                 }
             }
         }
         if (!downloading && !importing && missing.isNotEmpty()) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                if (BuildConfig.NETWORK) TextButton(onClick = { picker.launch(arrayOf("*/*")) }) { Text("Import from files instead") }
+                TextButton(onClick = { picker.launch(arrayOf("*/*")) }) { Text("Import from files instead") }
                 TextButton(onClick = { showSources = true }) { Text("Where to get the files") }
             }
         }
@@ -463,10 +465,10 @@ private fun SummaryModelChooser(app: SottoApp) {
     val chosenId by app.settings.summarizer.collectAsState()
     fun state(spec: ModelSpec) = states[spec.id] ?: InstallState.Missing
     // The imported slot only appears once something has been imported into it.
-    val options = ModelCatalog.summarizers + listOfNotNull(ModelCatalog.importedSummarizer.takeIf { state(it) == InstallState.Installed })
+    val options = ModelCatalog.summarizers + listOfNotNull(ModelCatalog.importedSummarizer.takeIf { state(it).works })
     // Until the user picks one, the choice shown is the one that would actually be used: whatever
     // is installed, and failing that the better model as the one to get.
-    val chosen = options.firstOrNull { it.id == chosenId } ?: options.firstOrNull { state(it) == InstallState.Installed } ?: ModelCatalog.summarizers.last()
+    val chosen = options.firstOrNull { it.id == chosenId } ?: options.firstOrNull { state(it).works } ?: ModelCatalog.summarizers.last()
     val chosenState = state(chosen)
     var importing by remember { mutableStateOf(false) }
 
@@ -490,10 +492,10 @@ private fun SummaryModelChooser(app: SottoApp) {
                 SheetRow(
                     icon = Icons.Rounded.AutoAwesome,
                     label = option.title,
-                    detail = (if (state(option) == InstallState.Installed) "Ready" else formatBytes(size)) + "  ·  " + option.summary,
+                    detail = (if (state(option).works) "Ready" else formatBytes(size)) + "  ·  " + option.summary,
                     trailing = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (state(option) == InstallState.Installed) {
+                            if (state(option).works) {
                                 IconButton(onClick = { app.models.delete(option) }) { Icon(Icons.Rounded.DeleteOutline, "Remove ${option.title}", tint = colors.onSurfaceVariant) }
                             }
                             RadioButton(selected = option.id == chosen.id, onClick = null)
@@ -515,12 +517,10 @@ private fun SummaryModelChooser(app: SottoApp) {
             }
             chosenState != InstallState.Installed -> {
                 (chosenState as? InstallState.Failed)?.let { Text(it.message, style = MaterialTheme.typography.bodyMedium, color = colors.error, modifier = Modifier.padding(bottom = 8.dp)) }
-                if (BuildConfig.NETWORK) {
-                    Button(onClick = { app.models.install(chosen) }, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-                        Icon(Icons.Rounded.Download, null)
-                        Spacer(Modifier.width(10.dp))
-                        Text("Download  ·  " + formatBytes(chosen.source.downloadBytes), style = MaterialTheme.typography.titleMedium)
-                    }
+                Button(onClick = { app.models.install(chosen) }, modifier = Modifier.fillMaxWidth().height(56.dp)) {
+                    Icon(Icons.Rounded.Download, null)
+                    Spacer(Modifier.width(10.dp))
+                    Text((if (chosenState == InstallState.Outdated) "Update" else "Download") + "  ·  " + formatBytes(chosen.source.downloadBytes), style = MaterialTheme.typography.titleMedium)
                 }
             }
         }

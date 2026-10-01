@@ -6,18 +6,33 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// Files the build needs that are too big for git. Each is tried from this project's own `models`
+// release first, which keeps copies so the build does not depend on another project's release
+// page staying as it is, and then from where it was originally published.
+val mirror = "https://github.com/PimpinPumpkin/sotto/releases/download/models"
+fun fetch(target: File, upstream: String) {
+    target.parentFile.mkdirs()
+    val tmp = File(target.parentFile, target.name + ".part")
+    val urls = listOf("$mirror/build.${upstream.substringAfterLast('/')}", upstream)
+    for ((index, url) in urls.withIndex()) {
+        try {
+            logger.lifecycle("Downloading $url")
+            URI(url).toURL().openStream().use { input -> tmp.outputStream().use { input.copyTo(it) } }
+            break
+        } catch (e: java.io.IOException) {
+            if (index == urls.lastIndex) throw e
+        }
+    }
+    tmp.renameTo(target)
+}
+
 // sherpa-onnx (the on-device speech runtime) publishes its Android AAR on GitHub releases only,
 // not on Maven, and at 50 MB it does not belong in git. Fetch it once, at configuration time,
 // so a fresh clone builds with a plain `./gradlew assembleDebug`.
 val sherpaVersion: String = libs.versions.sherpaOnnx.get()
 val sherpaAar = layout.projectDirectory.file("libs/sherpa-onnx-$sherpaVersion.aar").asFile
 if (!sherpaAar.exists()) {
-    sherpaAar.parentFile.mkdirs()
-    val url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/v$sherpaVersion/sherpa-onnx-$sherpaVersion.aar"
-    logger.lifecycle("Downloading $url")
-    val tmp = File(sherpaAar.parentFile, sherpaAar.name + ".part")
-    URI(url).toURL().openStream().use { input -> tmp.outputStream().use { input.copyTo(it) } }
-    tmp.renameTo(sherpaAar)
+    fetch(sherpaAar, "https://github.com/k2-fsa/sherpa-onnx/releases/download/v$sherpaVersion/sherpa-onnx-$sherpaVersion.aar")
 }
 
 // The sound classifier (CED tiny, 6 MB) ships inside the APK: it is what tells music and applause
@@ -26,10 +41,8 @@ if (!sherpaAar.exists()) {
 val soundsDir = layout.projectDirectory.dir("src/main/assets/sounds").asFile
 if (!File(soundsDir, "model.int8.onnx").exists()) {
     val name = "sherpa-onnx-ced-tiny-audio-tagging-2024-04-19"
-    val url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/audio-tagging-models/$name.tar.bz2"
-    logger.lifecycle("Downloading $url")
-    val archive = File(layout.buildDirectory.asFile.get(), "$name.tar.bz2").apply { parentFile.mkdirs() }
-    URI(url).toURL().openStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
+    val archive = File(layout.buildDirectory.asFile.get(), "$name.tar.bz2")
+    fetch(archive, "https://github.com/k2-fsa/sherpa-onnx/releases/download/audio-tagging-models/$name.tar.bz2")
     copy {
         from(tarTree(resources.bzip2(archive))) {
             include("**/model.int8.onnx", "**/class_labels_indices.csv")
@@ -45,10 +58,8 @@ if (!File(soundsDir, "model.int8.onnx").exists()) {
 val speakersDir = layout.projectDirectory.dir("src/main/assets/speakers").asFile
 if (!File(speakersDir, "model.int8.onnx").exists()) {
     val name = "sherpa-onnx-pyannote-segmentation-3-0"
-    val url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/$name.tar.bz2"
-    logger.lifecycle("Downloading $url")
-    val archive = File(layout.buildDirectory.asFile.get(), "$name.tar.bz2").apply { parentFile.mkdirs() }
-    URI(url).toURL().openStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
+    val archive = File(layout.buildDirectory.asFile.get(), "$name.tar.bz2")
+    fetch(archive, "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/$name.tar.bz2")
     copy {
         from(tarTree(resources.bzip2(archive))) {
             include("**/model.int8.onnx")
@@ -83,22 +94,6 @@ android {
                 // -PllamaSrc=<path> builds llama.cpp from a local checkout instead of fetching it.
                 (project.findProperty("llamaSrc") as String?)?.let { arguments += "-DLLAMA_SRC=$it" }
             }
-        }
-    }
-
-    // Two builds of the same app. "standard" can download its speech models; "offline" does not
-    // even ask for the internet permission, and takes models only from files the user imports.
-    // Same application id and signing key, so one can be installed over the other.
-    flavorDimensions += "network"
-    productFlavors {
-        create("standard") {
-            dimension = "network"
-            buildConfigField("boolean", "NETWORK", "true")
-        }
-        create("offline") {
-            dimension = "network"
-            buildConfigField("boolean", "NETWORK", "false")
-            versionNameSuffix = "-offline"
         }
     }
 

@@ -23,12 +23,18 @@ import java.net.URL
 import java.security.MessageDigest
 import kotlin.coroutines.coroutineContext
 
+/** True when the model can be used right now, whether it is the current version or an earlier one. */
+val InstallState?.works: Boolean get() = this == InstallState.Installed || this == InstallState.Outdated
+
 sealed interface InstallState {
     data object Missing : InstallState
     data class Downloading(val doneBytes: Long, val totalBytes: Long) : InstallState {
         val fraction: Float get() = if (totalBytes > 0) (doneBytes.toFloat() / totalBytes).coerceIn(0f, 1f) else 0f
     }
     data object Installed : InstallState
+
+    /** An earlier version of this model is installed and in use; this one is there to be fetched. */
+    data object Outdated : InstallState
     data class Failed(val message: String) : InstallState
 }
 
@@ -52,7 +58,20 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
 
     init {
         _states.value = ModelCatalog.allModels
-            .associate { it.id to if (isInstalled(it)) InstallState.Installed else InstallState.Missing }
+            .associate { it.id to resting(it) }
+    }
+
+    /**
+     * The model to load for [spec]: itself if it is installed, otherwise an earlier version that
+     * still is, otherwise null.
+     */
+    fun usable(spec: ModelSpec): ModelSpec? = spec.takeIf(::isInstalled) ?: spec.replaces.firstOrNull(::isInstalled)
+
+    /** What [spec] is when nothing is being downloaded. */
+    private fun resting(spec: ModelSpec): InstallState = when {
+        isInstalled(spec) -> InstallState.Installed
+        usable(spec) != null -> InstallState.Outdated
+        else -> InstallState.Missing
     }
 
     /** Continues any download that was interrupted rather than paused. */
@@ -81,9 +100,10 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
                 }
                 File(dir, DONE).createNewFile()
                 wanted = wanted - spec.id
+                retire(spec)
                 set(spec, InstallState.Installed)
             } catch (e: CancellationException) {
-                set(spec, InstallState.Missing)
+                set(spec, resting(spec))
                 throw e
             } catch (e: Exception) {
                 set(spec, InstallState.Failed(e.message ?: e.javaClass.simpleName))
@@ -103,13 +123,20 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
         wanted = wanted - spec.id
         jobs.remove(spec.id)?.cancel()
         dir(spec).deleteRecursively()
+        retire(spec)
         set(spec, InstallState.Missing)
     }
 
     /**
+     * Removes the versions [spec] replaces. A model already loaded keeps working until it is
+     * released: its files are only unlinked, and it was read into memory when it was loaded.
+     */
+    private fun retire(spec: ModelSpec) = spec.replaces.forEach { dir(it).deleteRecursively() }
+
+    /**
      * Installs a model from a `.tar.bz2` the user already has: the same archive sherpa-onnx
-     * publishes, fetched on another device or by other means. This is the only way in for the
-     * offline build, and lets anyone avoid the in-app download.
+     * publishes, fetched on another device or by other means. It lets anyone avoid the in-app
+     * download, including on a phone where Sotto is not allowed on the network.
      *
      * @return the model that was installed
      * @throws IOException if the file is not an archive of a model this version uses
@@ -156,6 +183,7 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
                 needed.forEach { if (!File(staging, it).renameTo(File(dir, it))) throw IOException("Could not save $it") }
                 File(dir, DONE).createNewFile()
                 wanted = wanted - found.id
+                retire(found)
                 set(found, InstallState.Installed)
             }
             return found
@@ -176,6 +204,7 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
             if (!file.renameTo(File(dir, wanted.name))) throw IOException("Could not save the model")
             File(dir, DONE).createNewFile()
             this.wanted = this.wanted - spec.id
+            retire(spec)
             set(spec, InstallState.Installed)
         }
         return spec
@@ -194,6 +223,7 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
             if (!file.renameTo(File(dir, ModelCatalog.GGUF))) throw IOException("Could not save the model")
             File(dir, DONE).createNewFile()
             wanted = wanted - spec.id
+            retire(spec)
             set(spec, InstallState.Installed)
         }
         return spec
@@ -208,7 +238,9 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
             val target = File(dir, file.name)
             if (!(target.exists() && target.length() == file.bytes)) {
                 val part = File(dir, file.name + ".part")
-                fetchResumable(file, part) { done -> set(spec, InstallState.Downloading(before + done, total)) }
+                firstThatWorks(ModelCatalog.urls(spec, file)) { url ->
+                    fetchResumable(url, file.bytes, part) { done -> set(spec, InstallState.Downloading(before + done, total)) }
+                }
                 if (file.sha256 != null && sha256(part) != file.sha256) {
                     part.delete()
                     throw IOException("${file.name} was corrupted in transit. Try again.")
@@ -220,15 +252,31 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
         }
     }
 
+    /**
+     * Runs [fetch] against each address in turn until one succeeds. The copies are identical, so
+     * a download that one host cut short carries on from the next.
+     */
+    private suspend fun firstThatWorks(urls: List<String>, fetch: suspend (String) -> Unit) {
+        var failure: IOException? = null
+        for (url in urls) {
+            try {
+                return fetch(url)
+            } catch (e: IOException) {
+                failure = e
+            }
+        }
+        throw failure ?: IOException("Nowhere to download from")
+    }
+
     /** Appends to [part] from wherever a previous attempt stopped. */
-    private suspend fun fetchResumable(file: ModelFile, part: File, onProgress: (Long) -> Unit) {
+    private suspend fun fetchResumable(url: String, bytes: Long, part: File, onProgress: (Long) -> Unit) {
         var have = if (part.exists()) part.length() else 0L
-        if (have > file.bytes) {
+        if (have > bytes) {
             part.delete()
             have = 0
         }
-        if (have == file.bytes) return
-        val connection = open(file.url, rangeFrom = have)
+        if (have == bytes) return
+        val connection = open(url, rangeFrom = have)
         try {
             if (connection.responseCode == HttpURLConnection.HTTP_OK && have > 0) {
                 // Server ignored the range request; start over.
@@ -255,15 +303,18 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
                     }
                 }
             }
-            if (have != file.bytes) throw IOException("Connection dropped. Try again to resume.")
+            if (have != bytes) throw IOException("Connection dropped. Try again to resume.")
         } finally {
             connection.disconnect()
         }
     }
 
     /** Streams the archive straight into its files: nothing but the wanted entries ever hits storage. */
-    private suspend fun downloadTarball(spec: ModelSpec, source: ModelSource.Tarball, dir: File) {
-        val connection = open(source.url, rangeFrom = 0)
+    private suspend fun downloadTarball(spec: ModelSpec, source: ModelSource.Tarball, dir: File) =
+        firstThatWorks(ModelCatalog.urls(spec, source)) { url -> downloadTarball(spec, source, dir, url) }
+
+    private suspend fun downloadTarball(spec: ModelSpec, source: ModelSource.Tarball, dir: File, url: String) {
+        val connection = open(url, rangeFrom = 0)
         try {
             if (connection.responseCode !in 200..299) throw IOException("Download failed (HTTP ${connection.responseCode})")
             val counting = CountingStream(connection.inputStream)

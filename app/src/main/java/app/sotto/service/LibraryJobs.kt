@@ -58,7 +58,7 @@ class LibraryJobs(
     // The speech models are too big to run two jobs at once.
     private val oneAtATime = Mutex()
 
-    fun canTranscribe(): Boolean = models.isInstalled(settings.pack.live)
+    fun canTranscribe(): Boolean = models.usable(settings.pack.live) != null
 
     /** Copies an audio file into the library as a new recording, transcribing it on the way in. */
     fun import(uri: Uri) {
@@ -117,8 +117,8 @@ class LibraryJobs(
                 autoTitle = { false },
                 sounds = SoundTagger(context.assets, scope),
                 diarize = diarizer.takeIf { settings.speakerLabels.value && it.isReady() }?.let { it::turns },
-                transcriberFactory = if (!models.isInstalled(pack.live)) null else { onRefined ->
-                    LiveTranscriber(engine, pack.live, refiner, pack.continuers, store.spool(id), scope, onRefined)
+                transcriberFactory = models.usable(pack.live)?.let { live ->
+                    { onRefined -> LiveTranscriber(engine, live, refiner, pack.continuers, store.spool(id), scope, onRefined) }
                 },
             )
             session.begin()
@@ -140,12 +140,12 @@ class LibraryJobs(
 
     private suspend fun runRetranscribe(key: String, id: String) {
         val pack = settings.pack
-        if (!models.isInstalled(pack.live)) error("no speech model is installed")
+        val live = models.usable(pack.live) ?: error("no speech model is installed")
         val decoder = AudioDecoder(store.audio(id))
         val spool = store.spool(id)
         engine.retain()
         store.setPendingRefine(id, 1)
-        val transcriber = LiveTranscriber(engine, pack.live, installedRefiner(), pack.continuers, spool, scope)
+        val transcriber = LiveTranscriber(engine, live, installedRefiner(), pack.continuers, spool, scope)
         val sounds = SoundTagger(context.assets, scope)
         try {
             val decimator = Decimator()
@@ -182,8 +182,8 @@ class LibraryJobs(
         }
     }
 
-    private fun installedRefiner() = settings.chosenQuality.refiner.takeIf { models.isInstalled(it) }
-        ?: settings.pack.qualities.map { it.refiner }.firstOrNull { models.isInstalled(it) }
+    private fun installedRefiner() = models.usable(settings.chosenQuality.refiner)
+        ?: settings.pack.qualities.firstNotNullOfOrNull { models.usable(it.refiner) }
 
     private fun displayName(uri: Uri): String = runCatching {
         context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->

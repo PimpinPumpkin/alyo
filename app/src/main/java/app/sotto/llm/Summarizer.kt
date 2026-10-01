@@ -49,7 +49,7 @@ class Summarizer(
     /** The model that will be used: the chosen one if it is installed, else any that is. */
     fun model(): ModelSpec? {
         val all = ModelCatalog.summarizers + ModelCatalog.importedSummarizer
-        return all.firstOrNull { it.id == settings.summarizer.value && models.isInstalled(it) } ?: all.firstOrNull(models::isInstalled)
+        return all.firstOrNull { it.id == settings.summarizer.value }?.let(models::usable) ?: all.firstNotNullOfOrNull(models::usable)
     }
 
     @Synchronized

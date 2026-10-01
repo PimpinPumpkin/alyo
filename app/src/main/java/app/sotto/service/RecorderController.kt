@@ -53,8 +53,8 @@ class RecorderController(
         val id = store.newId()
         val now = System.currentTimeMillis()
         val pack = settings.pack
-        val refiner = settings.chosenQuality.refiner.takeIf { models.isInstalled(it) }
-            ?: pack.qualities.map { it.refiner }.firstOrNull { models.isInstalled(it) }
+        val live = models.usable(pack.live)
+        val refiner = models.usable(settings.chosenQuality.refiner) ?: pack.qualities.firstNotNullOfOrNull { models.usable(it.refiner) }
         val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         var mic: MicSource? = null
         val openSource: () -> PcmSource = if (wav != null) ({ WavFileSource(wav) }) else ({
@@ -78,8 +78,8 @@ class RecorderController(
             // mutes what this app is recording. Either one means stop and wait.
             interrupted = if (wav != null) ({ false }) else ({ audio.mode != AudioManager.MODE_NORMAL || mic?.isSilenced == true }),
             diarize = diarizer.takeIf { settings.speakerLabels.value && it.isReady() }?.let { it::turns },
-            transcriberFactory = if (!models.isInstalled(pack.live)) null else { onRefined ->
-                LiveTranscriber(engine, pack.live, refiner, pack.continuers, store.spool(id), scope, onRefined)
+            transcriberFactory = if (live == null) null else { onRefined ->
+                LiveTranscriber(engine, live, refiner, pack.continuers, store.spool(id), scope, onRefined)
             },
         )
         _session.value = session

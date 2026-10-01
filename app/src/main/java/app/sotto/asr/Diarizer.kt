@@ -22,9 +22,9 @@ data class SpeakerTurn(val speaker: Int, val startMs: Int, val endMs: Int)
  * grouped as the same person. It runs once over a whole recording, after the fact.
  */
 class Diarizer(private val context: Context, private val models: ModelManager) {
-    val spec: ModelSpec get() = ModelCatalog.speakers
+    private val spec: ModelSpec? get() = models.usable(ModelCatalog.speakers)
 
-    fun isReady(): Boolean = models.isInstalled(spec)
+    fun isReady(): Boolean = spec != null
 
     /**
      * @param spool 16 kHz mono 16-bit audio, as [LiveTranscriber] writes it
@@ -34,6 +34,7 @@ class Diarizer(private val context: Context, private val models: ModelManager) {
         if (!isReady() || !spool.exists() || spool.length() > MAX_BYTES) return emptyList()
         val samples = read(spool)
         if (samples.size < AudioSpec.ASR_SAMPLE_RATE * 2) return emptyList()
+        val spec = spec ?: return emptyList()
         val diarization = OfflineSpeakerDiarization(
             null,
             OfflineSpeakerDiarizationConfig(

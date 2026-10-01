@@ -51,6 +51,12 @@ data class ModelSpec(
      * moment it committed. Subtracted so tapping a live word lands on the word, not after it.
      */
     val lagMs: Int = 0,
+    /**
+     * Earlier models this one takes over from, newest first. A phone that has one of them keeps
+     * transcribing with it until this one has been downloaded, at which point the old one is
+     * deleted. So upgrading a model is: give the new one a new [id], and move the old spec here.
+     */
+    val replaces: List<ModelSpec> = emptyList(),
 )
 
 /** How good the finished transcript is, traded against download size and memory. */
@@ -95,7 +101,7 @@ object ModelCatalog {
                     ModelFile("encoder.int8.onnx", "$base/encoder.int8.onnx", 131_507_603, "100c5616929a131b5b3c8c8ab0d83aaba2cdcae163acd8d190b4e5ffa5f7d051"),
                     ModelFile("decoder.int8.onnx", "$base/decoder.int8.onnx", 3_955_864, "4f04431988472f8c7b815f942aa6901976929c9e22353029681fcdb262da0164"),
                     ModelFile("joiner.int8.onnx", "$base/joiner.int8.onnx", 1_408_182, "d2d8e7290a6a8245a83ed211aa0dd8cdf8effb8a7c64fe392399561111b52f30"),
-                    ModelFile("tokens.txt", "$base/tokens.txt", 11_896),
+                    ModelFile("tokens.txt", "$base/tokens.txt", 11_896, "618dc110fc2213886b52e063ff42329bbdf37a266ca7705184090fa5f39f3131"),
                 ),
             )
         },
@@ -113,7 +119,7 @@ object ModelCatalog {
                     ModelFile("encoder.int8.onnx", "$base/encoder.int8.onnx", 652_184_296, "a32b12d17bbbc309d0686fbbcc2987b5e9b8333a7da83fa6b089f0a2acd651ab"),
                     ModelFile("decoder.int8.onnx", "$base/decoder.int8.onnx", 7_257_753, "b6bb64963457237b900e496ee9994b59294526439fbcc1fecf705b31a15c6b4e"),
                     ModelFile("joiner.int8.onnx", "$base/joiner.int8.onnx", 1_739_080, "7946164367946e7f9f29a122407c3252b680dbae9a51343eb2488d057c3c43d2"),
-                    ModelFile("tokens.txt", "$base/tokens.txt", 9_384),
+                    ModelFile("tokens.txt", "$base/tokens.txt", 9_384, "ec182b70dd42113aff6c5372c75cac58c952443eb22322f57bbd7f53977d497d"),
                 ),
             )
         },
@@ -214,10 +220,24 @@ object ModelCatalog {
         ),
     )
 
+    /** Every model this version offers. */
     val allModels: List<ModelSpec>
         get() = languages.flatMap { pack -> listOf(pack.live) + pack.qualities.map { it.refiner } } + summarizers + importedSummarizer + speakers
 
-    /** Where the archive for [spec] can be fetched by hand, for importing into a build with no network. */
+    /**
+     * Sotto's own copies of the model files, tried before the upstream hosts. The models belong to
+     * other projects, which may rename or remove them; copies here mean a release keeps working
+     * for as long as it is installed. Files are named `<model id>.<file name>`, and nothing is
+     * ever deleted from this release, since old versions of the app still point at it.
+     */
+    const val MIRROR = "https://github.com/PimpinPumpkin/sotto/releases/download/models"
+
+    /** Where [file] of [spec] can be fetched from, in the order to try. */
+    fun urls(spec: ModelSpec, file: ModelFile): List<String> = listOf("$MIRROR/${spec.id}.${file.name}", file.url)
+
+    fun urls(spec: ModelSpec, tarball: ModelSource.Tarball): List<String> = listOf("$MIRROR/${spec.id}.tar.bz2", tarball.url)
+
+    /** Where the archive for [spec] can be fetched by hand, for importing instead of downloading in the app. */
     fun archiveUrl(spec: ModelSpec): String = "$GH/${spec.archive}.tar.bz2"
 
     fun language(code: String): LanguagePack = languages.firstOrNull { it.code == code } ?: english

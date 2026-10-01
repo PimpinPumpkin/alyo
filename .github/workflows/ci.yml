@@ -1,6 +1,6 @@
 name: CI
 
-# Three channels, the same arrangement as Vela.
+# Three channels.
 #
 #   canary   every push to the `canary` branch replaces the one APK on the rolling `canary` release.
 #   nightly  a daily cron cuts a v0.1.<run> PRERELEASE from main, only if main moved since the last.
@@ -96,7 +96,7 @@ jobs:
           fi
 
       - name: Unit tests
-        run: ./gradlew :app:testStandardDebugUnitTest --no-daemon
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
 
       - name: Derive build version
         id: ver
@@ -111,8 +111,8 @@ jobs:
           echo "code=$(( 1000 + ${{ github.run_number }} ))" >> "$GITHUB_OUTPUT"
 
       - name: Write the What's new notes
-        # The app shows these after an update, and it cannot fetch them: it may have no network
-        # permission at all. So the last dozen user-facing changes ride inside the APK.
+        # The app shows these after an update, and it does not go online for them: the only thing
+        # it ever downloads is a model. So the last dozen user-facing changes ride inside the APK.
         run: |
           mkdir -p app/src/main/assets
           bash scripts/changelog.sh -n 12 HEAD > app/src/main/assets/whatsnew.txt
@@ -124,7 +124,7 @@ jobs:
           SOTTO_KEYSTORE_PASSWORD: ${{ secrets.SOTTO_KEYSTORE_PASSWORD }}
           SOTTO_KEY_ALIAS: ${{ secrets.SOTTO_KEY_ALIAS }}
         run: >
-          ./gradlew :app:assembleStandardRelease :app:assembleOfflineRelease --no-daemon
+          ./gradlew :app:assembleRelease --no-daemon
           -PappVersionName=${{ steps.ver.outputs.name }}
           -PappVersionCode=${{ steps.ver.outputs.code }}
 
@@ -132,7 +132,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: sotto-recorder-apk
-          path: app/build/outputs/apk/*/release/*.apk
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
       - name: Publish canary build (rolling release)
@@ -144,13 +144,12 @@ jobs:
         run: |
           VER="${{ steps.ver.outputs.name }}"
           CODE="${{ steps.ver.outputs.code }}"
-          cp app/build/outputs/apk/standard/release/app-standard-release.apk sotto-recorder-canary.apk
-          cp app/build/outputs/apk/offline/release/app-offline-release.apk sotto-recorder-offline-canary.apk
+          cp app/build/outputs/apk/release/app-release.apk sotto-recorder-canary.apk
           SUBJ="$(bash scripts/changelog.sh --latest HEAD)"
           [ -z "$SUBJ" ] && SUBJ="$(git log -1 --no-merges --pretty=%s)"
           NOTES="$(printf 'Canary branch.\n\nversionName: %s\nversionCode: %s\n\nLatest change: %s\n' "$VER" "$CODE" "$SUBJ")"
           gh release delete canary --yes --cleanup-tag 2>/dev/null || true
-          gh release create canary --prerelease --target "$GITHUB_SHA" --title "Sotto Recorder $VER" --notes "$NOTES" sotto-recorder-canary.apk sotto-recorder-offline-canary.apk
+          gh release create canary --prerelease --target "$GITHUB_SHA" --title "Sotto Recorder $VER" --notes "$NOTES" sotto-recorder-canary.apk
 
       - name: Publish nightly (prerelease)
         if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
@@ -165,8 +164,7 @@ jobs:
             exit 0
           fi
           VER="${{ steps.ver.outputs.name }}"
-          cp app/build/outputs/apk/standard/release/app-standard-release.apk "sotto-recorder-v${VER}.apk"
-          cp app/build/outputs/apk/offline/release/app-offline-release.apk "sotto-recorder-offline-v${VER}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "sotto-recorder-v${VER}.apk"
           # Commit subjects are written as plain changelog lines, so this reads as release notes.
           if [ -n "$LAST" ]; then
             LOG="$(bash scripts/changelog.sh "${LAST}..HEAD")"
@@ -182,11 +180,11 @@ jobs:
             --target "$GITHUB_SHA" \
             --prerelease \
             --notes "$NOTES" \
-            "sotto-recorder-v${VER}.apk" "sotto-recorder-offline-v${VER}.apk"
+            "sotto-recorder-v${VER}.apk"
 
       - name: Prune old nightlies (stables are kept for good)
         # Thirty nightlies is a month of bisect range. The v0.* filter is load bearing: `canary`
-        # is a prerelease too and must never be swept up here.
+        # and `models` (the mirrored model files) are prereleases too and must never be swept up.
         if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
