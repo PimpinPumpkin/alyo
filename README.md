@@ -21,7 +21,8 @@ It is a free-software take on Google's Recorder app.
 - Backup and restore of the whole library
 - Recordings appear in the system file picker
 
-English only for now. Requires Android 10 or later on a 64-bit ARM phone.
+Transcribes English, German, French and Spanish. Requires Android 10 or later on a 64-bit ARM
+phone. The app itself is in English.
 
 ## Install
 
@@ -41,10 +42,14 @@ All three share a signing key, so you can switch between them without reinstalli
 Nothing is transcribed until a speech model is on the phone. The app offers to download one on
 first launch.
 
-| Choice | Second-pass model | Download |
+| Language | Standard (default) | Best |
 | --- | --- | --- |
-| Standard (default) | Parakeet TDT 110M | 275 MB |
-| Best | Parakeet TDT 0.6B v2 | 828 MB, and about 1.1 GB of memory while recording |
+| English | 275 MB | 828 MB |
+| German, French | 101 MB | 771 MB |
+| Spanish | 186 MB | 856 MB |
+
+Best uses about 1.1 GB of memory while recording. The sizes include the 30 MB voice model behind
+speaker labels.
 
 Summaries need a separate model: Quick (Qwen2.5 0.5B, 676 MB) or Thorough (Qwen2.5 1.5B, 1.1 GB).
 Any other GGUF chat model can be imported instead.
@@ -62,12 +67,19 @@ later version moves to a newer model, the old one keeps working until the new on
 Transcription is two passes, both on the CPU through
 [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx):
 
-1. NVIDIA's streaming FastConformer produces the words you see appear. It is fast and rough:
-   lower case, no punctuation.
-2. At each pause, NVIDIA Parakeet TDT hears the whole sentence and rewrites it with punctuation,
+1. A streaming model produces the words you see appear.
+2. At each pause, a larger model hears the whole sentence and rewrites it with punctuation,
    capitals and better word timings.
 
-On a Pixel 4a 5G (2020) each pass runs at about 7x real time.
+| Language | Live | Second pass |
+| --- | --- | --- |
+| English | NVIDIA FastConformer | Parakeet TDT 110M (Standard) or 0.6B v2 (Best) |
+| German, French, Spanish | Kroko streaming Zipformer | None (Standard) or Parakeet TDT 0.6B v3 (Best) |
+
+The English live model writes lower case with no punctuation, so it always gets a second pass.
+The Kroko models punctuate as they go, so their text can stand as the transcript.
+
+On a Pixel 4a 5G (2020) every one of these runs at 5x real time or better.
 
 Someone who talks without pausing is split at the quietest moment after ten seconds, so a
 sentence is never cut at a fixed length.
@@ -108,6 +120,10 @@ Needs JDK 17, Android SDK platform 37, the NDK and CMake. The first build downlo
 sherpa-onnx library and the two bundled models, and fetches llama.cpp at its pinned tag. Pass
 `-PllamaSrc=<checkout>` to build llama.cpp from a local copy.
 
+The APK carries a copy of ONNX Runtime built with only the operators these models use, which
+halves its size. `scripts/build-onnxruntime.sh` rebuilds it, and has to be run again when a
+model is added.
+
 Debug builds can record from a WAV file (16-bit mono, 16 or 48 kHz) instead of the microphone:
 
 ```bash
@@ -118,8 +134,10 @@ adb shell am start -n app.sotto/.MainActivity --es wav /data/user/0/app.sotto/fi
 
 ## Known gaps
 
-- English only. A language is one entry in
-  [`ModelCatalog.kt`](app/src/main/java/app/sotto/asr/ModelCatalog.kt).
+- Four languages. Adding one is an entry in
+  [`ModelCatalog.kt`](app/src/main/java/app/sotto/asr/ModelCatalog.kt), but it needs a streaming
+  model, and few languages have a good open one.
+- The app's own text is English only.
 - A sentence shared by two people is labeled with whoever spoke most of it.
 - The Bluetooth microphone option and pausing for phone calls have not been tested on real
   hardware.
@@ -133,6 +151,7 @@ GPL-3.0. See [LICENSE](LICENSE).
 | --- | --- |
 | [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), llama.cpp, ONNX Runtime | Apache 2.0, MIT |
 | NVIDIA FastConformer and Parakeet TDT | CC BY 4.0 |
+| Banafo Kroko ASR | CC BY-SA 4.0 |
 | CED tiny, 3D-Speaker CAM++, Qwen2.5 | Apache 2.0 |
 | pyannote segmentation 3.0 | MIT |
 | [Google Sans Flex](https://fonts.google.com/specimen/Google+Sans+Flex) | OFL 1.1, see [licenses/](licenses/GoogleSansFlex-OFL.txt) |

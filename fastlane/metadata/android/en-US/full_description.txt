@@ -22,4 +22,4 @@ The app goes online for one thing only: downloading the speech model the first t
 
 <b>Models</b>
 
-Speech recognition uses NVIDIA's FastConformer and Parakeet models through sherpa-onnx. Summaries use Qwen2.5 through llama.cpp. English only for now.
+Speech recognition uses NVIDIA's FastConformer and Parakeet models and Banafo's Kroko models, through sherpa-onnx. Summaries use Qwen2.5 through llama.cpp. It transcribes English, German, French and Spanish.

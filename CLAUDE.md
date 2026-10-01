@@ -21,6 +21,8 @@ once per clone.
 - The `models` release holds the model files every install downloads. Never delete it or anything
   in it. To change a model, upload the new files, add a `ModelSpec` with a new id, and list the
   old one under `replaces`.
+- The APK ships a trimmed ONNX Runtime. After adding any model, rerun
+  `scripts/build-onnxruntime.sh <dir with every model>` or the new model may fail to load.
 
 ## Building
 
