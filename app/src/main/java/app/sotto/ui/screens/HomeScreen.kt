@@ -1,5 +1,7 @@
 package app.sotto.ui.screens
 
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.material.icons.rounded.History
 import app.sotto.service.LibraryJobs
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.LaunchedEffect
@@ -106,7 +108,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun HomeScreen(
     app: SottoApp,
-    onOpen: (id: String, autoplay: Boolean) -> Unit,
+    onOpen: (id: String, autoplay: Boolean, find: String) -> Unit,
     onRecord: () -> Unit,
     onReturnToRecording: () -> Unit,
     onSettings: () -> Unit,
@@ -129,6 +131,8 @@ fun HomeScreen(
     val session by app.recorder.session.collectAsState()
     val modelStates by app.models.states.collectAsState()
     var query by rememberSaveable { mutableStateOf("") }
+    var searchFocused by remember { mutableStateOf(false) }
+    val history by app.settings.searches.collectAsState()
     var menuFor by remember { mutableStateOf<RecordingMeta?>(null) }
     var renaming by remember { mutableStateOf<RecordingMeta?>(null) }
     var deleting by remember { mutableStateOf<RecordingMeta?>(null) }
@@ -198,8 +202,9 @@ fun HomeScreen(
                     RecordingCard(
                         app = app,
                         meta = meta,
-                        onClick = { onOpen(meta.id, false) },
-                        onPlay = { onOpen(meta.id, true) },
+                        // Opening a result is what makes a search worth remembering.
+                        onClick = { app.settings.rememberSearch(query); onOpen(meta.id, false, query.trim()) },
+                        onPlay = { app.settings.rememberSearch(query); onOpen(meta.id, true, query.trim()) },
                         onLongClick = { menuFor = meta },
                         modifier = Modifier.animateItem(),
                     )
@@ -219,7 +224,24 @@ fun HomeScreen(
                 .statusBarsPadding()
                 .padding(horizontal = 8.dp, vertical = 8.dp),
         ) {
-            SearchPill(query, onQuery = { query = it }, onSettings = onSettings, onImport = { importer.launch(arrayOf("audio/*", "video/*")) })
+            Column {
+                SearchPill(query, onQuery = { query = it }, onSettings = onSettings, onImport = { importer.launch(arrayOf("audio/*", "video/*")) }, onFocus = { searchFocused = it })
+                // Recent searches, offered while the field is in use and still empty.
+                if (searchFocused && query.isEmpty() && history.isNotEmpty()) {
+                    Surface(shape = RoundedCornerShape(24.dp), color = colors.surfaceContainerHigh, modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+                        Column(Modifier.padding(vertical = 8.dp)) {
+                            for (past in history) {
+                                Row(Modifier.fillMaxWidth().clickable { query = past }.padding(start = 20.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Rounded.History, null, tint = colors.onSurfaceVariant)
+                                    Spacer(Modifier.width(16.dp))
+                                    Text(past, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                    IconButton(onClick = { app.settings.forgetSearch(past) }) { Icon(Icons.Rounded.Close, "Remove $past from search history", tint = colors.onSurfaceVariant) }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // Centered on a phone held upright; tucked into the corner when the screen is wide, where
@@ -262,7 +284,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun SearchPill(query: String, onQuery: (String) -> Unit, onSettings: () -> Unit, onImport: () -> Unit) {
+private fun SearchPill(query: String, onQuery: (String) -> Unit, onSettings: () -> Unit, onImport: () -> Unit, onFocus: (Boolean) -> Unit) {
     val colors = MaterialTheme.colorScheme
     val focus = LocalFocusManager.current
     // No container: on the original the search row is just an icon and text on the page.
@@ -281,7 +303,7 @@ private fun SearchPill(query: String, onQuery: (String) -> Unit, onSettings: () 
                     textStyle = MaterialTheme.typography.titleLarge.copy(color = colors.onSurface),
                     cursorBrush = SolidColor(colors.primary),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().onFocusChanged { onFocus(it.isFocused) },
                 )
             }
             if (query.isNotEmpty()) {

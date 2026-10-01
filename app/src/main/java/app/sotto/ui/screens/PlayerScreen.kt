@@ -40,6 +40,9 @@ import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
+import app.sotto.ui.components.SheetGroup
+import androidx.compose.material.icons.rounded.PersonAdd
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Star
@@ -117,6 +120,8 @@ fun PlayerScreen(
     app: SottoApp,
     id: String,
     autoplay: Boolean,
+    /** What the user searched for to get here, if anything: every occurrence is highlighted on arrival. */
+    find: String,
     onBack: () -> Unit,
     onCrop: () -> Unit,
     onSettings: () -> Unit,
@@ -161,14 +166,15 @@ fun PlayerScreen(
     var showTranscript by rememberSaveable { mutableStateOf(!transcript.isEmpty) }
     var editing by rememberSaveable { mutableStateOf(false) }
     var editingSegment by remember { mutableStateOf<Segment?>(null) }
-    var searching by rememberSaveable { mutableStateOf(false) }
-    var query by rememberSaveable { mutableStateOf("") }
+    var searching by rememberSaveable { mutableStateOf(find.isNotBlank() && !transcript.isEmpty) }
+    var query by rememberSaveable { mutableStateOf(find) }
     var menuOpen by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var sharing by remember { mutableStateOf(false) }
     var summarizing by remember { mutableStateOf(false) }
     var namingSpeaker by remember { mutableStateOf<Int?>(null) }
+    var speakerOf by remember { mutableStateOf<Paragraph?>(null) }
     val jobs by app.jobs.active.collectAsState()
     val job = jobs.firstOrNull { it.recordingId == id }
     val busy = meta.pendingRefine > 0
@@ -281,7 +287,7 @@ fun PlayerScreen(
                                 sounds = sounds,
                                 onSoundTap = { player.seekTo(it.startMs.toLong()); player.play() },
                                 speakerName = if (transcript.hasSpeakers) transcript::speakerName else null,
-                                onSpeakerTap = { namingSpeaker = it },
+                                onSpeakerTap = { speakerOf = it },
                                 onLongPress = { segment -> if (!busy) { player.pause(); editingSegment = segment } },
                                 modifier = Modifier.weight(1f).fillMaxWidth(),
                             )
@@ -367,6 +373,26 @@ fun PlayerScreen(
                 editingSegment = null
             },
         )
+    }
+    speakerOf?.let { paragraph ->
+        val current = paragraph.speaker ?: 0
+        val known = transcript.segments.mapNotNull { it.speaker }.distinct().sorted()
+        fun assign(speaker: Int) {
+            val ids = paragraph.segments.map { it.id }.toSet()
+            app.store.updateTranscript(id) { t -> t.copy(segments = t.segments.map { if (it.id in ids) it.copy(speaker = speaker) else it }) }
+            speakerOf = null
+        }
+        ModalBottomSheet(onDismissRequest = { speakerOf = null }, containerColor = colors.surfaceContainerLow) {
+            Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
+                Text(transcript.speakerName(current), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 12.dp, bottom = 16.dp))
+                SheetGroup(listOf(SheetRow(Icons.Rounded.Edit, "Rename", detail = "Everywhere in this recording") { speakerOf = null; namingSpeaker = current }))
+                Text("This part was said by", style = MaterialTheme.typography.titleSmall, color = colors.primary, modifier = Modifier.padding(start = 12.dp, top = 20.dp, bottom = 10.dp))
+                SheetGroup(
+                    known.filter { it != current }.map { other -> SheetRow(Icons.Rounded.Person, transcript.speakerName(other)) { assign(other) } } +
+                        SheetRow(Icons.Rounded.PersonAdd, "Someone else") { assign((known.maxOrNull() ?: 0) + 1) },
+                )
+            }
+        }
     }
     namingSpeaker?.let { speaker ->
         NameDialog("Name this speaker", transcript.speakerName(speaker), onDismiss = { namingSpeaker = null }) { name ->

@@ -201,7 +201,7 @@ fun TranscriptView(
     sounds: List<SoundSpan> = emptyList(),
     onSoundTap: (SoundSpan) -> Unit = {},
     speakerName: ((Int) -> String)? = null,
-    onSpeakerTap: (Int) -> Unit = {},
+    onSpeakerTap: (Paragraph) -> Unit = {},
     onLongPress: (Segment) -> Unit = {},
 ) {
     val livePartial = remember(partial) { if (partial.isEmpty()) null else Paragraph(listOf(Segment(Long.MAX_VALUE, partial)), live = true) }
@@ -234,7 +234,7 @@ private fun ParagraphBlock(
     onEditSegment: (Segment) -> Unit,
     onSelectionDrag: (startEdge: Boolean, word: Word) -> Unit,
     speakerName: ((Int) -> String)?,
-    onSpeakerTap: (Int) -> Unit,
+    onSpeakerTap: (Paragraph) -> Unit,
     onLongPress: (Segment) -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -282,7 +282,7 @@ private fun ParagraphBlock(
                     speakerName(speaker),
                     style = MaterialTheme.typography.labelLarge,
                     color = tint,
-                    modifier = Modifier.clip(CircleShape).clickable { onSpeakerTap(speaker) }.padding(horizontal = 6.dp, vertical = 2.dp),
+                    modifier = Modifier.clip(CircleShape).clickable { onSpeakerTap(paragraph) }.padding(horizontal = 6.dp, vertical = 2.dp),
                 )
             }
         }

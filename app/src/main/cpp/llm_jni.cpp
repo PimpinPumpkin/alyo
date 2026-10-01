@@ -95,7 +95,7 @@ Java_app_sotto_llm_Llama_nativeCountTokens(JNIEnv *env, jclass, jlong handle, js
 // Returns 0 on a normal finish, 1 if stopped by the caller, negative on failure.
 JNIEXPORT jint JNICALL
 Java_app_sotto_llm_Llama_nativeGenerate(JNIEnv *env, jclass, jlong handle, jstring system, jstring user,
-                                        jstring opening, jint max_tokens, jobject sink) {
+                                        jstring opening, jstring grammar, jint max_tokens, jobject sink) {
     auto *s = (Session *) handle;
     s->cancel = false;
     jclass sinkClass = env->GetObjectClass(sink);
@@ -118,6 +118,17 @@ Java_app_sotto_llm_Llama_nativeGenerate(JNIEnv *env, jclass, jlong handle, jstri
 
     // Low temperature: a summary should be the likely reading of the text, not a creative one.
     llama_sampler *sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
+    // A grammar makes anything outside the wanted shape impossible to write, rather than merely
+    // discouraged: tokens that would break it are removed before one is chosen.
+    const std::string rules = to_string(env, grammar);
+    if (!rules.empty()) {
+        llama_sampler *shape = llama_sampler_init_grammar(s->vocab, rules.c_str(), "root");
+        if (shape) {
+            llama_sampler_chain_add(sampler, shape);
+        } else {
+            __android_log_print(ANDROID_LOG_ERROR, TAG, "grammar did not parse; generating without it");
+        }
+    }
     llama_sampler_chain_add(sampler, llama_sampler_init_top_k(40));
     llama_sampler_chain_add(sampler, llama_sampler_init_top_p(0.9f, 1));
     llama_sampler_chain_add(sampler, llama_sampler_init_temp(0.3f));

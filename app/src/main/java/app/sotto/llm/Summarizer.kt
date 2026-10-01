@@ -99,16 +99,25 @@ class Summarizer(
                 }
             }
 
+            val words = parts.sumOf { it.count { c -> c == ' ' } + 1 }
+            // How much there is to say depends on how much was said. A short memo gets a title and
+            // nothing else: summarizing three sentences only produces a longer version of them.
+            val points = when {
+                words < SHORT_WORDS -> 0..0
+                words < 300 -> 1..2
+                words < 1200 -> 2..4
+                else -> 3..5
+            }
             val reply = if (chunks.size == 1) {
-                llama.generate(SYSTEM, chunks[0], REPLY_TOKENS, OPENING, listener(writing = true))
+                llama.generate(system(points), chunks[0], REPLY_TOKENS, OPENING, shape(points), listener(writing = true))
             } else {
                 val notes = StringBuilder()
                 for (chunk in chunks) {
-                    val part = llama.generate(NOTES_SYSTEM, chunk, NOTE_TOKENS, "- ", listener(writing = false)) ?: return
+                    val part = llama.generate(NOTES_SYSTEM, chunk, NOTE_TOKENS, "", NOTES_SHAPE, listener(writing = false)) ?: return
                     notes.append(part.trim()).append('\n')
                     done++
                 }
-                llama.generate(SYSTEM, "Notes taken from a long recording, in order:\n\n$notes", REPLY_TOKENS, OPENING, listener(writing = true))
+                llama.generate(system(points), "Notes taken from a long recording, in order:\n\n$notes", REPLY_TOKENS, OPENING, shape(points), listener(writing = true))
             } ?: return
 
             val summary = parse(reply, "the ${spec.title} model")
@@ -156,17 +165,30 @@ class Summarizer(
         private const val OPENING = "Title:"
         private const val MAX_TITLE_WORDS = 8
 
-        // Spelled out as a form to fill in: the smallest models follow a shape far more reliably
-        // than a description of one.
-        private const val SYSTEM =
-            "You summarize transcripts of voice recordings. Reply in exactly this form and nothing else:\n" +
-                "Title: <what it is about, at most six words>\n" +
-                "- <key point>\n" +
-                "- <key point>\n" +
-                "Give 2 to 5 key points covering the main facts, decisions and action items. Use only what is in the transcript."
-        private const val NOTES_SYSTEM =
-            "List the key points of this part of a transcript as 2 to 4 short bullet points, each starting with \"- \". " +
-                "Use only what is in the text. No introduction."
+        /** Below this many words a recording is only given a title. */
+        private const val SHORT_WORDS = 80
+
+        private fun system(points: IntRange): String =
+            "You label transcripts of voice recordings. Reply with a title of two to six words that says what the recording is about" +
+                if (points.last == 0) "." else ", then ${points.first} to ${points.last} sentences that each state one thing that was said: a fact, a decision, or something to do. State the thing itself, with its details. Use only what is in the transcript."
+
+        // The reply's shape as a grammar, continuing from the "Title:" the reply is started with.
+        // A title is a few plain words on one line: no brackets, colons or markup, which is what
+        // a model echoing its instructions would need. Each point is exactly one sentence: it
+        // starts with a capital, has no colon to hang a "Key points:" label on, and stops at the
+        // first full stop, so a point cannot run on into a second one.
+        private const val WORDS = """word ::= [^ \n<>\[\]{}:*#"]{1,24}
+title ::= word (" " word){1,6}
+line ::= [A-Z0-9$] [^\n.!?<>*#:]{12,170} [.!?]
+"""
+
+        private fun shape(points: IntRange): String = WORDS + (
+            if (points.last == 0) "root ::= \" \" title \"\\n\"\n"
+            else "root ::= \" \" title \"\\n\" (\"- \" line \"\\n\"){${points.first},${points.last}}\n"
+            )
+
+        private const val NOTES_SYSTEM = "Write 2 to 4 sentences that each state one thing said in this part of a transcript, with its details. Use only what is in the text."
+        private const val NOTES_SHAPE = WORDS + "root ::= (\"- \" line \"\\n\"){2,4}\n"
 
         /** Turns the model's reply into a title and points, forgiving the ways small models stray from the format. */
         fun parse(reply: String, model: String): Summary {

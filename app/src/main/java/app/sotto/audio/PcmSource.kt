@@ -67,6 +67,14 @@ class MicSource(private val context: Context, private val choose: (List<AudioDev
             }
         }
 
+    /** Moves the recording to another microphone without stopping it. Null hands the choice back to Android. */
+    fun select(device: AudioDeviceInfo?) {
+        if (bluetooth) closeBluetoothLink()
+        bluetooth = device != null && device.type in BLUETOOTH_TYPES
+        if (bluetooth) openBluetoothLink(device!!)
+        record.preferredDevice = device
+    }
+
     /** True when the system has muted this recording because something with priority (a call) has the microphone. */
     val isSilenced: Boolean get() = record.activeRecordingConfiguration?.isClientSilenced == true
 
@@ -83,20 +91,40 @@ class MicSource(private val context: Context, private val choose: (List<AudioDev
     override fun stop() = record.stop()
     override fun read(buffer: ShortArray): Int = record.read(buffer, 0, buffer.size)
 
+    private fun closeBluetoothLink() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            manager.clearCommunicationDevice()
+        } else {
+            @Suppress("DEPRECATION")
+            manager.stopBluetoothSco()
+        }
+    }
+
     override fun release() {
         record.release()
-        if (bluetooth) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                manager.clearCommunicationDevice()
-            } else {
-                @Suppress("DEPRECATION")
-                manager.stopBluetoothSco()
-            }
-        }
+        if (bluetooth) closeBluetoothLink()
     }
 
     companion object {
         val BLUETOOTH_TYPES = setOf(AudioDeviceInfo.TYPE_BLUETOOTH_SCO, AudioDeviceInfo.TYPE_BLE_HEADSET)
+
+        /** The kinds of input worth offering: the phone's own microphone and anything plugged in or paired. */
+        private val OFFERED = BLUETOOTH_TYPES + setOf(
+            AudioDeviceInfo.TYPE_BUILTIN_MIC, AudioDeviceInfo.TYPE_WIRED_HEADSET, AudioDeviceInfo.TYPE_USB_HEADSET, AudioDeviceInfo.TYPE_USB_DEVICE,
+        )
+
+        /** Microphones connected right now, one per kind and name (a phone reports several built-in ones). */
+        fun inputs(context: Context): List<AudioDeviceInfo> =
+            (context.getSystemService(Context.AUDIO_SERVICE) as AudioManager).getDevices(AudioManager.GET_DEVICES_INPUTS)
+                .filter { it.type in OFFERED }
+                .distinctBy { if (it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC) "phone" else "${it.type}:${it.productName}" }
+
+        fun label(device: AudioDeviceInfo): String = when (device.type) {
+            AudioDeviceInfo.TYPE_BUILTIN_MIC -> "Phone microphone"
+            AudioDeviceInfo.TYPE_WIRED_HEADSET -> "Wired headset"
+            AudioDeviceInfo.TYPE_USB_HEADSET, AudioDeviceInfo.TYPE_USB_DEVICE -> device.productName?.toString()?.takeIf { it.isNotBlank() } ?: "USB microphone"
+            else -> device.productName?.toString()?.takeIf { it.isNotBlank() } ?: "Bluetooth headset"
+        }
     }
 }
 

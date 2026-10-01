@@ -1,9 +1,9 @@
 package app.sotto.data
 
-import android.app.ActivityManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
+import android.media.AudioDeviceInfo
 import androidx.core.content.edit
 import app.sotto.asr.LanguagePack
 import app.sotto.asr.ModelCatalog
@@ -13,10 +13,6 @@ import kotlinx.coroutines.flow.StateFlow
 
 class Settings(context: Context) {
     private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-    private val totalRamBytes: Long = ActivityManager.MemoryInfo().also {
-        (context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).getMemoryInfo(it)
-    }.totalMem
-
     private val _language = MutableStateFlow(prefs.getString(LANGUAGE, "en")!!)
     val language: StateFlow<String> = _language
 
@@ -40,7 +36,7 @@ class Settings(context: Context) {
         _autoTitle.value = on
     }
 
-    private val _summarizer = MutableStateFlow(prefs.getString(SUMMARIZER, null) ?: ModelCatalog.summarizers.first().id)
+    private val _summarizer = MutableStateFlow(prefs.getString(SUMMARIZER, null) ?: ModelCatalog.summarizers.last().id)
     /** Id of the model the user wants summaries written by. */
     val summarizer: StateFlow<String> = _summarizer
 
@@ -59,12 +55,41 @@ class Settings(context: Context) {
     }
 
     private val _microphone = MutableStateFlow(prefs.getString(MICROPHONE, MIC_AUTO)!!)
-    /** Which microphone to record from: [MIC_AUTO], [MIC_PHONE] or [MIC_BLUETOOTH]. */
+    /**
+     * Which microphone to record from: [MIC_AUTO], or a key naming one input (see [micKey]). A
+     * remembered microphone that is not connected falls back to automatic for that recording.
+     */
     val microphone: StateFlow<String> = _microphone
 
     fun setMicrophone(choice: String) {
         prefs.edit { putString(MICROPHONE, choice) }
         _microphone.value = choice
+    }
+
+    private val _shareWithPicker = MutableStateFlow(prefs.getBoolean(PICKER, true))
+    /** Show the library in the system file picker, so other apps can be handed a recording the user picks. */
+    val shareWithPicker: StateFlow<Boolean> = _shareWithPicker
+
+    fun setShareWithPicker(on: Boolean) {
+        prefs.edit { putBoolean(PICKER, on) }
+        _shareWithPicker.value = on
+    }
+
+    private val _searches = MutableStateFlow(prefs.getString(SEARCHES, "")!!.split('\n').filter { it.isNotBlank() })
+    /** Recent searches, newest first. */
+    val searches: StateFlow<List<String>> = _searches
+
+    fun rememberSearch(query: String) {
+        val clean = query.trim()
+        if (clean.length < 2) return
+        saveSearches((listOf(clean) + _searches.value.filterNot { it.equals(clean, ignoreCase = true) }).take(MAX_SEARCHES))
+    }
+
+    fun forgetSearch(query: String) = saveSearches(_searches.value - query)
+
+    private fun saveSearches(list: List<String>) {
+        prefs.edit { putString(SEARCHES, list.joinToString("\n")) }
+        _searches.value = list
     }
 
     private val packages = context.packageManager
@@ -88,14 +113,19 @@ class Settings(context: Context) {
         _plainName.value = on
     }
 
-    /** The large model wants about a gigabyte of headroom; phones sold as "6 GB" report roughly 5.5. */
-    fun recommendedQuality(): String = if (totalRamBytes >= 5L * 1024 * 1024 * 1024) "best" else "light"
+    /** The best model is the default everywhere. A phone short on memory can pick the lighter one. */
+    fun recommendedQuality(): String = "best"
 
     companion object {
         /** Whatever Android routes to: a wired or USB headset microphone if one is plugged in, else the phone's. */
         const val MIC_AUTO = "auto"
-        const val MIC_PHONE = "phone"
-        const val MIC_BLUETOOTH = "bluetooth"
+
+        /** A stable name for an input. Device ids change between connections; its kind and product name do not. */
+        fun micKey(device: AudioDeviceInfo): String = "${device.type}:${device.productName}"
+
+        private const val PICKER = "share_with_picker"
+        private const val SEARCHES = "searches"
+        private const val MAX_SEARCHES = 8
 
         private const val SPEAKERS = "speaker_labels"
         private const val MICROPHONE = "microphone"

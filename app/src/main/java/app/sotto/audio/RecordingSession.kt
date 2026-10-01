@@ -111,6 +111,13 @@ class RecordingSession(
     /** Name of the microphone in use ("Phone", "Pixel Buds"), or null if unknown. */
     val inputName: String? get() = (activeSource as? MicSource)?.inputName
 
+    /** Switches microphone mid-recording. Null lets Android choose. Does nothing for a source that is not a microphone. */
+    fun selectInput(device: android.media.AudioDeviceInfo?) {
+        (activeSource as? MicSource)?.select(device)
+    }
+
+    val usesMicrophone: Boolean get() = activeSource is MicSource
+
     private fun capture() {
         var source: PcmSource? = null
         var encoder: AacWriter? = null

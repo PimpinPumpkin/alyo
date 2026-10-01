@@ -2,7 +2,6 @@ package app.sotto.service
 
 import android.content.Context
 import android.content.Intent
-import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import androidx.core.content.ContextCompat
 import app.sotto.asr.AsrEngine
@@ -60,11 +59,9 @@ class RecorderController(
         var mic: MicSource? = null
         val openSource: () -> PcmSource = if (wav != null) ({ WavFileSource(wav) }) else ({
             MicSource(context) { inputs ->
-                when (settings.microphone.value) {
-                    Settings.MIC_PHONE -> inputs.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }
-                    Settings.MIC_BLUETOOTH -> inputs.firstOrNull { it.type in MicSource.BLUETOOTH_TYPES }
-                    else -> null
-                }
+                // The remembered microphone if it is connected; otherwise leave it to Android.
+                val wanted = settings.microphone.value
+                if (wanted == Settings.MIC_AUTO) null else inputs.firstOrNull { Settings.micKey(it) == wanted }
             }.also { mic = it }
         })
         engine.retain()

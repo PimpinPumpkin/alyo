@@ -59,6 +59,9 @@ class Exporter(private val context: Context, private val store: RecordingStore) 
         return written
     }
 
+    /** The transcript as a text file, for handing to another app through the file picker. */
+    fun textFile(meta: RecordingMeta): File = render(meta, ExportFormat.TEXT)
+
     private fun render(meta: RecordingMeta, format: ExportFormat): File {
         exports.mkdirs()
         val target = File(exports, safeName(meta.title) + "." + format.extension)

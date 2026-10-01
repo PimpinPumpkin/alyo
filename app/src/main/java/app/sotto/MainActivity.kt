@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
@@ -114,7 +115,7 @@ private object Routes {
     const val SETUP = "setup"
     const val SETTINGS = "settings"
     const val LICENSES = "licenses"
-    fun player(id: String, autoplay: Boolean = false) = "player/$id/$autoplay"
+    fun player(id: String, autoplay: Boolean = false, find: String = "") = "player/$id/$autoplay/${Uri.encode(find)}"
     fun crop(id: String) = "crop/$id"
 }
 
@@ -234,6 +235,7 @@ private fun App(app: SottoApp, debugWav: File?, recordRequested: Boolean, onReco
                 app = app,
                 id = parts[1],
                 autoplay = parts.getOrNull(2) == "true",
+                find = Uri.decode(parts.getOrNull(3).orEmpty()),
                 onBack = ::pop,
                 onCrop = { push(Routes.crop(parts[1])) },
                 onSettings = { push(Routes.SETTINGS) },
@@ -248,7 +250,7 @@ private fun App(app: SottoApp, debugWav: File?, recordRequested: Boolean, onReco
             Routes.LICENSES -> LicensesScreen(onBack = ::pop)
             else -> HomeScreen(
                 app = app,
-                onOpen = { id, autoplay -> push(Routes.player(id, autoplay)) },
+                onOpen = { id, autoplay, find -> push(Routes.player(id, autoplay, find)) },
                 onRecord = { startRecording() },
                 onReturnToRecording = { push(Routes.RECORD) },
                 onSettings = { push(Routes.SETTINGS) },

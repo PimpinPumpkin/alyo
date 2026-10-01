@@ -1,10 +1,12 @@
 package app.sotto.ui.screens
 
+import app.sotto.export.LibraryProvider
+import androidx.compose.material.icons.rounded.FolderShared
+import android.provider.DocumentsContract
 import app.sotto.data.Settings
 import app.sotto.data.Backup
 import androidx.compose.material.icons.rounded.Unarchive
 import androidx.compose.material.icons.rounded.RecordVoiceOver
-import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Archive
 import android.content.ActivityNotFoundException
 import android.content.ClipData
@@ -112,6 +114,7 @@ fun SettingsScreen(app: SottoApp, onDone: () -> Unit, onLicenses: () -> Unit, on
     val context = LocalContext.current
     val plainName by app.settings.plainName.collectAsState()
     val autoTitle by app.settings.autoTitle.collectAsState()
+    val sharePicker by app.settings.shareWithPicker.collectAsState()
 
     Column(Modifier.fillMaxSize().background(colors.surface).statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -122,12 +125,11 @@ fun SettingsScreen(app: SottoApp, onDone: () -> Unit, onLicenses: () -> Unit, on
             SectionTitle("Transcription")
             ModelChooser(app, onReady = null, readyLabel = "")
 
-            SectionTitle("Summaries")
+            SectionTitle("Summaries (experimental)")
             SummaryModelChooser(app)
 
             SectionTitle("Recordings")
             val speakerLabels by app.settings.speakerLabels.collectAsState()
-            val microphone by app.settings.microphone.collectAsState()
             val states by app.models.states.collectAsState()
             val speakerState = states[ModelCatalog.speakers.id] ?: InstallState.Missing
             SheetGroup(
@@ -151,19 +153,6 @@ fun SettingsScreen(app: SottoApp, onDone: () -> Unit, onLicenses: () -> Unit, on
                         },
                     ),
                     SheetRow(
-                        Icons.Rounded.Mic,
-                        "Microphone",
-                        detail = when (microphone) {
-                            Settings.MIC_PHONE -> "Always the phone's own"
-                            Settings.MIC_BLUETOOTH -> "Bluetooth headset when one is connected"
-                            else -> "Automatic: a plugged-in headset if there is one"
-                        },
-                        onClick = {
-                            val order = listOf(Settings.MIC_AUTO, Settings.MIC_PHONE, Settings.MIC_BLUETOOTH)
-                            app.settings.setMicrophone(order[(order.indexOf(microphone) + 1) % order.size])
-                        },
-                    ),
-                    SheetRow(
                         Icons.Rounded.AutoAwesome,
                         "Name recordings by topic",
                         detail = "Adds what was talked about to the title",
@@ -179,6 +168,17 @@ fun SettingsScreen(app: SottoApp, onDone: () -> Unit, onLicenses: () -> Unit, on
             SectionTitle("App")
             SheetGroup(
                 listOfNotNull(
+                    SheetRow(
+                        Icons.Rounded.FolderShared,
+                        "Show in the file picker",
+                        detail = "Other apps can open a recording you pick, and only that one",
+                        trailing = { Switch(checked = sharePicker, onCheckedChange = null) },
+                        onClick = {
+                            app.settings.setShareWithPicker(!sharePicker)
+                            // Tell the system picker its list of places has changed.
+                            context.contentResolver.notifyChange(DocumentsContract.buildRootsUri(context.packageName + LibraryProvider.AUTHORITY_SUFFIX), null)
+                        },
+                    ),
                     SheetRow(
                         Icons.Rounded.Badge,
                         "Show as \"Recorder\"",
@@ -294,7 +294,7 @@ private fun ModelChooser(app: SottoApp, onReady: (() -> Unit)?, readyLabel: Stri
                 val size = formatBytes(pack.live.source.downloadBytes + option.refiner.source.downloadBytes)
                 SheetRow(
                     icon = if (option.id == "best") Icons.Rounded.HighQuality else Icons.Rounded.Speed,
-                    label = option.title + if (option.id == app.settings.recommendedQuality()) "  ·  suits this phone" else "",
+                    label = option.title,
                     detail = (if (installed) "Ready" else size) + "  ·  " + option.summary,
                     enabled = !downloading,
                     trailing = {

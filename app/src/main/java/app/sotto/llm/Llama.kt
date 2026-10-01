@@ -26,10 +26,12 @@ class Llama private constructor(private var handle: Long) : AutoCloseable {
      *
      * @param opening words the reply is made to begin with. Small models drift from a requested
      *   format; starting the answer for them is the reliable way to hold them to it.
+     * @param grammar rules in llama.cpp's GBNF form that the rest of the reply must follow, or
+     *   empty for free text. Unlike instructions, a grammar cannot be ignored.
      * @return the reply, or null if it was cancelled
      * @throws IllegalStateException if the prompt does not fit the context or decoding failed
      */
-    fun generate(system: String, user: String, maxTokens: Int, opening: String = "", listener: Listener = object : Listener {}): String? {
+    fun generate(system: String, user: String, maxTokens: Int, opening: String = "", grammar: String = "", listener: Listener = object : Listener {}): String? {
         val bytes = ByteArrayOutputStream()
         bytes.write(opening.toByteArray())
         val sink = object : Sink {
@@ -39,7 +41,7 @@ class Llama private constructor(private var handle: Long) : AutoCloseable {
                 listener.onText(bytes.toString(Charsets.UTF_8).trimEnd('�'))
             }
         }
-        return when (val code = nativeGenerate(handle, system, user, opening, maxTokens, sink)) {
+        return when (val code = nativeGenerate(handle, system, user, opening, grammar, maxTokens, sink)) {
             0 -> bytes.toString(Charsets.UTF_8)
             1 -> null
             -2 -> error("The text is too long for the model in one go")
@@ -74,7 +76,7 @@ class Llama private constructor(private var handle: Long) : AutoCloseable {
 
         @JvmStatic private external fun nativeLoad(path: String, contextTokens: Int, threads: Int): Long
         @JvmStatic private external fun nativeCountTokens(handle: Long, text: String): Int
-        @JvmStatic private external fun nativeGenerate(handle: Long, system: String, user: String, opening: String, maxTokens: Int, sink: Sink): Int
+        @JvmStatic private external fun nativeGenerate(handle: Long, system: String, user: String, opening: String, grammar: String, maxTokens: Int, sink: Sink): Int
         @JvmStatic private external fun nativeCancel(handle: Long)
         @JvmStatic private external fun nativeFree(handle: Long)
     }

@@ -100,6 +100,9 @@ fun SummarySheet(app: SottoApp, id: String, onDismiss: () -> Unit, onGetModel: (
                     Text(current.title.ifBlank { "Summary" }, style = MaterialTheme.typography.headlineSmall)
                     Spacer(Modifier.height(16.dp))
                     Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                        if (current.points.isEmpty()) {
+                            Text("This one is short enough to read as it is, so it only got a title.", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(bottom = 12.dp))
+                        }
                         for (point in current.points) {
                             Row(Modifier.padding(bottom = 12.dp)) {
                                 Text("•", style = MaterialTheme.typography.bodyLarge, color = colors.primary, modifier = Modifier.width(20.dp))

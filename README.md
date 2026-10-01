@@ -18,8 +18,9 @@ no cloud.
 - **Widget, quick settings tile and launcher shortcut** to start recording in one tap.
 - **Pauses for phone calls** and resumes by itself afterwards.
 - **Marks music, applause and laughter** in the waveform and the transcript.
-- **Search** across titles and every word of every transcript, and within one transcript with
-  jump-to-match.
+- **Search** across titles and every word of every transcript, with a history you can prune.
+  Opening a result highlights every match in it.
+- **Shows up in the system file picker**, so another app can be handed a recording you pick.
 - **Background playback** with lock screen and notification controls.
 - **Summaries.** A small language model on the phone writes a title and the key points. Optional.
 - **Names recordings by topic** once the transcript is in.
@@ -76,6 +77,11 @@ notes. Measured on a Pixel 4a 5G:
 | --- | --- | --- | --- |
 | Quick (Qwen2.5 0.5B) | 676 MB | about 49 tokens a second | about 16 |
 | Thorough (Qwen2.5 1.5B) | 1.1 GB | about 11 tokens a second | about 7 |
+
+The reply is held to a shape by a grammar rather than by asking nicely: a title of a few plain
+words, then one to five single sentences, the count set by how long the recording is. A recording
+under 80 words gets a title only. Small models still make mistakes of fact, so the feature is
+marked experimental.
 
 A minute of speech is roughly 200 tokens, so on that phone Quick reads a ten-minute recording in
 well under a minute and Thorough takes about three. Any other chat model in GGUF form can be

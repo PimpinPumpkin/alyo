@@ -1,5 +1,20 @@
 package app.sotto.ui.screens
 
+import kotlinx.coroutines.delay
+import app.sotto.ui.components.SheetRow
+import app.sotto.ui.components.SheetGroup
+import app.sotto.data.Settings
+import app.sotto.audio.MicSource
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.produceState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.RepeatMode
@@ -109,6 +124,8 @@ fun RecordScreen(app: SottoApp, session: RecordingSession, onMinimize: () -> Uni
             Spacer(Modifier.width(48.dp))
         }
 
+        MicrophoneChip(app, session, Modifier.align(Alignment.CenterHorizontally).padding(bottom = 8.dp))
+
         AdaptivePane(content = {
         ContentCard(Modifier.weight(1f)) {
             AnimatedContent(showTranscript, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "tab") { transcript ->
@@ -179,6 +196,54 @@ fun RecordScreen(app: SottoApp, session: RecordingSession, onMinimize: () -> Uni
             },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Keep recording") } },
         )
+    }
+}
+
+/** Says which microphone is being recorded from; tap to choose another, or let Android decide. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MicrophoneChip(app: SottoApp, session: RecordingSession, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val colors = MaterialTheme.colorScheme
+    var choosing by remember { mutableStateOf(false) }
+    val chosen by app.settings.microphone.collectAsState()
+    // Asked once a second: plugging in a headset changes the answer without the app being told.
+    val name by produceState<String?>(null, session) {
+        while (true) {
+            value = session.inputName
+            delay(1000)
+        }
+    }
+    val current = name ?: return
+    Surface(onClick = { choosing = true }, shape = CircleShape, color = colors.surfaceContainerHigh, modifier = modifier) {
+        Row(Modifier.padding(start = 12.dp, end = 14.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.Mic, null, Modifier.size(16.dp), tint = colors.onSurfaceVariant)
+            Spacer(Modifier.width(6.dp))
+            Text(current, style = MaterialTheme.typography.labelLarge, color = colors.onSurfaceVariant)
+        }
+    }
+    if (choosing) {
+        val inputs = remember { MicSource.inputs(context) }
+        ModalBottomSheet(onDismissRequest = { choosing = false }, containerColor = colors.surfaceContainerLow) {
+            Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
+                Text("Microphone", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 12.dp, bottom = 16.dp))
+                SheetGroup(
+                    listOf(
+                        SheetRow(Icons.Rounded.AutoAwesome, "Automatic", detail = "A plugged-in headset if there is one", trailing = { RadioButton(chosen == Settings.MIC_AUTO, onClick = null) }) {
+                            app.settings.setMicrophone(Settings.MIC_AUTO)
+                            session.selectInput(null)
+                            choosing = false
+                        },
+                    ) + inputs.map { device ->
+                        SheetRow(Icons.Rounded.Mic, MicSource.label(device), trailing = { RadioButton(chosen == Settings.micKey(device), onClick = null) }) {
+                            app.settings.setMicrophone(Settings.micKey(device))
+                            session.selectInput(device)
+                            choosing = false
+                        }
+                    },
+                )
+            }
+        }
     }
 }
 

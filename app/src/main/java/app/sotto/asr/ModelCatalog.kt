@@ -144,7 +144,7 @@ object ModelCatalog {
             Quality(
                 id = "best",
                 title = "Best",
-                summary = "Most accurate. For phones with 6 GB or more.",
+                summary = "Most accurate. Uses about 1 GB of memory while recording.",
                 refiner = enParakeetLarge,
             ),
             Quality(
@@ -175,12 +175,12 @@ object ModelCatalog {
      */
     val summarizers: List<ModelSpec> = listOf(
         gguf(
-            "llm-qwen2.5-0.5b", "Quick", "Fast on any phone. Gets the gist; can miss detail.",
+            "llm-qwen2.5-0.5b", "Quick", "Four times faster. Gets the gist; can miss detail.",
             "Qwen/Qwen2.5-0.5B-Instruct-GGUF", "qwen2.5-0.5b-instruct-q8_0.gguf", 675_710_816,
             "ca59ca7f13d0e15a8cfa77bd17e65d24f6844b554a7b6c12e07a5f89ff76844e",
         ),
         gguf(
-            "llm-qwen2.5-1.5b", "Thorough", "Better summaries, four times slower. For recent phones.",
+            "llm-qwen2.5-1.5b", "Thorough", "The better summaries. Slow on older phones.",
             "Qwen/Qwen2.5-1.5B-Instruct-GGUF", "qwen2.5-1.5b-instruct-q4_k_m.gguf", 1_117_320_736,
             "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e",
         ),
