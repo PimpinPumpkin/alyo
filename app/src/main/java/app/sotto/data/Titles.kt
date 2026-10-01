@@ -40,6 +40,9 @@ object Titles {
             "that their theirs them themselves then there these they thing things think this those though through today together took toward " +
             "under until upon used very want wants well went were what whatever when where whether which while whom whose will with within without " +
             "would yeah year years yours yourself actually basically definitely probably literally first second third last people time times " +
-            "start started back come comes came called lets great good thought"
+            "start started back come comes came called lets great good thought " +
+            // Dates are capitalized like names but say when, not what.
+            "january february march april june july august september october november december " +
+            "monday tuesday wednesday thursday friday saturday sunday tomorrow yesterday tonight week weeks month months"
         ).split(' ').toHashSet()
 }
