@@ -85,7 +85,7 @@ private fun ToggleCell(icon: ImageVector, label: String, selected: Boolean, size
     }
 }
 
-/** The wide Play / Pause pill at the centre of the transport row. */
+/** The wide Play / Pause pill at the center of the transport row. */
 @Composable
 fun RowScope.PlayPill(playing: Boolean, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme

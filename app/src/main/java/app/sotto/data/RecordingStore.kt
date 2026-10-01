@@ -199,7 +199,7 @@ class RecordingStore(context: Context) {
         val saved = runCatching { json.decodeFromString<RecordingMeta>(metaFile(id).readText()) }.getOrNull()
         // Nothing is still refining after a restart, whatever the file says.
         if (saved != null) return saved.copy(pendingRefine = 0)
-        // The app died between finalising the audio and writing its metadata: rebuild what we can.
+        // The app died between finalizing the audio and writing its metadata: rebuild what we can.
         val modified = audio(id).lastModified()
         return RecordingMeta(id, Titles.forDate(modified), modified, M4a.durationMs(audio(id)))
     }

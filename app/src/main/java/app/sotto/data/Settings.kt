@@ -1,7 +1,9 @@
 package app.sotto.data
 
 import android.app.ActivityManager
+import android.content.ComponentName
 import android.content.Context
+import android.content.pm.PackageManager
 import androidx.core.content.edit
 import app.sotto.asr.LanguagePack
 import app.sotto.asr.ModelCatalog
@@ -27,6 +29,27 @@ class Settings(context: Context) {
     fun setQuality(id: String) {
         prefs.edit { putString(QUALITY, id) }
         _quality.value = id
+    }
+
+    private val packages = context.packageManager
+    private val named = ComponentName(context, "app.sotto.LauncherNamed")
+    private val plain = ComponentName(context, "app.sotto.LauncherPlain")
+
+    private val _plainName = MutableStateFlow(packages.getComponentEnabledSetting(plain) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
+    /** Whether the launcher shows the app as plain "Recorder" instead of "Sotto Recorder". */
+    val plainName: StateFlow<Boolean> = _plainName
+
+    /** Swaps which launcher entry exists. Launchers can take a few seconds to notice. */
+    fun setPlainName(on: Boolean) {
+        fun set(component: ComponentName, enabled: Boolean) = packages.setComponentEnabledSetting(
+            component,
+            if (enabled) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+            PackageManager.DONT_KILL_APP,
+        )
+        // Enable the new one before disabling the old, so there is never a moment with no icon.
+        set(if (on) plain else named, true)
+        set(if (on) named else plain, false)
+        _plainName.value = on
     }
 
     /** The large model wants about a gigabyte of headroom; phones sold as "6 GB" report roughly 5.5. */

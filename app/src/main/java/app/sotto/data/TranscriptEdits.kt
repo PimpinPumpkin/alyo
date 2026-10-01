@@ -52,7 +52,7 @@ fun Segment.withText(text: String): Segment? {
     fun fill(untilOld: Int, untilNew: Int, nextAnchorStart: Int) {
         val count = untilNew - j
         if (count > 0) {
-            // The audio the replaced words covered, or the gap between neighbours for a pure insertion.
+            // The audio the replaced words covered, or the gap between neighbors for a pure insertion.
             val from = if (untilOld > i) words[i].startMs else cursor
             val to = maxOf(if (untilOld > i) words[untilOld - 1].endMs else nextAnchorStart, from + count)
             val step = (to - from).toFloat() / count

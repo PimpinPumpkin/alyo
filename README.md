@@ -1,4 +1,4 @@
-# Sotto
+# Sotto Recorder
 
 A voice recorder for Android that transcribes as you speak, entirely on the phone. It is a
 free-software take on Google's Recorder: same idea, same feel, no Google services, no account,
@@ -116,7 +116,7 @@ two are punctuated as one sentence.
 - Model downloads do not run as a foreground service, so a very long download can be interrupted
   if the app is swiped away. It resumes where it stopped the next time the app opens.
 
-## Licences
+## Licenses
 
 Sotto is licensed under the GNU General Public License v3.0; see [LICENSE](LICENSE).
 

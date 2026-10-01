@@ -282,7 +282,7 @@ private fun RecordingCard(
                     Text(meta.title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                     if (meta.starred) {
                         Spacer(Modifier.width(8.dp))
-                        Icon(Icons.Rounded.Star, "Favourite", tint = colors.primary, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Rounded.Star, "Favorite", tint = colors.primary, modifier = Modifier.size(20.dp))
                     }
                 }
                 IconButton(onClick = onPlay) { Icon(Icons.Rounded.PlayArrow, "Play ${meta.title}", Modifier.size(32.dp)) }

@@ -76,10 +76,10 @@ import kotlinx.coroutines.launch
 /**
  * Saving or deleting ends the session, and the screen closes itself when the session is gone.
  *
- * @param onMinimise leave the screen with the recording still running
+ * @param onMinimize leave the screen with the recording still running
  */
 @Composable
-fun RecordScreen(app: SottoApp, session: RecordingSession, onMinimise: () -> Unit) {
+fun RecordScreen(app: SottoApp, session: RecordingSession, onMinimize: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val paused by session.paused.collectAsState()
     val segments by session.segments.collectAsState()
@@ -98,13 +98,13 @@ fun RecordScreen(app: SottoApp, session: RecordingSession, onMinimise: () -> Uni
         app.scope.launch { app.recorder.stop() }
     }
 
-    BackHandler(onBack = onMinimise)
+    BackHandler(onBack = onMinimize)
     // A finite source (the debug WAV) running dry ends the recording the way pressing Save would.
     LaunchedEffect(sourceEnded) { if (sourceEnded) save() }
 
     Column(Modifier.fillMaxSize().background(colors.surface).statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onMinimise) { Icon(Icons.Rounded.KeyboardArrowDown, "Keep recording in the background") }
+            IconButton(onClick = onMinimize) { Icon(Icons.Rounded.KeyboardArrowDown, "Keep recording in the background") }
             TitleField(title, onChange = { session.title.value = it }, modifier = Modifier.weight(1f))
             Spacer(Modifier.width(48.dp))
         }

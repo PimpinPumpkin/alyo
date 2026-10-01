@@ -24,12 +24,36 @@
             android:exported="true"
             android:launchMode="singleTask"
             android:screenOrientation="portrait"
-            android:windowSoftInputMode="adjustResize">
+            android:windowSoftInputMode="adjustResize" />
+
+        <!--
+            The launcher entry is one of these two aliases, never the activity itself, so its
+            label can be switched from Settings: enabling one and disabling the other is the only
+            way Android lets an app change the name under its own icon.
+        -->
+        <activity-alias
+            android:name=".LauncherNamed"
+            android:enabled="true"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".LauncherPlain"
+            android:enabled="false"
+            android:exported="true"
+            android:label="@string/app_name_plain"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
 
         <service
             android:name=".service.RecordingService"

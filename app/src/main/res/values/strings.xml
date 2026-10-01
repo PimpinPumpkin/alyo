@@ -1,3 +1,5 @@
 <resources>
-    <string name="app_name">Sotto</string>
+    <string name="app_name">Sotto Recorder</string>
+    <!-- The launcher label when "Show as Recorder" is on. -->
+    <string name="app_name_plain">Recorder</string>
 </resources>

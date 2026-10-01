@@ -126,7 +126,7 @@ class RecordingService : LifecycleService() {
 
     private fun createChannel() {
         val channel = NotificationChannel(CHANNEL, "Recording", NotificationManager.IMPORTANCE_LOW).apply {
-            description = "Shown while Sotto is recording"
+            description = "Shown while Sotto Recorder is recording"
             setShowBadge(false)
         }
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)

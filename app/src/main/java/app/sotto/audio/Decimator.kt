@@ -39,7 +39,7 @@ class Decimator(private val factor: Int = AudioSpec.DECIMATION) {
     private companion object {
         const val TAPS = 63
 
-        /** Hamming-windowed sinc, normalised to unity gain at DC. [cutoff] is in cycles per input sample. */
+        /** Hamming-windowed sinc, normalized to unity gain at DC. [cutoff] is in cycles per input sample. */
         fun design(n: Int, cutoff: Float): FloatArray {
             val mid = (n - 1) / 2.0
             val h = DoubleArray(n) { i ->

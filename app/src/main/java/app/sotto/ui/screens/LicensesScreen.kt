@@ -30,7 +30,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import app.sotto.BuildConfig
 
-private class Credit(val name: String, val by: String, val licence: String, val use: String, val url: String)
+private class Credit(val name: String, val by: String, val license: String, val use: String, val url: String)
 
 /**
  * Everything Sotto is built from. The speech models are CC BY 4.0, which makes naming their
@@ -50,22 +50,22 @@ private val CREDITS = listOf(
 )
 
 @Composable
-fun LicencesScreen(onBack: () -> Unit) {
+fun LicensesScreen(onBack: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val context = LocalContext.current
     Column(Modifier.fillMaxSize().background(colors.surface).statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") }
-            Text("Open-source licences", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 8.dp))
+            Text("Open-source licenses", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = 8.dp))
         }
         LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp)) {
             item {
                 Column(Modifier.padding(horizontal = 8.dp, vertical = 12.dp)) {
-                    Text("Sotto ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.headlineSmall)
+                    Text("Sotto Recorder ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.headlineSmall)
                     Spacer(Modifier.height(6.dp))
                     Text(
                         "Free software under the GNU General Public License, version 3. You may use, study, share and change it; " +
-                            "changed versions you pass on must stay under the same licence. It comes with no warranty.",
+                            "changed versions you pass on must stay under the same license. It comes with no warranty.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = colors.onSurfaceVariant,
                     )
@@ -82,14 +82,14 @@ fun LicencesScreen(onBack: () -> Unit) {
                 ) {
                     Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
                         Text(credit.name, style = MaterialTheme.typography.titleMedium)
-                        Text("${credit.by}  ·  ${credit.licence}", style = MaterialTheme.typography.bodyMedium, color = colors.primary)
+                        Text("${credit.by}  ·  ${credit.license}", style = MaterialTheme.typography.bodyMedium, color = colors.primary)
                         Text(credit.use, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
                     }
                 }
             }
             item {
                 Text(
-                    "Sotto is not affiliated with or endorsed by Google or NVIDIA.",
+                    "Sotto Recorder is not affiliated with or endorsed by Google or NVIDIA.",
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),

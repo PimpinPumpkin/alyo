@@ -104,7 +104,7 @@ private val SPEEDS = listOf(1f, 1.25f, 1.5f, 2f, 0.5f, 0.75f)
 private fun nextSpeed(current: Float): Float = SPEEDS[(SPEEDS.indexOf(current) + 1).mod(SPEEDS.size)]
 
 /**
- * Word times mark where the model first recognised a word, which is a touch after its onset, so
+ * Word times mark where the model first recognized a word, which is a touch after its onset, so
  * jumping to exactly that time clips the first sound. Jumps land this much early, and the
  * highlight runs the same amount ahead so the tapped word is still the one lit.
  */
@@ -182,7 +182,7 @@ fun PlayerScreen(
                 IconButton(onClick = { app.store.setStarred(id, !meta.starred) }) {
                     Icon(
                         if (meta.starred) Icons.Rounded.Star else Icons.Rounded.StarBorder,
-                        if (meta.starred) "Remove from favourites" else "Add to favourites",
+                        if (meta.starred) "Remove from favorites" else "Add to favorites",
                         tint = if (meta.starred) colors.primary else colors.onSurface,
                     )
                 }

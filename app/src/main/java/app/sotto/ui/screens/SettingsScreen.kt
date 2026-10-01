@@ -1,5 +1,10 @@
 package app.sotto.ui.screens
 
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -26,6 +31,8 @@ import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Badge
+import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -36,6 +43,7 @@ import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.toShape
@@ -44,12 +52,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import app.sotto.BuildConfig
 import app.sotto.SottoApp
 import app.sotto.asr.InstallState
 import app.sotto.asr.ModelSpec
 import app.sotto.asr.Quality
+import app.sotto.ui.components.SheetGroup
+import app.sotto.ui.components.SheetRow
 import app.sotto.ui.formatBytes
 
 /**
@@ -57,7 +68,7 @@ import app.sotto.ui.formatBytes
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun SettingsScreen(app: SottoApp, firstRun: Boolean, onDone: () -> Unit, onLicences: () -> Unit = {}) {
+fun SettingsScreen(app: SottoApp, firstRun: Boolean, onDone: () -> Unit, onLicenses: () -> Unit = {}) {
     val colors = MaterialTheme.colorScheme
     val states by app.models.states.collectAsState()
     val qualityId by app.settings.quality.collectAsState()
@@ -90,7 +101,7 @@ fun SettingsScreen(app: SottoApp, firstRun: Boolean, onDone: () -> Unit, onLicen
             Text(if (firstRun) "Transcribe as you speak" else "Transcription", style = MaterialTheme.typography.headlineLarge)
             Spacer(Modifier.height(12.dp))
             Text(
-                "Sotto writes down what it hears while you record, and it does it on this phone. " +
+                "Sotto Recorder writes down what it hears while you record, and it does it on this phone. " +
                     "That needs a speech model, downloaded once. After that nothing leaves the device and no connection is needed.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = colors.onSurfaceVariant,
@@ -121,23 +132,40 @@ fun SettingsScreen(app: SottoApp, firstRun: Boolean, onDone: () -> Unit, onLicen
                 Icon(Icons.Rounded.CloudOff, null, tint = colors.onSurfaceVariant, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    "Recordings and transcripts are stored only in this app. The download is the only time Sotto goes online.",
+                    "Recordings and transcripts are stored only in this app. The download is the only time it goes online.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.onSurfaceVariant,
                 )
             }
             if (!firstRun) {
-                Spacer(Modifier.height(20.dp))
-                Surface(onClick = onLicences, shape = RoundedCornerShape(24.dp), color = colors.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(horizontal = 20.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.Info, null, tint = colors.onSurfaceVariant)
-                        Spacer(Modifier.width(16.dp))
-                        Column {
-                            Text("Open-source licences", style = MaterialTheme.typography.titleMedium)
-                            Text("Sotto ${BuildConfig.VERSION_NAME}, and what it is built from", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
-                        }
-                    }
-                }
+                val plainName by app.settings.plainName.collectAsState()
+                val context = LocalContext.current
+                Spacer(Modifier.height(28.dp))
+                Text("App", style = MaterialTheme.typography.titleSmall, color = colors.primary)
+                Spacer(Modifier.height(12.dp))
+                SheetGroup(
+                    listOf(
+                        SheetRow(
+                            Icons.Rounded.Badge,
+                            "Show as \"Recorder\"",
+                            detail = "Use the plain name on the home screen",
+                            trailing = { Switch(checked = plainName, onCheckedChange = null) },
+                            onClick = { app.settings.setPlainName(!plainName) },
+                        ),
+                        SheetRow(
+                            Icons.Rounded.Favorite,
+                            "Support Sotto Recorder",
+                            detail = "Free and ad-free. A donation is welcome, never needed.",
+                            onClick = { open(context, DONATE_URL) },
+                        ),
+                        SheetRow(
+                            Icons.Rounded.Info,
+                            "Open-source licenses",
+                            detail = "Version ${BuildConfig.VERSION_NAME}, and what it is built from",
+                            onClick = onLicenses,
+                        ),
+                    ),
+                )
             }
             Spacer(Modifier.height(24.dp))
         }
@@ -244,5 +272,15 @@ private fun QualityCard(
                 }
             }
         }
+    }
+}
+
+private const val DONATE_URL = "https://buymeacoffee.com/PimpinPumpkin"
+
+private fun open(context: Context, url: String) {
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    } catch (e: ActivityNotFoundException) {
+        Toast.makeText(context, "No browser installed to open the page", Toast.LENGTH_SHORT).show()
     }
 }

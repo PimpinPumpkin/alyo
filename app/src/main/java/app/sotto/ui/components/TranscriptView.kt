@@ -146,7 +146,7 @@ fun paragraphsOf(segments: List<Segment>): List<Paragraph> {
         words += segment.words.size
     }
     if (current.isNotEmpty()) out += Paragraph(current)
-    // Second pass so each paragraph knows its neighbours; a selection uses that to decide whether
+    // Second pass so each paragraph knows its neighbors; a selection uses that to decide whether
     // it starts or ends here or merely passes through.
     return out.mapIndexed { i, p -> Paragraph(p.segments, previousEndMs = out.getOrNull(i - 1)?.endMs, nextStartMs = out.getOrNull(i + 1)?.startMs) }
 }
@@ -222,12 +222,12 @@ private fun ParagraphBlock(
                 if (active >= 0 && match.first < paragraph.wordEnd(active) && match.last >= paragraph.wordStart(active)) continue
                 addStyle(SpanStyle(background = colors.tertiaryContainer, color = colors.onTertiaryContainer), match.first, match.last + 1)
             }
-            // The box behind the active word is drawn by hand below; here only its text colour flips.
+            // The box behind the active word is drawn by hand below; here only its text color flips.
             if (active >= 0) addStyle(SpanStyle(color = colors.onPrimary), paragraph.wordStart(active), paragraph.wordEnd(active))
         }.toAnnotatedString()
     }
     val activeBox = colors.primary
-    // Opaque, because the box is a fill plus a stroke and a translucent colour would show the overlap.
+    // Opaque, because the box is a fill plus a stroke and a translucent color would show the overlap.
     val selectedBox = colors.outlineVariant
     val handleColor = colors.inverseSurface
 

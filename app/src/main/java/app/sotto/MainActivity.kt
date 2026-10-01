@@ -45,7 +45,7 @@ import app.sotto.data.RecordingMeta
 import app.sotto.ui.screens.CropScreen
 import app.sotto.ui.screens.ShareSheet
 import app.sotto.ui.screens.HomeScreen
-import app.sotto.ui.screens.LicencesScreen
+import app.sotto.ui.screens.LicensesScreen
 import app.sotto.ui.screens.PlayerScreen
 import app.sotto.ui.screens.RecordScreen
 import app.sotto.ui.screens.SettingsScreen
@@ -94,7 +94,7 @@ private object Routes {
     const val RECORD = "record"
     const val SETUP = "setup"
     const val SETTINGS = "settings"
-    const val LICENCES = "licences"
+    const val LICENSES = "licenses"
     fun player(id: String, autoplay: Boolean = false) = "player/$id/$autoplay"
     fun crop(id: String) = "crop/$id"
 }
@@ -137,7 +137,7 @@ private fun App(app: SottoApp, debugWav: File?, onDebugWavConsumed: () -> Unit) 
     // Arriving while a recording is running (e.g. from the notification) lands on the record screen.
     LaunchedEffect(session != null) {
         if (session != null && Routes.RECORD !in stack) {
-            // Always directly above the library, so minimising lands where the "Recording" pill is.
+            // Always directly above the library, so minimizing lands where the "Recording" pill is.
             forward = true
             stack.clear()
             stack.add(Routes.HOME)
@@ -152,7 +152,7 @@ private fun App(app: SottoApp, debugWav: File?, onDebugWavConsumed: () -> Unit) 
         if (granted[Manifest.permission.RECORD_AUDIO] == true) {
             app.recorder.start(pendingSource)
         } else {
-            Toast.makeText(context, "Sotto needs the microphone to record", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "Sotto Recorder needs the microphone to record", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -200,7 +200,7 @@ private fun App(app: SottoApp, debugWav: File?, onDebugWavConsumed: () -> Unit) 
         val parts = route.split("/")
         when (parts[0]) {
             Routes.RECORD -> session?.let { active ->
-                RecordScreen(app, active, onMinimise = ::pop)
+                RecordScreen(app, active, onMinimize = ::pop)
             }
             "player" -> PlayerScreen(
                 app = app,
@@ -215,8 +215,8 @@ private fun App(app: SottoApp, debugWav: File?, onDebugWavConsumed: () -> Unit) 
                 if (copy != null) push(Routes.player(copy))
             }
             Routes.SETUP -> SettingsScreen(app, firstRun = true, onDone = ::pop)
-            Routes.SETTINGS -> SettingsScreen(app, firstRun = false, onDone = ::pop, onLicences = { push(Routes.LICENCES) })
-            Routes.LICENCES -> LicencesScreen(onBack = ::pop)
+            Routes.SETTINGS -> SettingsScreen(app, firstRun = false, onDone = ::pop, onLicenses = { push(Routes.LICENSES) })
+            Routes.LICENSES -> LicensesScreen(onBack = ::pop)
             else -> HomeScreen(
                 app = app,
                 onOpen = { id, autoplay -> push(Routes.player(id, autoplay)) },

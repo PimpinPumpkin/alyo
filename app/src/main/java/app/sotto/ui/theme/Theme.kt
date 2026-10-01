@@ -25,7 +25,7 @@ import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import app.sotto.R
 
-/** Colours Material's scheme has no role for: the record red is the same on every wallpaper. */
+/** Colors Material's scheme has no role for: the record red is the same on every wallpaper. */
 @Immutable
 data class SottoColors(val record: Color, val onRecord: Color, val recordContainer: Color, val dark: Boolean = false)
 

@@ -43,9 +43,9 @@ class TranscriptEditsTest {
         val split = segment.withText("the quick dark brown fox")!!
         assertEquals(segment.words[2], split.words[3])
 
-        val replaced = segment.withText("the quick light grey fox")!!
+        val replaced = segment.withText("the quick light gray fox")!!
         assertEquals(Word("light", 2000, 2500), replaced.words[2])
-        assertEquals(Word("grey", 2500, 3000), replaced.words[3])
+        assertEquals(Word("gray", 2500, 3000), replaced.words[3])
     }
 
     @Test

@@ -126,7 +126,7 @@ class Player(private val context: Context, background: Boolean = false) {
     fun load(file: File, title: String = "") {
         val item = MediaItem.Builder()
             .setUri(Uri.fromFile(file))
-            .setMediaMetadata(MediaMetadata.Builder().setTitle(title).setArtist("Sotto").build())
+            .setMediaMetadata(MediaMetadata.Builder().setTitle(title).setArtist("Sotto Recorder").build())
             .build()
         exo.setMediaItem(item)
         exo.prepare()

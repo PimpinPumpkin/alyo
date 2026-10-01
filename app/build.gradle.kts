@@ -28,12 +28,31 @@ android {
         applicationId = "app.sotto"
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        // CI passes -PappVersionCode / -PappVersionName, derived from the workflow run number so
+        // every channel sits on one rising line. Local builds stay at 1 on purpose: lower than any
+        // published build, so a phone that had a dev build can always take a real one.
+        versionCode = (project.findProperty("appVersionCode") as String?)?.toIntOrNull() ?: 1
+        versionName = (project.findProperty("appVersionName") as String?) ?: "0.1.0-dev"
         // Every phone this targets is 64-bit ARM; one ABI keeps the APK ~30 MB instead of ~110 MB.
         // Pass -Pabis=arm64-v8a,x86_64 to also run on an x86 emulator.
         ndk {
             abiFilters += ((project.findProperty("abis") as String?) ?: "arm64-v8a").split(",")
+        }
+    }
+
+    // Release signing comes from the environment (CI secrets, or keystore.properties exported by
+    // hand). Without it the release build falls back to the debug key, which still installs for
+    // testing but cannot update a properly signed copy.
+    //   SOTTO_KEYSTORE_PATH / SOTTO_KEYSTORE_PASSWORD / SOTTO_KEY_ALIAS
+    signingConfigs {
+        create("releaseFromEnv") {
+            val path = System.getenv("SOTTO_KEYSTORE_PATH")
+            if (!path.isNullOrBlank() && File(path).exists()) {
+                storeFile = File(path)
+                storePassword = System.getenv("SOTTO_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("SOTTO_KEY_ALIAS") ?: "sotto"
+                keyPassword = System.getenv("SOTTO_KEYSTORE_PASSWORD")
+            }
         }
     }
 
@@ -42,7 +61,8 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("debug")
+            val fromEnv = signingConfigs.getByName("releaseFromEnv")
+            signingConfig = if (fromEnv.storeFile?.exists() == true) fromEnv else signingConfigs.getByName("debug")
         }
     }
 
