@@ -1,6 +1,9 @@
 package app.sotto.ui.components
 
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,6 +32,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -95,6 +99,21 @@ class Paragraph(
         return segments.last()
     }
 
+    /** The part of a selection that falls in this paragraph: which words, and whether it begins or ends here. */
+    class SelectedPart(val first: Int, val last: Int, val startsHere: Boolean, val endsHere: Boolean)
+
+    fun selected(startMs: Long, endMs: Long): SelectedPart? {
+        val first = words.indexOfFirst { (it.startMs + it.endMs) / 2 >= startMs }
+        val last = words.indexOfLast { (it.startMs + it.endMs) / 2 < endMs }
+        if (first < 0 || last < first) return null
+        return SelectedPart(
+            first,
+            last,
+            startsHere = first > 0 || previousEndMs.let { it == null || startMs >= it },
+            endsHere = last < words.lastIndex || nextStartMs.let { it == null || endMs <= it },
+        )
+    }
+
     /** Character ranges where [query] occurs, ignoring case. */
     fun find(query: String): List<IntRange> {
         if (query.isBlank()) return emptyList()
@@ -132,6 +151,7 @@ fun paragraphsOf(segments: List<Segment>): List<Paragraph> {
     return out.mapIndexed { i, p -> Paragraph(p.segments, previousEndMs = out.getOrNull(i - 1)?.endMs, nextStartMs = out.getOrNull(i + 1)?.startMs) }
 }
 
+private val GUTTER = 14.dp
 private const val PARAGRAPH_GAP_MS = 2000
 private const val PARAGRAPH_WORDS = 70
 
@@ -156,17 +176,18 @@ fun TranscriptView(
     query: String = "",
     selection: (() -> Pair<Long, Long>)? = null,
     listState: LazyListState = rememberLazyListState(),
-    contentPadding: PaddingValues = PaddingValues(horizontal = 24.dp, vertical = 20.dp),
+    contentPadding: PaddingValues = PaddingValues(horizontal = 24.dp - GUTTER, vertical = 20.dp),
     onWordTap: (Word) -> Unit = {},
     onEditSegment: (Segment) -> Unit = {},
+    onSelectionDrag: (startEdge: Boolean, word: Word) -> Unit = { _, _ -> },
 ) {
     val livePartial = remember(partial) { if (partial.isEmpty()) null else Paragraph(listOf(Segment(Long.MAX_VALUE, partial)), live = true) }
     LazyColumn(modifier, state = listState, contentPadding = contentPadding) {
         itemsIndexed(paragraphs, key = { _, p -> p.key }) { _, paragraph ->
-            ParagraphBlock(paragraph, positionMs, editing, query, selection, onWordTap, onEditSegment)
+            ParagraphBlock(paragraph, positionMs, editing, query, selection, onWordTap, onEditSegment, onSelectionDrag)
         }
         if (livePartial != null) {
-            item(key = "partial") { ParagraphBlock(livePartial, null, false, "", null, {}, {}) }
+            item(key = "partial") { ParagraphBlock(livePartial, null, false, "", null, {}, {}, { _, _ -> }) }
         }
     }
 }
@@ -180,8 +201,11 @@ private fun ParagraphBlock(
     selection: (() -> Pair<Long, Long>)?,
     onWordTap: (Word) -> Unit,
     onEditSegment: (Segment) -> Unit,
+    onSelectionDrag: (startEdge: Boolean, word: Word) -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
+    val dragSelection = rememberUpdatedState(onSelectionDrag)
+    val currentSelection = rememberUpdatedState(selection)
     // Only this paragraph recomposes, and only when playback crosses into a different word.
     val active by remember(paragraph, positionMs) {
         derivedStateOf { positionMs?.let { paragraph.wordAt(it()) } ?: -1 }
@@ -212,7 +236,7 @@ private fun ParagraphBlock(
             if (paragraph.live) "" else formatStamp(paragraph.startMs.toLong()),
             style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
             color = colors.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 6.dp),
+            modifier = Modifier.padding(start = GUTTER, bottom = 6.dp),
         )
         Text(
             text,
@@ -224,47 +248,77 @@ private fun ParagraphBlock(
                 .drawBehind {
                     val result = layout ?: return@drawBehind
                     val length = result.layoutInput.text.length
-                    val corner = PathEffect.cornerPathEffect(4.dp.toPx())
-                    fun box(from: Int, to: Int, color: Color) {
-                        if (to <= from || to > length) return
-                        val path = result.getPathForRange(from, to)
-                        drawPath(path, color, style = Fill)
-                        // The stroke pads the box out around the glyphs and rounds its corners.
-                        drawPath(path, color, style = Stroke(width = 5.dp.toPx(), join = StrokeJoin.Round, pathEffect = corner))
-                    }
+                    // Everything below is in the text's own coordinates, which start past the gutter.
+                    translate(left = GUTTER.toPx()) {
+                        val corner = PathEffect.cornerPathEffect(4.dp.toPx())
+                        fun box(from: Int, to: Int, color: Color) {
+                            if (to <= from || to > length) return
+                            val path = result.getPathForRange(from, to)
+                            drawPath(path, color, style = Fill)
+                            // The stroke pads the box out around the glyphs and rounds its corners.
+                            drawPath(path, color, style = Stroke(width = 5.dp.toPx(), join = StrokeJoin.Round, pathEffect = corner))
+                        }
 
-                    selection?.invoke()?.let { (start, end) ->
-                        val first = paragraph.words.indexOfFirst { (it.startMs + it.endMs) / 2 >= start }
-                        val last = paragraph.words.indexOfLast { (it.startMs + it.endMs) / 2 < end }
-                        if (first in 0..last) {
-                            val from = paragraph.wordStart(first)
-                            val to = paragraph.wordEnd(last)
+                        selection?.invoke()?.let { (start, end) ->
+                            val part = paragraph.selected(start, end) ?: return@let
+                            val from = paragraph.wordStart(part.first)
+                            val to = paragraph.wordEnd(part.last)
                             box(from, to, selectedBox)
-                            // A handle where the selection begins and ends, if that is in this paragraph.
-                            val handle = Size(5.dp.toPx(), 0f)
-                            val startsHere = first > 0 || paragraph.previousEndMs.let { it == null || start >= it }
-                            val endsHere = last < paragraph.words.lastIndex || paragraph.nextStartMs.let { it == null || end <= it }
-                            if (startsHere) {
+                            // A grip where the selection begins and ends, if that is in this paragraph.
+                            val grip = Size(8.dp.toPx(), 0f)
+                            if (part.startsHere) {
                                 val at = result.getBoundingBox(from.coerceAtMost(length - 1))
-                                drawRoundRect(handleColor, Offset(at.left - 7.dp.toPx(), at.top), handle.copy(height = at.height), CornerRadius(3.dp.toPx()))
+                                drawRoundRect(handleColor, Offset(at.left - 9.dp.toPx(), at.top - 2.dp.toPx()), grip.copy(height = at.height + 4.dp.toPx()), CornerRadius(4.dp.toPx()))
                             }
-                            if (endsHere) {
+                            if (part.endsHere) {
                                 val at = result.getBoundingBox((to - 1).coerceIn(0, length - 1))
-                                drawRoundRect(handleColor, Offset(at.right + 2.dp.toPx(), at.top), handle.copy(height = at.height), CornerRadius(3.dp.toPx()))
+                                drawRoundRect(handleColor, Offset(at.right + 1.dp.toPx(), at.top - 2.dp.toPx()), grip.copy(height = at.height + 4.dp.toPx()), CornerRadius(4.dp.toPx()))
                             }
                         }
+                        if (active in paragraph.words.indices) box(paragraph.wordStart(active), paragraph.wordEnd(active), activeBox)
                     }
-                    if (active in paragraph.words.indices) box(paragraph.wordStart(active), paragraph.wordEnd(active), activeBox)
+                }
+                // Dragging a grip moves that end of the selection word by word. Only a touch that
+                // lands on a grip is claimed, so anywhere else still scrolls the transcript.
+                .pointerInput(paragraph, selection != null) {
+                    if (selection == null) return@pointerInput
+                    val reach = 30.dp.toPx()
+                    val gutter = Offset(GUTTER.toPx(), 0f)
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val result = layout ?: return@awaitEachGesture
+                        val (start, end) = currentSelection.value?.invoke() ?: return@awaitEachGesture
+                        val part = paragraph.selected(start, end) ?: return@awaitEachGesture
+                        val length = result.layoutInput.text.length
+                        val startBox = result.getBoundingBox(paragraph.wordStart(part.first).coerceAtMost(length - 1))
+                        val endBox = result.getBoundingBox((paragraph.wordEnd(part.last) - 1).coerceIn(0, length - 1))
+                        val toStart = (down.position - gutter - Offset(startBox.left, startBox.center.y)).getDistance()
+                        val toEnd = (down.position - gutter - Offset(endBox.right, endBox.center.y)).getDistance()
+                        val startEdge = when {
+                            part.startsHere && toStart < reach && (toStart <= toEnd || !part.endsHere) -> true
+                            part.endsHere && toEnd < reach -> false
+                            else -> return@awaitEachGesture
+                        }
+                        down.consume()
+                        drag(down.id) { change ->
+                            change.consume()
+                            val index = paragraph.wordAtChar(result.getOffsetForPosition(change.position - gutter))
+                            if (index >= 0) dragSelection.value(startEdge, paragraph.words[index])
+                        }
+                    }
                 }
                 .pointerInput(paragraph) {
                     if (paragraph.live) return@pointerInput
                     detectTapGestures { position ->
                         val result = layout ?: return@detectTapGestures
-                        val index = paragraph.wordAtChar(result.getOffsetForPosition(position))
+                        val index = paragraph.wordAtChar(result.getOffsetForPosition(position - Offset(GUTTER.toPx(), 0f)))
                         if (index < 0) return@detectTapGestures
                         if (isEditing.value) edit.value(paragraph.segmentOfWord(index)) else tap.value(paragraph.words[index])
                     }
-                },
+                }
+                // Inside the gesture and drawing modifiers, so the selection grips, which hang
+                // just outside the text, are still within reach of a finger.
+                .padding(horizontal = GUTTER),
         )
     }
 }

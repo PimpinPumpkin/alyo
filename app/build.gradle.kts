@@ -85,6 +85,8 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation(libs.androidx.media3.exoplayer)
+    // The media session: lock screen and notification controls, playback with the app in the background.
+    implementation(libs.androidx.media3.session)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     // Unpacks the .tar.bz2 model archives sherpa-onnx publishes.

@@ -73,3 +73,29 @@ class SpanTest {
         assertTrue(kept.slice(3000, 3000).isEmpty())
     }
 }
+
+class RelativeLoudnessTest {
+    private fun peaks(vararg runs: Pair<Int, Int>): Peaks = Peaks().also { p ->
+        for ((bars, amplitude) in runs) repeat(bars) { p.add(ShortArray(960) { amplitude.toShort() }, 960) }
+    }
+
+    @Test
+    fun `speech stands out from a noisy room`() {
+        // Room tone around -40 dB, speech around -14 dB.
+        val p = peaks(100 to 330, 100 to 6500)
+        assertTrue("room ${p.relative(10)}", p.relative(10) < 0.1f)
+        assertTrue("speech ${p.relative(150)}", p.relative(150) > 0.9f)
+    }
+
+    @Test
+    fun `a recording of only room tone stays low`() {
+        val p = peaks(200 to 330)
+        assertTrue("room ${p.relative(10)}", p.relative(10) < 0.5f)
+    }
+
+    @Test
+    fun `quieter words survive when there is no silence at all`() {
+        val p = peaks(100 to 6500, 100 to 2500)
+        assertTrue("quiet speech ${p.relative(150)}", p.relative(150) > 0.3f)
+    }
+}

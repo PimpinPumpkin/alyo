@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Forward10
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material.icons.rounded.Replay5
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -50,14 +52,25 @@ fun TimeLabels(positionMs: () -> Long, durationMs: Long) {
     }
 }
 
-/** Back five seconds, the Play pill, forward ten. */
+/**
+ * Skip back, the Play pill, skip forward. The player uses 5 s back and 10 s forward; crop mode
+ * passes [fine] for one-second steps and takes over [onPlayPause] to keep playback inside the selection.
+ */
 @Composable
-fun TransportRow(player: Player) {
+fun TransportRow(player: Player, fine: Boolean = false, onPlayPause: () -> Unit = player::toggle) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 12.dp, bottom = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-        RoundControl(Icons.Rounded.Replay5, "Back 5 seconds", onClick = { player.seekBy(-5_000) })
+        if (fine) {
+            RoundControl(Icons.Rounded.Replay, "Back 1 second", onClick = { player.seekBy(-1_000) })
+        } else {
+            RoundControl(Icons.Rounded.Replay5, "Back 5 seconds", onClick = { player.seekBy(-5_000) })
+        }
         Spacer(Modifier.width(12.dp))
-        PlayPill(player.isPlaying, onClick = player::toggle)
+        PlayPill(player.isPlaying, onClick = onPlayPause)
         Spacer(Modifier.width(12.dp))
-        RoundControl(Icons.Rounded.Forward10, "Forward 10 seconds", onClick = { player.seekBy(10_000) })
+        if (fine) {
+            RoundControl(Icons.Rounded.Refresh, "Forward 1 second", onClick = { player.seekBy(1_000) })
+        } else {
+            RoundControl(Icons.Rounded.Forward10, "Forward 10 seconds", onClick = { player.seekBy(10_000) })
+        }
     }
 }

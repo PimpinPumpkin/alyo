@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -44,6 +45,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.sotto.BuildConfig
 import app.sotto.SottoApp
 import app.sotto.asr.InstallState
 import app.sotto.asr.ModelSpec
@@ -55,7 +57,7 @@ import app.sotto.ui.formatBytes
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun SettingsScreen(app: SottoApp, firstRun: Boolean, onDone: () -> Unit) {
+fun SettingsScreen(app: SottoApp, firstRun: Boolean, onDone: () -> Unit, onLicences: () -> Unit = {}) {
     val colors = MaterialTheme.colorScheme
     val states by app.models.states.collectAsState()
     val qualityId by app.settings.quality.collectAsState()
@@ -123,6 +125,19 @@ fun SettingsScreen(app: SottoApp, firstRun: Boolean, onDone: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.onSurfaceVariant,
                 )
+            }
+            if (!firstRun) {
+                Spacer(Modifier.height(20.dp))
+                Surface(onClick = onLicences, shape = RoundedCornerShape(24.dp), color = colors.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
+                    Row(Modifier.padding(horizontal = 20.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.Info, null, tint = colors.onSurfaceVariant)
+                        Spacer(Modifier.width(16.dp))
+                        Column {
+                            Text("Open-source licences", style = MaterialTheme.typography.titleMedium)
+                            Text("Sotto ${BuildConfig.VERSION_NAME}, and what it is built from", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                        }
+                    }
+                }
             }
             Spacer(Modifier.height(24.dp))
         }

@@ -45,6 +45,7 @@ import app.sotto.data.RecordingMeta
 import app.sotto.ui.screens.CropScreen
 import app.sotto.ui.screens.ShareSheet
 import app.sotto.ui.screens.HomeScreen
+import app.sotto.ui.screens.LicencesScreen
 import app.sotto.ui.screens.PlayerScreen
 import app.sotto.ui.screens.RecordScreen
 import app.sotto.ui.screens.SettingsScreen
@@ -93,6 +94,7 @@ private object Routes {
     const val RECORD = "record"
     const val SETUP = "setup"
     const val SETTINGS = "settings"
+    const val LICENCES = "licences"
     fun player(id: String, autoplay: Boolean = false) = "player/$id/$autoplay"
     fun crop(id: String) = "crop/$id"
 }
@@ -213,7 +215,8 @@ private fun App(app: SottoApp, debugWav: File?, onDebugWavConsumed: () -> Unit) 
                 if (copy != null) push(Routes.player(copy))
             }
             Routes.SETUP -> SettingsScreen(app, firstRun = true, onDone = ::pop)
-            Routes.SETTINGS -> SettingsScreen(app, firstRun = false, onDone = ::pop)
+            Routes.SETTINGS -> SettingsScreen(app, firstRun = false, onDone = ::pop, onLicences = { push(Routes.LICENCES) })
+            Routes.LICENCES -> LicencesScreen(onBack = ::pop)
             else -> HomeScreen(
                 app = app,
                 onOpen = { id, autoplay -> push(Routes.player(id, autoplay)) },

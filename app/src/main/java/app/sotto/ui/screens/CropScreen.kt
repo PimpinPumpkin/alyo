@@ -70,9 +70,9 @@ import java.io.File
 private const val MIN_SELECTION_MS = 200L
 
 /**
- * Crop and remove, laid out like the player. Select a stretch by dragging the frame's handles on
- * the waveform or the seek bar, or by tapping words in the transcript; Crop keeps only the
- * selection, Remove cuts it out. Edits stack up and can be undone, each one can be listened to,
+ * Crop and remove, laid out like the player. Select a stretch by dragging the grips at either end
+ * of the highlighted words in the transcript, or the frame's handles on the waveform or seek bar.
+ * Play auditions just the selection. Crop keeps only the selection, Remove cuts it out. Edits stack up and can be undone, each one can be listened to,
  * and nothing touches the original: the result is saved as a copy.
  *
  * @param onClose called with the id of the new copy, or null if the user backed out
@@ -133,6 +133,20 @@ fun CropScreen(app: SottoApp, id: String, onClose: (copyId: String?) -> Unit) {
         while (player.isPlaying && isActive) {
             withFrameNanos { }
             position = player.positionMs
+            // Play auditions the selection: it stops at the selection's end and rewinds to its start.
+            if (position >= end) {
+                player.pause()
+                player.seekTo(start)
+            }
+        }
+    }
+
+    fun playSelection() {
+        if (player.isPlaying) {
+            player.pause()
+        } else {
+            if (position < start || position >= end - 50) player.seekTo(start)
+            player.play()
         }
     }
 
@@ -193,6 +207,9 @@ fun CropScreen(app: SottoApp, id: String, onClose: (copyId: String?) -> Unit) {
                                         val middle = (word.startMs + word.endMs) / 2
                                         if (middle < (start + end) / 2) select(word.startMs.toLong(), end) else select(start, word.endMs.toLong())
                                     },
+                                    onSelectionDrag = { startEdge, word ->
+                                        if (startEdge) select(word.startMs.toLong(), end) else select(start, word.endMs.toLong())
+                                    },
                                     modifier = Modifier.fillMaxSize(),
                                 )
                             }
@@ -232,7 +249,7 @@ fun CropScreen(app: SottoApp, id: String, onClose: (copyId: String?) -> Unit) {
                 modifier = Modifier.padding(horizontal = 12.dp),
             )
             TimeLabels({ position }, duration)
-            TransportRow(player)
+            TransportRow(player, fine = true, onPlayPause = ::playSelection)
         }
 
         if (saving || rendering) {

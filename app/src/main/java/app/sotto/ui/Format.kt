@@ -57,5 +57,5 @@ fun monthLabel(millis: Long, now: Long = System.currentTimeMillis()): String {
     return SimpleDateFormat(pattern, Locale.getDefault()).format(Date(millis))
 }
 
-/** "Sep 3" */
-fun shortDate(millis: Long): String = SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(millis))
+/** "Thu, Sep 3" */
+fun shortDate(millis: Long): String = SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(Date(millis))

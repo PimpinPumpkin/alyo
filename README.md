@@ -14,6 +14,7 @@ no cloud.
   through the share sheet or straight into `Download/Sotto`.
 - **Search** across titles and every word of every transcript, and within one transcript with
   jump-to-match.
+- **Background playback** with lock screen and notification controls.
 - **Offline.** The only network request the app ever makes is the one-time speech model download.
 
 Requires Android 10 or later on a 64-bit ARM phone.
@@ -111,7 +112,7 @@ two are punctuated as one sentence.
 - Transcribing a recording after the fact (imported audio, or one made before the model was downloaded).
 - Languages other than English.
 - Speaker labels.
-- Playback controls on the lock screen.
+- Summaries. That needs a second, general-purpose language model on the phone.
 - Model downloads do not run as a foreground service, so a very long download can be interrupted
   if the app is swiped away. It resumes where it stopped the next time the app opens.
 

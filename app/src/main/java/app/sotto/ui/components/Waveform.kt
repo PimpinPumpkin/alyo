@@ -26,20 +26,17 @@ import app.sotto.ui.formatStamp
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.pow
 
 private const val BAR_MS = 160
 private val BAR_PITCH = 11.dp
 private const val PEAKS_PER_BAR = BAR_MS / AudioSpec.PEAK_MS
 
-/** Below this a stretch counts as silence and is drawn as a dot rather than a bar (about -38 dB). */
-private const val SILENCE = 0.3f
+/** Below this, relative to the recording's own range, a stretch is drawn as silence. */
+private const val SILENCE = 0.18f
 
-/**
- * Stored levels are decibels, which is right for keeping quiet speech visible but draws loud
- * material as a solid block. Cubing spreads the top of the range back out: -6 dB is about 70% of
- * full height, -20 dB a quarter.
- */
-private fun shaped(level: Float): Float = level * level * level
+/** Eases the bottom of the range down so quiet speech reads as quiet rather than half height. */
+private fun shaped(relative: Float): Float = relative.pow(1.5f)
 
 private enum class Grab { SCRUB, START, END }
 
@@ -116,7 +113,7 @@ fun TapeWaveform(
         for (bar in firstVisible..lastVisible) {
             val barX = x(bar.toLong() * BAR_MS) + pitch / 2f
             var level = 0f
-            for (p in bar * PEAKS_PER_BAR until (bar + 1) * PEAKS_PER_BAR) level = maxOf(level, peaks.level(p))
+            for (p in bar * PEAKS_PER_BAR until (bar + 1) * PEAKS_PER_BAR) level = maxOf(level, peaks.relative(p))
             if (level < SILENCE) {
                 drawCircle(silenceColor, radius = 2.5.dp.toPx(), center = Offset(barX, centerY))
             } else {
@@ -162,7 +159,7 @@ private fun DrawScope.drawSelectionFrame(left: Float, right: Float, top: Float, 
  * dim, so the shape of the conversation is visible at a glance. Tap or drag to seek.
  *
  * With [selection] it also shows the selected stretch as a framed box whose ends can be dragged,
- * and a small time bubble riding above the playhead.
+ * with a small bubble above it giving the length of the selection.
  */
 @Composable
 fun SeekBar(
@@ -243,13 +240,15 @@ fun SeekBar(
             CornerRadius(thumbWidth / 2f),
         )
 
-        if (bubble) {
-            val label = measurer.measure(formatStamp(now), bubbleStyle)
+        // The bubble rides over the middle of the selection and says how long it is.
+        selection?.invoke()?.let { (start, end) ->
+            val label = measurer.measure(formatStamp(end - start), bubbleStyle)
             val padX = 12.dp.toPx()
             val padY = 6.dp.toPx()
             val boxWidth = label.size.width + padX * 2
             val boxHeight = label.size.height + padY * 2
-            val left = (thumbX - boxWidth / 2f).coerceIn(0f, size.width - boxWidth)
+            val middle = (xAt(start, size.width, inset, durationMs) + xAt(end, size.width, inset, durationMs)) / 2f
+            val left = (middle - boxWidth / 2f).coerceIn(0f, size.width - boxWidth)
             drawRoundRect(colors.inverseSurface, Offset(left, 0f), Size(boxWidth, boxHeight), CornerRadius(boxHeight / 2f))
             drawText(label, colors.inverseOnSurface, Offset(left + padX, padY))
         }
@@ -275,7 +274,7 @@ private fun DrawScope.drawSpeechTrack(peaks: Peaks, left: Float, right: Float, y
         var level = 0f
         if (run < runs) {
             val first = (run * perRun).toInt()
-            for (p in first until maxOf(first + 1, ((run + 1) * perRun).toInt())) level = maxOf(level, peaks.level(p))
+            for (p in first until maxOf(first + 1, ((run + 1) * perRun).toInt())) level = maxOf(level, peaks.relative(p))
         }
         val speaking = run < runs && level >= SILENCE
         if (speaking && runStart < 0) runStart = run

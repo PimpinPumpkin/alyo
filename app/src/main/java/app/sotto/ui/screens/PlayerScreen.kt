@@ -132,11 +132,13 @@ fun PlayerScreen(
     val paragraphs = remember(transcript) { paragraphsOf(transcript.segments) }
     val peaks = remember(id, meta.durationMs) { app.store.peaks(id) }
 
-    val player = remember(id) { Player(context.applicationContext) }
+    val player = remember(id) { Player(context.applicationContext, background = true) }
     DisposableEffect(player) { onDispose { player.release() } }
     var autoplayed by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(player, meta.durationMs) {
-        player.load(app.store.audio(id))
+    LaunchedEffect(player, meta.durationMs, meta.title) {
+        val resumeAt = player.positionMs
+        player.load(app.store.audio(id), meta.title)
+        if (resumeAt > 0) player.seekTo(resumeAt)
         if (autoplay && !autoplayed) {
             autoplayed = true
             player.play()
