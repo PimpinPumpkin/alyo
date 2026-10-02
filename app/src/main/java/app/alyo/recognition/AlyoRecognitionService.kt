@@ -39,9 +39,14 @@ class AlyoRecognitionService : RecognitionService() {
                     Dictation.State.LISTENING -> {
                         callback.readyForSpeech(Bundle())
                         callback.beginningOfSpeech()
+                        reportLevel(callback)
                     }
-                    Dictation.State.FINISHING -> callback.endOfSpeech()
+                    Dictation.State.FINISHING -> {
+                        main.removeCallbacksAndMessages(LEVEL_TOKEN)
+                        callback.endOfSpeech()
+                    }
                     Dictation.State.DONE -> {
+                        main.removeCallbacksAndMessages(LEVEL_TOKEN)
                         dictation = null
                         if (text.isBlank()) callback.error(SpeechRecognizer.ERROR_NO_MATCH) else callback.results(results(text.toString()))
                     }
@@ -60,16 +65,28 @@ class AlyoRecognitionService : RecognitionService() {
         started.start()
     }
 
+    /**
+     * Tells the caller how loud the microphone is while listening, so it can show that it hears.
+     * Callers expect roughly -2 for silence up to 10 for loud speech.
+     */
+    private fun reportLevel(callback: Callback) {
+        val current = dictation ?: return
+        runCatching { callback.rmsChanged(current.level * 12f - 2f) }
+        main.postAtTime({ reportLevel(callback) }, LEVEL_TOKEN, android.os.SystemClock.uptimeMillis() + LEVEL_INTERVAL_MILLIS)
+    }
+
     override fun onStopListening(callback: Callback) {
         dictation?.finish()
     }
 
     override fun onCancel(callback: Callback) {
+        main.removeCallbacksAndMessages(LEVEL_TOKEN)
         dictation?.cancel()
         dictation = null
     }
 
     override fun onDestroy() {
+        main.removeCallbacksAndMessages(LEVEL_TOKEN)
         dictation?.cancel()
         super.onDestroy()
     }
@@ -77,5 +94,10 @@ class AlyoRecognitionService : RecognitionService() {
     private fun results(text: String) = Bundle().apply {
         putStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION, arrayListOf(text))
         putFloatArray(SpeechRecognizer.CONFIDENCE_SCORES, floatArrayOf(1f))
+    }
+
+    private companion object {
+        const val LEVEL_INTERVAL_MILLIS = 60L
+        val LEVEL_TOKEN = Any()
     }
 }
