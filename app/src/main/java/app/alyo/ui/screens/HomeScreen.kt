@@ -93,6 +93,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.alyo.AlyoApp
+import app.alyo.asr.AsrEngine
 import app.alyo.asr.InstallState
 import app.alyo.asr.works
 import app.alyo.audio.Peaks
@@ -175,6 +176,9 @@ fun HomeScreen(
             else -> SetupState.Ready
         }
     }
+    // Opening the recordings is usually followed by pressing record: have the model ready for it.
+    LaunchedEffect(Unit) { app.preloadSpeech(AsrEngine.RECORDING_PAUSE) }
+
     // A folder of recordings left by an earlier install, which this one cannot see until asked to.
     val reconnectPrefs = remember { context.getSharedPreferences("ui", Context.MODE_PRIVATE) }
     var fromBefore by remember { mutableStateOf(false) }

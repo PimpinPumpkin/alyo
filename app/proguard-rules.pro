@@ -10,3 +10,6 @@
 -keepclassmembers class app.alyo.tts.VoiceEngine$* {
     public java.lang.Integer invoke(float[]);
 }
+
+# Native method looked up by name.
+-keep class app.alyo.asr.ModelOptimizer { *; }

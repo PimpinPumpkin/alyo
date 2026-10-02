@@ -74,6 +74,25 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
         else -> InstallState.Missing
     }
 
+    /**
+     * Optimizes the installed speech models that have not been yet. Call off the main thread:
+     * each takes a few seconds. Models too large to hold in memory twice are left as they are.
+     */
+    fun optimizeInstalled() {
+        for (spec in ModelCatalog.allModels) {
+            if (spec.kind != ModelKind.STREAMING_TRANSDUCER && spec.kind != ModelKind.OFFLINE_NEMO_TRANSDUCER) continue
+            val dir = dir(spec)
+            val marker = File(dir, OPTIMIZED)
+            if (!isInstalled(spec) || marker.exists()) continue
+            for (name in listOf(spec.encoder, spec.decoder, spec.joiner)) {
+                val file = File(dir, name)
+                if (file.length() in 1..MAX_OPTIMIZE_BYTES) ModelOptimizer.optimize(file)
+            }
+            // Marked even if a file could not be done, so a model that will not optimize is not retried at every launch.
+            marker.createNewFile()
+        }
+    }
+
     /** Continues any download that was interrupted rather than paused. */
     fun resumeInterrupted() {
         val unfinished = wanted
@@ -102,6 +121,7 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
                 wanted = wanted - spec.id
                 retire(spec)
                 set(spec, InstallState.Installed)
+                optimizeInstalled()
             } catch (e: CancellationException) {
                 set(spec, resting(spec))
                 throw e
@@ -450,6 +470,9 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
 
     private companion object {
         const val DONE = ".installed"
+        const val OPTIMIZED = ".optimized"
+        // The optimizer holds the model in memory while it works, so the 650 MB ones are skipped.
+        const val MAX_OPTIMIZE_BYTES = 300_000_000L
         const val WANTED = "wanted"
         const val REPORT_EVERY = 512 * 1024L
     }

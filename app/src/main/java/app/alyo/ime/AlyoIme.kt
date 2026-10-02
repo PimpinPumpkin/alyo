@@ -25,6 +25,7 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import app.alyo.AlyoApp
+import app.alyo.asr.AsrEngine
 import app.alyo.MainActivity
 import app.alyo.data.Settings
 import app.alyo.dictation.Dictation
@@ -85,6 +86,8 @@ class AlyoIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner, V
 
     override fun onCreate() {
         super.onCreate()
+        // The earliest sign that someone is about to dictate: start loading before the panel is even drawn.
+        (application as AlyoApp).preloadSpeech(AsrEngine.DICTATION_PAUSE)
         saved.performRestore(null)
         registry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
     }

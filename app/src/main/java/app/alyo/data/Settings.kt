@@ -158,8 +158,11 @@ class Settings(context: Context) {
         _spokenPunctuation.value = on
     }
 
-    private val _keepWarmMinutes = MutableStateFlow(prefs.getInt(KEEP_WARM, 5))
-    /** How long the speech models stay in memory after a dictation, so the next one starts at once. */
+    private val _keepWarmMinutes = MutableStateFlow(prefs.getInt(KEEP_WARM, KEEP_WARM_ALWAYS))
+    /**
+     * How long the speech models stay in memory after they were last used, so the next dictation
+     * or recording starts at once. [KEEP_WARM_ALWAYS] holds them until the phone runs short of memory.
+     */
     val keepWarmMinutes: StateFlow<Int> = _keepWarmMinutes
 
     fun setKeepWarmMinutes(minutes: Int) {
@@ -256,7 +259,8 @@ class Settings(context: Context) {
         const val LIBRARY_PRIVATE = "private"
         private const val LIBRARY = "library"
         val STOP_AFTER_CHOICES = listOf(2, 3, 5, 10, 0)
-        val KEEP_WARM_CHOICES = listOf(0, 1, 5, 15)
+        const val KEEP_WARM_ALWAYS = -1
+        val KEEP_WARM_CHOICES = listOf(KEEP_WARM_ALWAYS, 15, 5, 0)
         private const val STOP_AFTER = "stop_after_seconds"
         private const val SPOKEN_PUNCTUATION = "spoken_punctuation"
         private const val KEEP_WARM = "keep_warm_minutes"

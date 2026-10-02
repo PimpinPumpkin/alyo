@@ -48,6 +48,14 @@ if (!ortSlim.exists()) {
     }
 }
 
+// The C header of ONNX Runtime, for the small piece of native code that asks the runtime to save
+// a model in its optimized form (see ort_optimize.cpp). It must match the runtime's version.
+val ortInclude = layout.projectDirectory.dir("libs/onnxruntime/include").asFile
+for (header in listOf("onnxruntime_c_api.h", "onnxruntime_ep_c_api.h", "onnxruntime_error_code.h")) {
+    val target = File(ortInclude, header)
+    if (!target.exists()) fetch(target, "https://raw.githubusercontent.com/microsoft/onnxruntime/v1.28.2/include/onnxruntime/core/session/$header")
+}
+
 // The sound classifier (CED tiny, 6 MB) ships inside the APK: it is what tells music and applause
 // from speech, it is small, and bundling it means that works with no download at all. Like the
 // AAR it is fetched once at configuration time rather than kept in git.

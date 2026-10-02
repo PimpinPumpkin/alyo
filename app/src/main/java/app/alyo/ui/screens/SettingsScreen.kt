@@ -274,7 +274,11 @@ fun SettingsScreen(app: AlyoApp, onDone: () -> Unit, onLicenses: () -> Unit, onW
                         SheetRow(
                             Icons.Rounded.Bolt,
                             "Keep ready",
-                            detail = if (keepWarm == 0) "The model is unloaded as soon as you finish" else "The model stays in memory for $keepWarm min, so the next dictation starts at once",
+                            detail = when (keepWarm) {
+                                Settings.KEEP_WARM_ALWAYS -> "The model stays in memory until the phone needs the room, so it is ready when you are"
+                                0 -> "The model is unloaded as soon as you finish. Every start waits for it."
+                                else -> "The model stays in memory for $keepWarm min after you finish"
+                            },
                             onClick = { app.settings.setKeepWarmMinutes(Settings.KEEP_WARM_CHOICES.let { it[(it.indexOf(keepWarm) + 1) % it.size] }) },
                         ),
                     ),

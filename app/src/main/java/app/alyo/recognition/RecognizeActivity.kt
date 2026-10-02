@@ -78,7 +78,7 @@ class RecognizeActivity : ComponentActivity() {
                     ) {
                         Column(Modifier.navigationBarsPadding().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
-                                problem.value ?: heard.value.ifEmpty { if (phase.value == PanelPhase.WARMING) "Warming up. Go ahead." else prompt ?: "Listening" },
+                                problem.value ?: heard.value.ifEmpty { prompt ?: "Listening" },
                                 style = MaterialTheme.typography.headlineSmall,
                                 color = if (heard.value.isEmpty()) colors.onSurfaceVariant else colors.onSurface,
                                 textAlign = TextAlign.Center,

@@ -217,8 +217,12 @@ Speech is turned into text in two passes, both on the CPU through
 | English | NVIDIA FastConformer | Parakeet TDT 110M (Standard) or 0.6B v2 (Best) |
 | German, French, Spanish | Kroko streaming Zipformer | None (Standard) or Parakeet TDT 0.6B v3 (Best) |
 
-The recorder and the keyboard share one engine and one copy of the models. After you dictate, the
-models stay in memory for a few minutes so the next sentence starts at once.
+The recorder and the keyboard share one engine and one copy of the models. Once loaded, the models
+stay in memory until the phone needs the room, so the next dictation or recording starts at once.
+The first load is shortened too: after a model is downloaded it is saved in the form the runtime
+would otherwise have to work out on every load, which cuts the wait roughly in half (3.6 to 2.1
+seconds for English on a Pixel 4a 5G). The microphone is open from the first moment either way,
+so nothing said while a model loads is lost.
 
 - **Sounds**: CED tiny, inside the APK, tags music, applause and laughter.
 - **Speakers**: pyannote segmentation finds where the voice changes, and NVIDIA TitaNet groups

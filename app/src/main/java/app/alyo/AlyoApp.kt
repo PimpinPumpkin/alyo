@@ -56,7 +56,7 @@ class AlyoApp : Application() {
         store = RecordingStore(this)
         library = Library(this, store, settings, scope)
         models = ModelManager(this, scope)
-        engine = AsrEngine(models)
+        engine = AsrEngine(models) { settings.keepWarmMinutes.value * 60_000L }
         voices = VoiceEngine(models)
         val diarizer = Diarizer(this, models)
         recorder = RecorderController(this, store, models, engine, settings, diarizer, scope)
@@ -76,8 +76,23 @@ class AlyoApp : Application() {
                 .collect { working -> if (working) DownloadService.start(this@AlyoApp) }
         }
         models.resumeInterrupted()
+        // Models that arrived by import, or before this was done at download time.
+        scope.launch(Dispatchers.IO) { models.optimizeInstalled() }
         // Asking for the folder is what creates it, and adb can only put test audio in one that exists.
         if (BuildConfig.DEBUG || BuildConfig.TEST_HOOKS) getExternalFilesDir(null)
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        // Running low while in use, or deep enough in the background that the system is about to
+        // start killing things. Merely leaving the screen is not a reason: that is exactly when
+        // the models are being kept for next time.
+        if (level == TRIM_MEMORY_RUNNING_LOW || level == TRIM_MEMORY_RUNNING_CRITICAL || level >= TRIM_MEMORY_MODERATE) engine.trim()
+    }
+
+    /** Starts loading the live speech model, for a moment when it is about to be wanted. */
+    fun preloadSpeech(sentencePause: Float) {
+        models.usable(settings.pack.live)?.let { engine.preload(it, sentencePause) }
     }
 
     val hasMicrophone: Boolean

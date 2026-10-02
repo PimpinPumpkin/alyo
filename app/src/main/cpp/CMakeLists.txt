@@ -45,6 +45,15 @@ else()
     endif()
 endif()
 
+# A few lines of glue that have ONNX Runtime rewrite a speech model in its optimized form. Only
+# the app's own build has it; the runtime itself is found at run time, not linked here.
+if(NOT ALYO_LLM_VARIANT)
+    add_library(alyo-ort SHARED ort_optimize.cpp)
+    target_include_directories(alyo-ort PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../../libs/onnxruntime/include)
+    target_compile_features(alyo-ort PRIVATE cxx_std_17)
+    target_link_libraries(alyo-ort PRIVATE log dl)
+endif()
+
 add_library(${ALYO_LLM_LIB} SHARED llm_jni.cpp)
 target_compile_features(${ALYO_LLM_LIB} PRIVATE cxx_std_17)
 target_link_libraries(${ALYO_LLM_LIB} PRIVATE llama log)

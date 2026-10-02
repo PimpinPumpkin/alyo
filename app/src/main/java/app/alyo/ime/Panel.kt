@@ -108,7 +108,9 @@ fun DictationPanel(
                 Text(
                     when (now) {
                         // Said plainly, because nothing appears in the field yet and that reads as broken.
-                        PanelPhase.WARMING -> "Warming up. Go ahead, it is recording."
+                        // The microphone is open and nothing said now is lost; the words follow
+                        // as soon as the model is up. So this is listening, and says so.
+                        PanelPhase.WARMING -> "Listening"
                         PanelPhase.LISTENING -> "Listening"
                         PanelPhase.FINISHING -> "Finishing"
                     },
@@ -179,7 +181,7 @@ fun VoiceOrb(phase: PanelPhase, level: () -> Float, modifier: Modifier = Modifie
                     }
                     .background(colors.primaryContainer, CircleShape),
             )
-            Icon(Icons.Rounded.Mic, "Warming up", tint = colors.onPrimaryContainer, modifier = Modifier.size(32.dp))
+            Icon(Icons.Rounded.Mic, "Listening", tint = colors.onPrimaryContainer, modifier = Modifier.size(32.dp))
             return@Box
         }
         Box(

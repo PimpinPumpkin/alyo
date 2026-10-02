@@ -21,7 +21,7 @@ import java.io.File
  * dictates one message is likely to dictate the next, and should not wait for it again. The
  * recorder and the keyboard share them.
  */
-class AsrEngine(private val models: ModelManager) {
+class AsrEngine(private val models: ModelManager, private val keepWarmMs: () -> Long = { 0L }) {
     // Keyed by model and pause length: a recorder and a keyboard want different pauses.
     private var live: Pair<String, OnlineRecognizer>? = null
     private var refiner: Pair<String, OfflineRecognizer>? = null
@@ -96,8 +96,10 @@ class AsrEngine(private val models: ModelManager) {
     private var users = 0
 
     companion object {
-        const val RECORDING_PAUSE = 0.9f
-        const val DICTATION_PAUSE = 0.7f
+        // The same for both on purpose. A loaded model is tied to its pause length, so two values
+        // would mean the recorder's warm model is no use to the keyboard, and the other way round.
+        const val RECORDING_PAUSE = 0.8f
+        const val DICTATION_PAUSE = 0.8f
     }
 
     /** Call before using the models, and [release] when done. */
@@ -109,11 +111,37 @@ class AsrEngine(private val models: ModelManager) {
 
     /** @param keepWarmMs how long to hold the models once nobody is using them */
     @Synchronized
-    fun release(keepWarmMs: Long = 0) {
+    fun release(keepWarmMs: Long = this.keepWarmMs()) {
         if (--users > 0) return
         users = 0
         handler.removeCallbacks(unload)
-        if (keepWarmMs <= 0) unloadNow() else handler.postDelayed(unload, keepWarmMs)
+        when {
+            // Kept until the phone asks for the memory back; see trim().
+            keepWarmMs < 0 -> Unit
+            keepWarmMs == 0L -> unloadNow()
+            else -> handler.postDelayed(unload, keepWarmMs)
+        }
+    }
+
+    /** The phone is short of memory: let the models go if nobody is using them. They load again on demand. */
+    fun trim() = unloadNow()
+
+    /**
+     * Loads the live model ahead of need, so the first words do not wait for it. Runs on a thread
+     * of its own and holds the model only as long as the keep-ready setting says.
+     */
+    fun preload(spec: ModelSpec, sentencePause: Float) {
+        if (synchronized(liveLock) { live?.first == "${spec.id}@$sentencePause" }) return
+        retain()
+        kotlin.concurrent.thread(name = "alyo-preload") {
+            try {
+                live(spec, sentencePause)
+            } catch (_: Throwable) {
+                // A model that cannot be loaded will say so when it is actually needed.
+            } finally {
+                release()
+            }
+        }
     }
 
     @Synchronized
