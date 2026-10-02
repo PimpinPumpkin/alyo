@@ -34,6 +34,10 @@ once per clone.
 
 ## Releases
 
+- FOR NOW (until Alyo goes public): every push to `main` is published at once as a stable
+  `v0.1.<run>` release marked Latest. Push finished work to `main` and keep `canary` level with it.
+  Before going public, remove the "Publish stable on push" step in `build.yml`; then the lines
+  below apply again.
 - Work on `canary`. Every push rebuilds the `canary` release.
 - Fast-forward `main` when it is ready. A daily job cuts a `v0.1.<run>` nightly if `main` moved.
 - `promote-stable.yml` promotes the newest nightly to stable every Monday.

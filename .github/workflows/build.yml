@@ -7,8 +7,11 @@ name: CI
 #   stable   promote-stable.yml flips the newest nightly to a full release once a week. Same APK,
 #            no rebuild.
 #
-# A push to main builds and tests only; the APK rides as a workflow artifact. Pushes never mint
-# releases, so a burst of commits cannot spam the release page.
+# FOR NOW, while the only users are us: every push to main is also published straight away as a
+# stable release, marked Latest, so an updater that follows releases/latest gets it within minutes.
+# Remove the "Publish stable on push" step before going public; the nightly and the weekly
+# promotion below then take over again (while that step is here they find nothing to do, because
+# main never moves past its newest tag).
 on:
   schedule:
     - cron: '30 10 * * *'
@@ -166,6 +169,30 @@ jobs:
           NOTES="$(printf 'Canary branch.\n\nversionName: %s\nversionCode: %s\n\nLatest change: %s\n' "$VER" "$CODE" "$SUBJ")"
           gh release delete canary --yes --cleanup-tag 2>/dev/null || true
           gh release create canary --prerelease --target "$GITHUB_SHA" --title "Alyo $VER" --notes "$NOTES" alyo-canary.apk
+
+      - name: Publish stable on push (temporary, see the top of this file)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER="${{ steps.ver.outputs.name }}"
+          LAST="$(git tag -l 'v0.[0-9]*' --sort=-v:refname | head -n1)"
+          cp app/build/outputs/apk/release/app-release.apk "alyo-v${VER}.apk"
+          if [ -n "$LAST" ]; then
+            LOG="$(bash scripts/changelog.sh "${LAST}..HEAD")"
+            COMPARE="**Full changelog:** https://github.com/${{ github.repository }}/compare/${LAST}...v${VER}"
+          else
+            LOG="$(bash scripts/changelog.sh -n 20 HEAD)"
+            COMPARE=""
+          fi
+          [ -z "$LOG" ] && LOG="- Maintenance and internal changes"
+          NOTES="$(printf 'What'\''s changed in %s\n\n%s\n\n%s\n' "$VER" "$LOG" "$COMPARE")"
+          gh release create "v${VER}" \
+            --title "Alyo $VER" \
+            --target "$GITHUB_SHA" \
+            --latest \
+            --notes "$NOTES" \
+            "alyo-v${VER}.apk"
 
       - name: Publish nightly (prerelease)
         if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
