@@ -8,6 +8,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.activity.compose.BackHandler
 import app.alyo.data.Feature
 import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.Height
 import androidx.compose.material.icons.rounded.Notes
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -219,6 +220,7 @@ fun SettingsScreen(app: AlyoApp, onDone: () -> Unit, onLicenses: () -> Unit, onW
     val stopAfter by app.settings.stopAfterSeconds.collectAsState()
     val spoken by app.settings.spokenPunctuation.collectAsState()
     val keepWarm by app.settings.keepWarmMinutes.collectAsState()
+    val tallPanel by app.settings.tallPanel.collectAsState()
     val autoTitle by app.settings.autoTitle.collectAsState()
     val sharePicker by app.settings.shareWithPicker.collectAsState()
     val theme by app.settings.theme.collectAsState()
@@ -270,6 +272,13 @@ fun SettingsScreen(app: AlyoApp, onDone: () -> Unit, onLicenses: () -> Unit, onW
                             detail = "Say comma, period, question mark or new line. Backspace right away puts a word back.",
                             trailing = { Switch(checked = spoken, onCheckedChange = null) },
                             onClick = { app.settings.setSpokenPunctuation(!spoken) },
+                        ),
+                        SheetRow(
+                            Icons.Rounded.Height,
+                            "Keyboard-height panel",
+                            detail = if (tallPanel) "As tall as a keyboard, so the app stays put when you switch to one to fix a word" else "A slim bar that leaves more of the app in view",
+                            trailing = { Switch(checked = tallPanel, onCheckedChange = null) },
+                            onClick = { app.settings.setTallPanel(!tallPanel) },
                         ),
                         SheetRow(
                             Icons.Rounded.Bolt,

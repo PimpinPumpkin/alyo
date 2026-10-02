@@ -107,8 +107,10 @@ class AlyoIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner, V
                     Settings.THEME_DARK -> true
                     else -> isSystemInDarkTheme()
                 }
+                val tall by app.settings.tallPanel.collectAsState()
                 AlyoTheme(dark = dark) {
                     DictationPanel(
+                        tall = tall,
                         phase = phase.value,
                         problem = problem.value,
                         canUndo = canUndo.value,
