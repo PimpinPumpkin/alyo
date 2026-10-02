@@ -7,6 +7,7 @@ import android.os.Looper
 import android.speech.RecognitionService
 import android.speech.SpeechRecognizer
 import app.alyo.AlyoApp
+import app.alyo.asr.AsrEngine
 import app.alyo.dictation.Dictation
 import app.alyo.text.SpokenPunctuation
 
@@ -17,6 +18,12 @@ import app.alyo.text.SpokenPunctuation
 class AlyoRecognitionService : RecognitionService() {
     private val main = Handler(Looper.getMainLooper())
     private var dictation: Dictation? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        // An app that holds on to this service is about to ask for speech: load before it does.
+        (application as AlyoApp).preloadSpeech(AsrEngine.DICTATION_PAUSE)
+    }
 
     override fun onStartListening(intent: Intent?, callback: Callback) {
         val app = application as AlyoApp
