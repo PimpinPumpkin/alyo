@@ -12,13 +12,17 @@ Android 10 or later, 64-bit. No account, no cloud, no Google services.
 
 </div>
 
-| Alyo | Voice typing | Read aloud | Recorder | Live transcript |
-|:-:|:-:|:-:|:-:|:-:|
-| <img src="docs/screenshots/00-alyo.png" width="150"> | <img src="docs/screenshots/11-voice-typing.png" width="150"> | <img src="docs/screenshots/12-read-aloud.png" width="150"> | <img src="docs/screenshots/01-home.png" width="150"> | <img src="docs/screenshots/02-live-transcript.png" width="150"> |
+<p align="center"><img src="docs/demo.gif" width="270" alt="Words appearing in the transcript while a recording is in progress"></p>
 
-| Speakers | Music and speech | Summary | Playback | Search |
+| Pick your features | Voice typing in any app | Select, then Read aloud | Reading a web page | Recordings |
 |:-:|:-:|:-:|:-:|:-:|
-| <img src="docs/screenshots/04-speakers.png" width="150"> | <img src="docs/screenshots/03-music.png" width="150"> | <img src="docs/screenshots/07-summary.png" width="150"> | <img src="docs/screenshots/05-playback.png" width="150"> | <img src="docs/screenshots/06-search.png" width="150"> |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/00-alyo.png"><img src="docs/screenshots/light/00-alyo.png" width="150" alt="Choose what Alyo is for"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/11-voice-typing.png"><img src="docs/screenshots/light/11-voice-typing.png" width="150" alt="Dictating a text message with Alyo"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/12-read-aloud-select.png"><img src="docs/screenshots/light/12-read-aloud-select.png" width="150" alt="Read aloud in the menu over selected text"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/13-read-aloud-sheet.png"><img src="docs/screenshots/light/13-read-aloud-sheet.png" width="150" alt="Alyo reading selected text from a web page"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/01-home.png"><img src="docs/screenshots/light/01-home.png" width="150" alt="The recordings list"></picture> |
+
+| Live transcript | Speakers | Summary | Music and speech | Search |
+|:-:|:-:|:-:|:-:|:-:|
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/02-live-transcript.png"><img src="docs/screenshots/light/02-live-transcript.png" width="150" alt="Words appearing while recording"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/04-speakers.png"><img src="docs/screenshots/light/04-speakers.png" width="150" alt="A transcript with speaker labels"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/07-summary.png"><img src="docs/screenshots/light/07-summary.png" width="150" alt="A summary above a transcript"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/05-playback.png"><img src="docs/screenshots/light/05-playback.png" width="150" alt="Playback with the music label"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dark/06-search.png"><img src="docs/screenshots/light/06-search.png" width="150" alt="Searching inside a recording"></picture> |
+
+Screenshots follow your GitHub theme: light or dark.
 
 Alyo is one app with three jobs. Turn on any of them; what you leave off stays out of your way.
 Voice typing and the recorder use the same speech models, so those are downloaded and kept once.
