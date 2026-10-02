@@ -23,3 +23,4 @@ dependencyResolutionManagement {
 rootProject.name = "Alyo"
 
 include(":app")
+include(":llm-fast")

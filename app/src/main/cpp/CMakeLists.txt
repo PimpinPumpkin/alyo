@@ -11,6 +11,14 @@ set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_RELEASE}")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_RELEASE}")
 
+# Built twice (see llm-fast/build.gradle.kts): once for any 64-bit ARM chip, and once with the
+# dot-product and half-float instructions, under another name so both can sit in the APK.
+set(ALYO_LLM_LIB alyo-llm)
+if(ALYO_LLM_VARIANT STREQUAL "dotprod" AND ANDROID_ABI STREQUAL "arm64-v8a")
+    set(ALYO_LLM_LIB alyo-llm-dotprod)
+    set(GGML_CPU_ARM_ARCH "armv8.2-a+dotprod+fp16" CACHE STRING "" FORCE)
+endif()
+
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
 set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
@@ -37,6 +45,6 @@ else()
     endif()
 endif()
 
-add_library(alyo-llm SHARED llm_jni.cpp)
-target_compile_features(alyo-llm PRIVATE cxx_std_17)
-target_link_libraries(alyo-llm PRIVATE llama log)
+add_library(${ALYO_LLM_LIB} SHARED llm_jni.cpp)
+target_compile_features(${ALYO_LLM_LIB} PRIVATE cxx_std_17)
+target_link_libraries(${ALYO_LLM_LIB} PRIVATE llama log)

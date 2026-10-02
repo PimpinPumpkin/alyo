@@ -82,7 +82,7 @@ class Summarizer(
         val parts = paragraphsOf(store.transcript(id).value.segments).map { it.text }
         if (parts.isEmpty()) error("There is no transcript to summarize")
 
-        val llama = Llama.load(File(models.dir(spec), ModelCatalog.GGUF), CONTEXT, threads())
+        val llama = threads().let { (write, read) -> Llama.load(File(models.dir(spec), ModelCatalog.GGUF), CONTEXT, write, read) }
             ?: error("The summary model could not be loaded. It may be damaged or unsupported.")
         active = llama
         try {
@@ -154,7 +154,22 @@ class Summarizer(
     }
 
     // Big cores only: the little ones slow the whole thing down to their pace.
-    private fun threads(): Int = (Runtime.getRuntime().availableProcessors() - 2).coerceIn(2, 6)
+    /**
+     * How many threads to write and to read with. Measured on a Pixel 4a 5G (two fast cores, six
+     * slow): with the fast build of the engine, writing is quickest on the fast cores alone, since
+     * a slow core holds each token up, and reading gains a little from two more. The plain build
+     * is so much slower per core that it wants nearly all of them for both.
+     */
+    private fun threads(): Pair<Int, Int> {
+        val cores = Runtime.getRuntime().availableProcessors()
+        if (!Llama.fast) return (cores - 2).coerceIn(2, 6).let { it to it }
+        // Each core's top speed; the fast ones are those above the slowest group.
+        val speeds = (0 until cores).mapNotNull { runCatching { File("/sys/devices/system/cpu/cpu$it/cpufreq/cpuinfo_max_freq").readText().trim().toLong() }.getOrNull() }
+        val slowest = speeds.minOrNull()
+        val quick = speeds.count { it > (slowest ?: 0) }.takeIf { it > 0 } ?: (cores / 2)
+        val write = quick.coerceIn(2, 4)
+        return write to (write + 2).coerceAtMost(cores)
+    }
 
     companion object {
         private const val TAG = "Summarizer"

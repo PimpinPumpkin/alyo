@@ -178,6 +178,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":llm-fast"))
     implementation(files(sherpaAar))
 
     implementation(libs.androidx.core.ktx)

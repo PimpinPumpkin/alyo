@@ -66,15 +66,28 @@ class Llama private constructor(private var handle: Long) : AutoCloseable {
     }
 
     companion object {
+        /** True when the faster build of the engine is the one in use. */
+        val fast: Boolean
+
         init {
-            System.loadLibrary("alyo-llm")
+            // Two builds of the engine ship. The faster one needs instructions that only chips
+            // from about 2018 on have, and every core has to have them, so the processor's own
+            // list of features is checked before it is loaded.
+            val features = runCatching { File("/proc/cpuinfo").readLines().filter { it.startsWith("Features") }.map { it.substringAfter(':').trim().split(' ').toSet() } }.getOrDefault(emptyList())
+            val capable = features.isNotEmpty() && features.all { "asimddp" in it && "fphp" in it && "asimdhp" in it }
+            fast = capable && runCatching { System.loadLibrary("alyo-llm-dotprod") }.isSuccess
+            if (!fast) System.loadLibrary("alyo-llm")
         }
 
-        /** @return null if [file] is not a model llama.cpp can run */
-        fun load(file: File, contextTokens: Int, threads: Int): Llama? =
-            nativeLoad(file.path, contextTokens, threads).takeIf { it != 0L }?.let(::Llama)
+        /**
+         * @param writeThreads threads used while writing the reply, one token at a time
+         * @param readThreads threads used while reading the transcript in, which parallelizes better
+         * @return null if [file] is not a model llama.cpp can run
+         */
+        fun load(file: File, contextTokens: Int, writeThreads: Int, readThreads: Int): Llama? =
+            nativeLoad(file.path, contextTokens, writeThreads, readThreads).takeIf { it != 0L }?.let(::Llama)
 
-        @JvmStatic private external fun nativeLoad(path: String, contextTokens: Int, threads: Int): Long
+        @JvmStatic private external fun nativeLoad(path: String, contextTokens: Int, threads: Int, batchThreads: Int): Long
         @JvmStatic private external fun nativeCountTokens(handle: Long, text: String): Int
         @JvmStatic private external fun nativeGenerate(handle: Long, system: String, user: String, opening: String, grammar: String, maxTokens: Int, sink: Sink): Int
         @JvmStatic private external fun nativeCancel(handle: Long)

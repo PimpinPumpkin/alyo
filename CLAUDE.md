@@ -24,6 +24,8 @@ once per clone.
   (`Documents/Alyo` through the media store, or a folder picked with the system picker) and keeps
   a sidecar file beside it. `RecordingStore.audio(id)` only exists until that move;
   use `source(id)` to play and `localAudio(id)` where a real file is needed.
+- `llm-fast/` is a second build of `app/src/main/cpp` (the summary engine) for processors with
+  dot-product instructions. `Llama.kt` picks one at load. A change to the CMake file affects both.
 - `tts/` read aloud: the Piper engine, the Android `TextToSpeechService`, and the sheet that
   reads shared or selected text.
 - `data/Settings.kt` holds `Feature`: each feature lists the manifest components it owns. They are

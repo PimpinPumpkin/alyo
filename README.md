@@ -221,7 +221,9 @@ models stay in memory for a few minutes so the next sentence starts at once.
   the voices. Runs once when a recording is saved. Skipped for recordings over 45 minutes.
 - **Summaries**: Qwen2.5 through [llama.cpp](https://github.com/ggml-org/llama.cpp), held by a
   grammar to a title and one to five sentences. Small models get facts wrong, so this is marked
-  experimental.
+  experimental. The engine ships in two builds, and phones from about 2018 on get the one that
+  uses newer processor instructions: on a Pixel 4a 5G it reads a transcript about three times
+  as fast (161 tokens a second against 57 for the Quick model, 39 against 12 for Thorough).
 - **Audio**: AAC, 48 kHz mono, written so that a recording survives the app being killed.
   Cropping copies audio frames without re-encoding.
 - **Storage**: when a recording is saved its audio is moved to the recordings folder, with a

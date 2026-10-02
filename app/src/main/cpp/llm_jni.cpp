@@ -56,7 +56,7 @@ std::string chat_prompt(const Session *s, const std::string &system, const std::
 extern "C" {
 
 JNIEXPORT jlong JNICALL
-Java_app_alyo_llm_Llama_nativeLoad(JNIEnv *env, jclass, jstring path, jint n_ctx, jint n_threads) {
+Java_app_alyo_llm_Llama_nativeLoad(JNIEnv *env, jclass, jstring path, jint n_ctx, jint n_threads, jint n_threads_batch) {
     static bool started = false;
     if (!started) {
         llama_log_set(quiet_log, nullptr);
@@ -75,7 +75,7 @@ Java_app_alyo_llm_Llama_nativeLoad(JNIEnv *env, jclass, jstring path, jint n_ctx
     cp.n_ctx = n_ctx;
     cp.n_batch = 256;
     cp.n_threads = n_threads;
-    cp.n_threads_batch = n_threads;
+    cp.n_threads_batch = n_threads_batch;
     s->ctx = llama_init_from_model(s->model, cp);
     if (!s->ctx) {
         llama_model_free(s->model);
