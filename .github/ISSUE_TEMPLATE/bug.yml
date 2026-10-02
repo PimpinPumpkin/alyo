@@ -1,0 +1,49 @@
+name: Something is wrong
+description: A bug, a crash, or text that came out badly
+labels: [bug]
+body:
+  - type: dropdown
+    id: part
+    attributes:
+      label: Which part of Alyo is this about?
+      description: Alyo is three things in one app. Knowing which one saves a round of questions.
+      options:
+        - Voice typing (dictating into another app)
+        - Recorder (recording, transcripts, speakers, summaries, playback)
+        - Read aloud (voices, reading selected or shared text)
+        - Setup, downloads or settings
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+      description: The steps that lead to it help most. For wrong text, say what was said and what was written.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Alyo version
+      description: Settings, at the bottom, under What's new or Open-source licenses.
+      placeholder: 0.1.17
+    validations:
+      required: true
+  - type: input
+    id: phone
+    attributes:
+      label: Phone and Android version
+      placeholder: Pixel 9, GrapheneOS, Android 16
+    validations:
+      required: true
+  - type: input
+    id: language
+    attributes:
+      label: Language and model, if it is about speech
+      placeholder: English, Standard
+  - type: input
+    id: keyboard
+    attributes:
+      label: Your keyboard, if it is about voice typing
+      placeholder: FUTO Keyboard, HeliBoard

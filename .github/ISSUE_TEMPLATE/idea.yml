@@ -1,0 +1,22 @@
+name: An idea
+description: Something Alyo should do, or do differently
+labels: [enhancement]
+body:
+  - type: dropdown
+    id: part
+    attributes:
+      label: Which part of Alyo is this about?
+      options:
+        - Voice typing (dictating into another app)
+        - Recorder (recording, transcripts, speakers, summaries, playback)
+        - Read aloud (voices, reading selected or shared text)
+        - Setup, downloads or settings
+        - The app as a whole
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like, and what would it let you do?
+    validations:
+      required: true
