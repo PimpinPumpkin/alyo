@@ -62,6 +62,7 @@ import app.alyo.ui.screens.VoiceTypingScreen
 import app.alyo.data.Feature
 import app.alyo.ui.theme.AlyoTheme
 import java.io.File
+import androidx.core.content.IntentCompat
 
 class MainActivity : ComponentActivity() {
     private val debugWav = mutableStateOf<File?>(null)
@@ -103,13 +104,13 @@ class MainActivity : ComponentActivity() {
         readDebugIntent(intent)
         readAction(intent)
         // Tapping an icon while the app is already open goes to that icon's own screen.
-        if (intent.action == ACTION_READ_ALOUD || (intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_LAUNCHER))) entry.value = entryFor(intent) to entry.value.second + 1
+        if (intent.action == ACTION_READ_ALOUD || isShare(intent) || (intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_LAUNCHER))) entry.value = entryFor(intent) to entry.value.second + 1
     }
 
     /** The "Recorder" icon opens the recordings; the "Alyo" icon opens the front page. */
     private fun entryFor(intent: Intent?): String =
         when {
-            intent?.component?.className?.endsWith(".RecorderLauncher") == true || intent?.action == ACTION_RECORD -> Routes.HOME
+            intent?.component?.className?.endsWith(".RecorderLauncher") == true || intent?.action == ACTION_RECORD || isShare(intent) -> Routes.HOME
             intent?.action == ACTION_READ_ALOUD -> Routes.READ
             // With one icon, the recorder is the app's face whenever it is turned on.
             (application as AlyoApp).settings.let { Feature.RECORDER in it.features.value && !it.recorderIcon.value } -> Routes.HOME
@@ -120,7 +121,19 @@ class MainActivity : ComponentActivity() {
         if (intent?.action == ACTION_RECORD) {
             recordRequested.value = true
         }
+        if (isShare(intent)) {
+            // Each file becomes a recording, transcribed on the way in, like one picked with the import button.
+            val app = application as AlyoApp
+            sharedFiles(intent!!).forEach(app.jobs::import)
+        }
     }
+
+    private fun isShare(intent: Intent?) =
+        intent?.action == Intent.ACTION_SEND || intent?.action == Intent.ACTION_SEND_MULTIPLE
+
+    private fun sharedFiles(intent: Intent): List<Uri> =
+        if (intent.action == Intent.ACTION_SEND_MULTIPLE) IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
+        else listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
 
     companion object {
         /** Open the app and start recording straight away. */

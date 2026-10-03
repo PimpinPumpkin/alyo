@@ -68,6 +68,25 @@
             </intent-filter>
         </activity-alias>
 
+        <!--
+            "Transcribe" in the share sheet, for audio and video files sent from other apps. Part
+            of the recorder: disabled here and enabled with it.
+        -->
+        <activity-alias
+            android:name=".ShareToRecorder"
+            android:enabled="false"
+            android:exported="true"
+            android:label="@string/share_transcribe"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="video/*" />
+            </intent-filter>
+        </activity-alias>
+
         <!-- The keyboard. Voice only: other keyboards' microphone keys switch to it. -->
         <service
             android:name=".ime.AlyoIme"

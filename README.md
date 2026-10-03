@@ -46,7 +46,7 @@ Voice typing and the recorder use the same speech models, so those are downloade
 - **Music, applause and laughter** shown in their own colors.
 - **Search** every recording at once, or inside one.
 - **Summaries**, written on the phone, ready to copy or share. Optional.
-- **Import audio or video files** and transcribe them. From a video only the sound is kept; the video file stays where it was.
+- **Import audio or video files** and transcribe them, with the + button or by sharing them to Alyo from another app. From a video only the sound is kept; the video file stays where it was.
 - **Export** audio, text, subtitles or word timings.
 - **Background playback**, lock screen controls, a widget and a quick settings tile.
 - **Recordings are ordinary files** in `Documents/Alyo`, or any folder you choose, including an

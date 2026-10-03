@@ -206,6 +206,10 @@ class Settings(context: Context) {
     /** The parts of the app the user has turned on. Empty until they have chosen. */
     val features: StateFlow<Set<Feature>> = _features
 
+    init {
+        enableNewComponents()
+    }
+
     /** True once the user has been through the first-run choice of features. */
     val onboarded: Boolean get() = prefs.getBoolean(ONBOARDED, false)
 
@@ -225,6 +229,17 @@ class Settings(context: Context) {
             // The icon of its own only makes sense while there is a recorder to open.
             if (!on) setRecorderIcon(false)
             recordShortcut(on)
+        }
+    }
+
+    /**
+     * Turns on whatever a feature that is on owns but the phone has off: a component added in an
+     * update stays as the manifest has it, disabled, until something enables it.
+     */
+    private fun enableNewComponents() {
+        for (feature in _features.value) for (component in feature.components) {
+            val name = ComponentName(packageName, "app.alyo$component")
+            if (packages.getComponentEnabledSetting(name) != PackageManager.COMPONENT_ENABLED_STATE_ENABLED) enable(component, true)
         }
     }
 
@@ -312,7 +327,7 @@ enum class Feature(val title: String, val summary: String, val components: List<
     RECORDER(
         "Recorder",
         "Record and get a transcript as you talk, with speaker labels, search and summaries.",
-        listOf(".service.RecordTile", ".service.RecordWidget", ".export.LibraryProvider"),
+        listOf(".service.RecordTile", ".service.RecordWidget", ".export.LibraryProvider", ".ShareToRecorder"),
     ),
     VOICE_TYPING(
         "Voice typing",

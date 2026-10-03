@@ -67,7 +67,10 @@ class LibraryJobs(
         _active.update { it + Job(key, name, null, 0f) }
         scope.launch(Dispatchers.IO) {
             try {
-                oneAtATime.withLock { runImport(key, uri, name) }
+                // Opened now, not when its turn comes: a file shared from another app may only be
+                // readable for as long as the share lasts, and an open file stays readable.
+                val decoder = AudioDecoder(context, uri)
+                oneAtATime.withLock { runImport(key, decoder, name) }
             } catch (e: Throwable) {
                 Log.e(TAG, "Import failed", e)
                 _errors.value = "Could not import $name: ${e.message ?: "unsupported file"}"
@@ -98,8 +101,7 @@ class LibraryJobs(
 
     private fun setProgress(key: String, progress: Float?) = _active.update { list -> list.map { if (it.key == key) it.copy(progress = progress) else it } }
 
-    private suspend fun runImport(key: String, uri: Uri, name: String) {
-        val decoder = AudioDecoder(context, uri)
+    private suspend fun runImport(key: String, decoder: AudioDecoder, name: String) {
         val id = store.newId()
         val now = System.currentTimeMillis()
         val pack = settings.pack

@@ -2,6 +2,7 @@
     <string name="app_name">Alyo</string>
     <!-- The second icon, which opens straight into the recordings. -->
     <string name="recorder_name">Recorder</string>
+    <string name="share_transcribe">Transcribe</string>
     <!-- The name shown in the phone's keyboard list. -->
     <string name="ime_name">Alyo voice typing</string>
     <string name="subtype_voice">Voice (English)</string>
