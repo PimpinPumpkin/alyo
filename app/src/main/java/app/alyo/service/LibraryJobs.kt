@@ -60,7 +60,7 @@ class LibraryJobs(
 
     fun canTranscribe(): Boolean = models.usable(settings.pack.live) != null
 
-    /** Copies an audio file into the library as a new recording, transcribing it on the way in. */
+    /** Copies the sound of an audio or video file into the library as a new recording, transcribing it on the way in. */
     fun import(uri: Uri) {
         val name = displayName(uri)
         val key = "import-" + System.nanoTime()

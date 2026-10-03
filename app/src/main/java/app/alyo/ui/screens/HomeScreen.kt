@@ -336,7 +336,7 @@ private fun SearchPill(query: String, onQuery: (String) -> Unit, onSettings: () 
             if (query.isNotEmpty()) {
                 IconButton(onClick = { onQuery(""); focus.clearFocus() }) { Icon(Icons.Rounded.Close, "Clear search") }
             } else {
-                IconButton(onClick = onImport) { Icon(Icons.Rounded.Add, "Import audio", tint = colors.onSurfaceVariant) }
+                IconButton(onClick = onImport) { Icon(Icons.Rounded.Add, "Import audio or video", tint = colors.onSurfaceVariant) }
                 IconButton(onClick = onSettings) { Icon(Icons.Rounded.Settings, "Settings", tint = colors.onSurfaceVariant) }
             }
         }

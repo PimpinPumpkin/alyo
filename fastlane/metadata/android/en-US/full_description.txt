@@ -19,7 +19,7 @@ Turn on any part. Voice typing and the recorder share the same speech models, so
 • Crop and remove: select by dragging across the words, the waveform or the seek bar.
 • Summaries: a small language model on the phone can write a title and the key points. Optional, and a separate download.
 • Music, applause and laughter are marked in the waveform and the transcript.
-• Import audio files and transcribe them.
+• Import audio or video files and transcribe them.
 • Back up and restore the whole library.
 • Widget and quick settings tile to start recording in one tap.
 • Search across every transcript, and within one.
