@@ -30,10 +30,13 @@ class AlyoRecognitionService : RecognitionService() {
         if (!app.hasMicrophone) return callback.error(SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS)
         dictation?.cancel()
         val text = StringBuilder()
+        var spokenEnd = false
         val listener = object : Dictation.Listener {
             override fun onText(final: Dictation.Sentence?, tail: String) = report {
                 if (final != null) {
-                    val sentence = if (app.settings.spokenPunctuation.value) SpokenPunctuation.apply(final.words).text else final.words.joinToString(" ") { it.text }
+                    val spoken = if (app.settings.spokenPunctuation.value) SpokenPunctuation.apply(final.words) else null
+                    spokenEnd = spoken?.spokenEnd == true
+                    val sentence = spoken?.text ?: final.words.joinToString(" ") { it.text }
                     if (text.isNotEmpty() && !sentence.first().isWhitespace()) text.append(' ')
                     text.append(sentence)
                 }
@@ -55,7 +58,8 @@ class AlyoRecognitionService : RecognitionService() {
                     Dictation.State.DONE -> {
                         main.removeCallbacksAndMessages(LEVEL_TOKEN)
                         dictation = null
-                        if (text.isBlank()) callback.error(SpeechRecognizer.ERROR_NO_MATCH) else callback.results(results(text.toString()))
+                        if (text.isBlank()) callback.error(SpeechRecognizer.ERROR_NO_MATCH)
+                        else callback.results(results(text.toString()).apply { putBoolean(EXTRA_SPOKEN_END, spokenEnd) })
                     }
                 }
             }
@@ -104,6 +108,12 @@ class AlyoRecognitionService : RecognitionService() {
     }
 
     private companion object {
+        /**
+         * In the results: whether the text ends in a mark the speaker said out loud ("period").
+         * A caller that strings utterances together can then tell it from the period the model
+         * puts at every pause, and leave that one out when the speaker simply goes on.
+         */
+        const val EXTRA_SPOKEN_END = "app.alyo.SPOKEN_END"
         const val LEVEL_INTERVAL_MILLIS = 60L
         val LEVEL_TOKEN = Any()
     }

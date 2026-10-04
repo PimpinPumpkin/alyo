@@ -19,6 +19,15 @@ class SpokenPunctuationTest {
     private fun apply(text: String) = SpokenPunctuation.apply(words(text))
 
     @Test
+    fun aMarkSaidAtTheEndIsToldApartFromOneTheModelPut() {
+        assertEquals(true, apply("That is all period").spokenEnd)
+        assertEquals(true, apply("Are you there question mark").spokenEnd)
+        // the model's own period at a pause, and a mark said in the middle
+        assertEquals(false, apply("I went to the store.").spokenEnd)
+        assertEquals(false, apply("Hello comma how are you.").spokenEnd)
+    }
+
+    @Test
     fun plainSentenceIsLeftAlone() {
         val result = apply("Hello, how are you?")
         assertEquals("Hello, how are you?", result.text)

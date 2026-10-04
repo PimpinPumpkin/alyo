@@ -20,8 +20,9 @@ object SpokenPunctuation {
      *   break, when the command was the first thing said: that belongs on the end of whatever
      *   came before.
      * @param literal the sentence as plain words, or null if nothing was converted
+     * @param spokenEnd the sentence ends in a mark that was said out loud, not one the model put there
      */
-    data class Result(val text: String, val literal: String?)
+    data class Result(val text: String, val literal: String?, val spokenEnd: Boolean = false)
 
     private class Command(val phrase: List<String>, val mark: String)
 
@@ -68,6 +69,7 @@ object SpokenPunctuation {
         var capitalizeNext = false
         // Whether anything other than commands has been written: a mark needs a word to sit on.
         var wroteWord = false
+        var endedOnCommand = false
         var i = 0
 
         fun append(text: String) {
@@ -75,6 +77,7 @@ object SpokenPunctuation {
             out.append(if (capitalizeNext) text.replaceFirstChar { it.uppercase() } else text)
             capitalizeNext = false
             wroteWord = true
+            endedOnCommand = false
         }
 
         while (i < words.size) {
@@ -97,9 +100,10 @@ object SpokenPunctuation {
             if (!lineBreak) while (out.isNotEmpty() && out.last() in MARKS) out.setLength(out.length - 1)
             out.append(command.mark)
             capitalizeNext = lineBreak || command.mark in ".?!"
+            endedOnCommand = true
             i += command.phrase.size
         }
-        return if (converted) Result(out.toString(), literal) else Result(literal, null)
+        return if (converted) Result(out.toString(), literal, endedOnCommand) else Result(literal, null)
     }
 
     private fun isCommand(words: List<Word>, at: Int, command: Command, wroteWord: Boolean): Boolean {
