@@ -150,10 +150,14 @@ fun PlayerScreen(
     val player = remember(id) { Player(context.applicationContext, background = true) }
     DisposableEffect(player) { onDispose { player.release() } }
     var autoplayed by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(player, meta.durationMs, meta.title) {
+    // Loaded again when the audio moves as well: a new recording is played from inside the app
+    // until it has been moved to the recordings folder, and the file it was playing is then gone.
+    LaunchedEffect(player, meta.durationMs, meta.title, meta.audioUri) {
         val resumeAt = player.positionMs
+        val wasPlaying = player.wantsToPlay
         player.load(app.store.source(id), meta.title)
         if (resumeAt > 0) player.seekTo(resumeAt)
+        if (wasPlaying) player.play()
         if (autoplay && !autoplayed) {
             autoplayed = true
             player.play()
@@ -236,6 +240,16 @@ fun PlayerScreen(
                         color = colors.primary,
                     )
                 }
+            }
+
+            player.problem?.let { why ->
+                Text(
+                    "This recording could not be played ($why). Tap play to try again.",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = colors.error,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 8.dp),
+                )
             }
 
             AdaptivePane(content = {

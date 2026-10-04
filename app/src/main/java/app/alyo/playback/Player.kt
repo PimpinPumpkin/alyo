@@ -128,10 +128,21 @@ class Player(private val context: Context, background: Boolean = false) {
     var seekCount by mutableIntStateOf(0)
         private set
 
+    /** Why the audio cannot be played, in a few words, or null while nothing is wrong. */
+    var problem by mutableStateOf<String?>(null)
+        private set
+
     init {
         exo.addListener(object : Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
                 isPlaying = playing
+                if (playing) problem = null
+            }
+
+            // Said on the screen, since a play button that does nothing gives no clue why.
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                android.util.Log.e("Player", "Playback failed", error)
+                problem = error.errorCodeName.removePrefix("ERROR_CODE_").lowercase().replace('_', ' ')
             }
 
             override fun onPlaybackStateChanged(state: Int) {
@@ -153,13 +164,21 @@ class Player(private val context: Context, background: Boolean = false) {
             .setUri(uri)
             .setMediaMetadata(MediaMetadata.Builder().setTitle(title).setArtist("Alyo").build())
             .build()
+        problem = null
         exo.setMediaItem(item)
         exo.prepare()
     }
 
-    fun play() = exo.play()
+    /** True from a press of play until a pause, whether or not sound is coming out yet. */
+    val wantsToPlay: Boolean get() = exo.playWhenReady
+
+    fun play() {
+        // A player that failed, for one because its file was moved, starts over and tries again.
+        if (exo.playerError != null) exo.prepare()
+        exo.play()
+    }
     fun pause() = exo.pause()
-    fun toggle() = if (exo.isPlaying) exo.pause() else exo.play()
+    fun toggle() = if (exo.isPlaying) exo.pause() else play()
     fun seekTo(ms: Long) {
         val target = ms.coerceIn(0, maxOf(durationMs, 0))
         exo.seekTo(target)
