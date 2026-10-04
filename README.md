@@ -276,6 +276,14 @@ entries are place names from around the United States and a few French ones from
 were checked against what the voices' text reader produces, not all by ear, so corrections are
 welcome. The Supertonic voices read by their own rules and do not use the table.
 
+Place names come in bulk from Wikipedia, whose articles give the local pronunciation of towns
+whose names are not said as they are spelled. [`pronunciation/places.tsv`](pronunciation/places.tsv)
+holds about 3,500 of them from the United States, Canada, the United Kingdom, Ireland, Australia
+and New Zealand, made by `scripts/wikipedia-places.py`, which keeps a name only if the voices get
+it wrong today and it would not change an ordinary word. Each voice says them in its own accent,
+and a name said one way in North America and another elsewhere has an entry for each. A name in
+the hand-written table wins over this list, so that is where to correct one.
+
 For words you would rather not share, such as the names around where you live, Read aloud has a
 "Your words" list in the app: the word and a spelling that sounds right, with a button to hear
 it first. That list stays on the phone and works with every voice.
@@ -358,5 +366,6 @@ GPL-3.0. See [LICENSE](LICENSE).
 | Piper voices | Per voice: public domain, CC0, CC BY 4.0, and one CC BY-NC-SA 4.0 |
 | Supertonic 3 voices | OpenRAIL-M, which allows any use but harmful ones |
 | eSpeak NG data (inside each voice) | GPL 3.0 |
+| Place-name pronunciations, from Wikipedia | CC BY-SA 4.0 |
 | [Google Sans Flex](https://fonts.google.com/specimen/Google+Sans+Flex) | OFL 1.1, see [licenses/](licenses/GoogleSansFlex-OFL.txt) |
 | AndroidX, Compose, Media3, Commons Compress | Apache 2.0 |

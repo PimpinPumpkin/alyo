@@ -1,6 +1,7 @@
-#!/bin/sh
-# Builds the English dictionary the Piper voices read with, from eSpeak NG's own word list plus
-# the entries in app/src/main/assets/pronunciation/en.tsv that give exact sounds (third column).
+#!/bin/bash
+# Builds the English dictionary the Piper voices read with, from eSpeak NG's own word list, the
+# place names in pronunciation/places.tsv (see scripts/wikipedia-places.py), and the entries in
+# app/src/main/assets/pronunciation/en.tsv that give exact sounds (third column).
 # The app puts the result in place of the dictionary inside each English Piper voice.
 #
 #   scripts/build-espeak-dict.sh <espeak-ng-data>
@@ -13,6 +14,7 @@ set -eu
 cd "$(dirname "$0")/.."
 DATA="$(cd "${1:?give the espeak-ng-data folder of an unpacked Piper voice}" && pwd)"
 TABLE="$PWD/app/src/main/assets/pronunciation/en.tsv"
+PLACES="$PWD/pronunciation/places.tsv"
 OUT="$PWD/app/src/main/assets/pronunciation"
 WORK="$PWD/build/espeak"
 # The source the voices' dictionary was built from: compiled untouched it gives the same file.
@@ -39,12 +41,25 @@ fi
 
 # word<tab>spelling<tab>sounds  ->  an eSpeak list line. Names of several words go in brackets,
 # and a full stop is a word of its own there.
-grep -v '^#' "$TABLE" | awk -F'\t' 'NF >= 3 && $3 != "" {
-    word = tolower($1); gsub(/\./, " .", word); gsub(/-/, " ", word)
-    if (word ~ / /) word = "(" word ")"
-    print word "\t" $3
-}' > en_extra
-espeak-ng --path="$WORK/data" --compile=en 2>&1 | grep -i -E "error|line" && { echo "eSpeak rejected an entry." >&2; exit 1; }
+entry() {
+    awk -F'\t' -v col="$1" 'NF >= col && $col != "" {
+        word = tolower($1); gsub(/\./, " .", word); gsub(/-/, " ", word)
+        if (word ~ / /) word = "(" word ")"
+        print word "\t" $col
+    }'
+}
+# The place names collected from Wikipedia, then the hand-written table, which leaves out
+# nothing the first has: scripts/wikipedia-places.py skips every name written by hand.
+: > en_extra
+# ?3 keeps a line to American voices and ?!3 to the others (dictrules 3 in eSpeak's en-US voice).
+[ -f "$PLACES" ] && grep -v '^#' "$PLACES" | entry 2 | paste - <(grep -v '^#' "$PLACES" | cut -f3) |
+    awk -F'\t' '{ prefix = $3 == "american" ? "?3 " : $3 == "british" ? "?!3 " : ""; print prefix $1 "\t" $2 }' >> en_extra
+grep -v '^#' "$TABLE" | entry 3 >> en_extra
+espeak-ng --path="$WORK/data" --compile=en > "$WORK/compile.log" 2>&1 || true
+if grep -i -E "error|bad " "$WORK/compile.log"; then
+    echo "eSpeak rejected an entry." >&2
+    exit 1
+fi
 
 cp "$WORK/data/espeak-ng-data/en_dict" "$OUT/en_dict"
 sum "$OUT/en_dict" > "$OUT/en_dict.version"

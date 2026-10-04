@@ -51,8 +51,10 @@ once per clone.
 
 ## Pronunciation
 
-`app/src/main/assets/pronunciation/en.tsv` lists words the Piper voices say wrong. After changing
-a third column there, run `scripts/build-espeak-dict.sh <espeak-ng-data of any Piper voice>` and
+`app/src/main/assets/pronunciation/en.tsv` lists words the Piper voices say wrong, by hand.
+`pronunciation/places.tsv` is the bulk list of place names, generated from Wikipedia by
+`scripts/wikipedia-places.py`; never edit it by hand, and never add the user's own local names
+to either file. After changing a third column or regenerating the places, run `scripts/build-espeak-dict.sh <espeak-ng-data of any Piper voice>` and
 commit the `en_dict` and `en_dict.version` it writes. eSpeak loads its data once per process, so
 test a rebuilt dictionary in a fresh one.
 
