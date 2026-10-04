@@ -276,6 +276,10 @@ entries are place names from around the United States and a few French ones from
 were checked against what the voices' text reader produces, not all by ear, so corrections are
 welcome. The Supertonic voices read by their own rules and do not use the table.
 
+For words you would rather not share, such as the names around where you live, Read aloud has a
+"Your words" list in the app: the word and a spelling that sounds right, with a button to hear
+it first. That list stays on the phone and works with every voice.
+
 </details>
 
 <details>

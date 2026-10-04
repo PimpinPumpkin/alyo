@@ -57,7 +57,7 @@ class AlyoApp : Application() {
         library = Library(this, store, settings, scope)
         models = ModelManager(this, scope)
         engine = AsrEngine(models) { settings.keepWarmMinutes.value * 60_000L }
-        voices = VoiceEngine(models, assets)
+        voices = VoiceEngine(models, assets) { settings.ownWords.value }
         val diarizer = Diarizer(this, models)
         recorder = RecorderController(this, store, models, engine, settings, diarizer, scope)
         jobs = LibraryJobs(this, store, models, engine, settings, diarizer, scope)

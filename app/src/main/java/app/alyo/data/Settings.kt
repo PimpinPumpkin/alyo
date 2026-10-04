@@ -189,6 +189,26 @@ class Settings(context: Context) {
         _voice.value = id
     }
 
+    private val _ownWords = MutableStateFlow(readOwnWords())
+    /**
+     * Words the user wants said their own way, each with the spelling to read in its place. Kept
+     * on this phone only: how someone says the names around them says where they live.
+     */
+    val ownWords: StateFlow<Map<String, String>> = _ownWords
+
+    fun setOwnWord(word: String, spelling: String) = saveOwnWords(_ownWords.value.filterKeys { !it.equals(word.trim(), ignoreCase = true) } + (word.trim() to spelling.trim()))
+
+    fun removeOwnWord(word: String) = saveOwnWords(_ownWords.value - word)
+
+    private fun readOwnWords(): Map<String, String> = prefs.getString(OWN_WORDS, "")!!.lineSequence()
+        .mapNotNull { line -> line.split('\t').takeIf { it.size == 2 }?.let { it[0] to it[1] } }
+        .toMap()
+
+    private fun saveOwnWords(words: Map<String, String>) {
+        prefs.edit { putString(OWN_WORDS, words.entries.joinToString("\n") { it.key + "\t" + it.value }) }
+        _ownWords.value = words
+    }
+
     private val _speechRate = MutableStateFlow(prefs.getFloat(SPEECH_RATE, 1f))
     /** How fast Alyo reads, on top of whatever speed the app asking for speech wants. 1 is natural. */
     val speechRate: StateFlow<Float> = _speechRate
@@ -292,6 +312,7 @@ class Settings(context: Context) {
         val SPEECH_RATES = listOf(0.8f, 1f, 1.2f, 1.5f, 2f)
         private const val VOICE = "voice"
         private const val SPEECH_RATE = "speech_rate"
+        private const val OWN_WORDS = "own_words"
         private const val FEATURES = "features"
         private const val ONBOARDED = "onboarded"
 

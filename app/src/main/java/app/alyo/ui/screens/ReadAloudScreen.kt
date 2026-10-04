@@ -60,6 +60,9 @@ import app.alyo.asr.InstallState
 import app.alyo.asr.ModelCatalog
 import app.alyo.asr.ModelSpec
 import app.alyo.asr.Synth
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.TextButton
 import app.alyo.tts.VoicePreview
 import androidx.compose.material3.FilledTonalIconButton
@@ -212,9 +215,80 @@ fun ReadAloudScreen(app: AlyoApp, onBack: () -> Unit, onSettings: () -> Unit) {
                     },
                 ),
             )
+
+            val ownWords by app.settings.ownWords.collectAsState()
+            var editing by remember { mutableStateOf<Pair<String, String>?>(null) }
+            Text("Your words", style = MaterialTheme.typography.titleSmall, color = colors.primary, modifier = Modifier.padding(start = 12.dp, top = 20.dp, bottom = 4.dp))
+            Text(
+                "Names and words you want said your way. They stay on this phone.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurfaceVariant,
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 10.dp),
+            )
+            SheetGroup(
+                ownWords.entries.sortedBy { it.key.lowercase() }.map { (word, spelling) ->
+                    SheetRow(
+                        Icons.Rounded.RecordVoiceOver,
+                        word,
+                        detail = "Said as: $spelling",
+                        trailing = { IconButton(onClick = { app.settings.removeOwnWord(word) }) { Icon(Icons.Rounded.DeleteOutline, "Remove $word", tint = colors.onSurfaceVariant) } },
+                    ) { editing = word to spelling }
+                } + SheetRow(Icons.Rounded.Add, "Add a word") { editing = "" to "" },
+            )
+            editing?.let { (word, spelling) ->
+                OwnWordDialog(
+                    word, spelling,
+                    canHear = ready,
+                    onHear = { reader.speak(it, chosen.id) },
+                    onSave = { newWord, newSpelling ->
+                        if (word.isNotEmpty() && !word.equals(newWord, ignoreCase = true)) app.settings.removeOwnWord(word)
+                        app.settings.setOwnWord(newWord, newSpelling)
+                        editing = null
+                    },
+                    onDismiss = { editing = null },
+                )
+            }
             Spacer(Modifier.height(24.dp))
         }
     }
+}
+
+/**
+ * Adds or changes one of the user's own words: the word as it is written, and a spelling that
+ * reads the way they say it. The spelling can be heard before it is kept, since finding one
+ * that works is trial and error.
+ */
+@Composable
+private fun OwnWordDialog(word: String, spelling: String, canHear: Boolean, onHear: (String) -> Unit, onSave: (String, String) -> Unit, onDismiss: () -> Unit) {
+    var newWord by rememberSaveable { mutableStateOf(word) }
+    var newSpelling by rememberSaveable { mutableStateOf(spelling) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (word.isEmpty()) "Add a word" else "Change a word") },
+        text = {
+            Column {
+                OutlinedTextField(newWord, { newWord = it }, label = { Text("The word, as it is written") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(newSpelling, { newSpelling = it.replace("\n", " ").replace("\t", " ") }, label = { Text("Spell it the way it sounds") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Try a few spellings and listen. Small changes matter: a voice may read \"too-sahn\" and \"toosonn\" differently.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (canHear) {
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(onClick = { onHear(newSpelling) }, enabled = newSpelling.isNotBlank()) {
+                        Icon(Icons.Rounded.PlayArrow, null, Modifier.size(20.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Hear it")
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(newWord.trim(), newSpelling.trim()) }, enabled = newWord.isNotBlank() && newSpelling.isNotBlank()) { Text("Save") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 /**

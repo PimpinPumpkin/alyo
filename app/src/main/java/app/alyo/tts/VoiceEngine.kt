@@ -20,7 +20,10 @@ import java.util.Locale
  * Turns text into speech with a Piper or Supertonic voice. One model is held in memory at a
  * time, and for a little while after it was last used, since reading aloud tends to come in runs.
  */
-class VoiceEngine(private val models: ModelManager, private val assets: AssetManager) {
+class VoiceEngine(private val models: ModelManager, private val assets: AssetManager, private val ownWords: () -> Map<String, String> = { emptyMap() }) {
+    // The user's own respellings, rebuilt only when their list changes.
+    private var own: Pair<Map<String, String>, Pronunciations> = emptyMap<String, String>() to Pronunciations.NONE
+
     // Read when a language is first spoken, and kept.
     private val pronunciations = HashMap<String, Pronunciations>()
 
@@ -78,7 +81,10 @@ class VoiceEngine(private val models: ModelManager, private val assets: AssetMan
             // its own rules: it knows some of these names already and trips over the spellings.
             val spoken = Locale.forLanguageTag(spec.locale).language
             val words = if (spec.synth == Synth.PIPER) pronunciations.getOrPut(spoken) { Pronunciations.load(assets, spoken) } else Pronunciations.NONE
-            for (phrase in Phrases.split(words.apply(text))) {
+            // The user's own words come first and go to every voice: they chose the spelling by ear.
+            val list = ownWords()
+            if (list != own.first) own = list to Pronunciations(list)
+            for (phrase in Phrases.split(words.apply(own.second.apply(text)))) {
                 if (stopped) break
                 when (spec.synth) {
                     Synth.PIPER -> tts.generateWithCallback(phrase, 0, pace, sink)
