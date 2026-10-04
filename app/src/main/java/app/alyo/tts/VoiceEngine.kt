@@ -7,14 +7,17 @@ import app.alyo.asr.ModelManager
 import app.alyo.asr.ModelSpec
 import com.k2fsa.sherpa.onnx.OfflineTts
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig
+import app.alyo.asr.Synth
+import com.k2fsa.sherpa.onnx.GenerationConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
+import com.k2fsa.sherpa.onnx.OfflineTtsSupertonicModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
 import java.io.File
 import java.util.Locale
 
 /**
- * Turns text into speech with a Piper voice. One voice is held in memory at a time, and for a
- * little while after it was last used, since reading aloud tends to come in runs.
+ * Turns text into speech with a Piper or Supertonic voice. One model is held in memory at a
+ * time, and for a little while after it was last used, since reading aloud tends to come in runs.
  */
 class VoiceEngine(private val models: ModelManager) {
     private var loaded: Pair<String, OfflineTts>? = null
@@ -32,20 +35,24 @@ class VoiceEngine(private val models: ModelManager) {
      * three-letter codes Android's speech framework uses ("eng", "USA").
      */
     fun voiceFor(language: String?, country: String?, preferred: ModelSpec?): ModelSpec? {
-        val candidates = installed().filter { Locale.forLanguageTag(it.locale).isO3Language.equals(language, ignoreCase = true) }
+        val candidates = installed().filter { voice ->
+            (listOf(Locale.forLanguageTag(voice.locale).language) + voice.languages).any { Locale(it).isO3Language.equals(language, ignoreCase = true) }
+        }
         return candidates.firstOrNull { it.id == preferred?.id }
             ?: candidates.firstOrNull { Locale.forLanguageTag(it.locale).isO3Country.equals(country, ignoreCase = true) }
             ?: candidates.firstOrNull()
     }
 
     /**
-     * Speaks [text], handing the audio over a sentence at a time as 22.05 kHz mono samples.
-     * Blocks until it is finished or stopped. [onAudio] returns false to stop early.
+     * Speaks [text], handing the audio over a sentence at a time as mono samples at the rate of
+     * the voice's engine ([Synth.sampleRate]). Blocks until it is finished or stopped. [onAudio]
+     * returns false to stop early.
      *
      * @param speed 1 is the voice's natural pace; 2 is twice as fast
+     * @param language what the text is written in, as a two-letter code, for voices that speak several
      */
     @Synchronized
-    fun speak(spec: ModelSpec, text: String, speed: Float, onAudio: (FloatArray) -> Boolean) {
+    fun speak(spec: ModelSpec, text: String, speed: Float, language: String? = null, onAudio: (FloatArray) -> Boolean) {
         handler.removeCallbacks(unload)
         stopped = false
         try {
@@ -55,7 +62,20 @@ class VoiceEngine(private val models: ModelManager) {
             val sink = object : Function1<FloatArray, Int> {
                 override fun invoke(samples: FloatArray): Int = if (stopped || !onAudio(samples)) 0 else 1
             }
-            tts.generateWithCallback(text, 0, speed.coerceIn(0.3f, 4f), sink)
+            val pace = speed.coerceIn(0.3f, 4f)
+            when (spec.synth) {
+                Synth.PIPER -> tts.generateWithCallback(text, 0, pace, sink)
+                Synth.SUPERTONIC -> tts.generateWithConfigAndCallback(
+                    text,
+                    GenerationConfig(
+                        speed = pace,
+                        sid = spec.speaker,
+                        numSteps = SUPERTONIC_STEPS,
+                        extra = mapOf("lang" to (language?.takeIf { it in spec.languages } ?: Locale.forLanguageTag(spec.locale).language)),
+                    ),
+                    sink,
+                )
+            }
         } finally {
             handler.postDelayed(unload, KEEP_MS)
         }
@@ -67,26 +87,41 @@ class VoiceEngine(private val models: ModelManager) {
     }
 
     private fun load(spec: ModelSpec): OfflineTts {
-        loaded?.let { (id, tts) -> if (id == spec.id) return tts else tts.release() }
+        // Voices of one model share it, so changing between them loads nothing.
+        loaded?.let { (key, tts) -> if (key == spec.key) return tts else tts.release() }
         val dir = models.dir(spec)
-        val config = OfflineTtsConfig(
-            model = OfflineTtsModelConfig(
-                vits = OfflineTtsVitsModelConfig(
-                    model = File(dir, spec.encoder).path,
-                    tokens = File(dir, spec.tokens).path,
-                    dataDir = File(dir, "espeak-ng-data").path,
+        fun path(name: String) = File(dir, name).path
+        val model = when (spec.synth) {
+            Synth.PIPER -> OfflineTtsModelConfig(
+                vits = OfflineTtsVitsModelConfig(model = path(spec.encoder), tokens = path(spec.tokens), dataDir = path("espeak-ng-data")),
+                numThreads = 2,
+                provider = "cpu",
+            )
+            Synth.SUPERTONIC -> OfflineTtsModelConfig(
+                supertonic = OfflineTtsSupertonicModelConfig(
+                    durationPredictor = path("duration_predictor.int8.onnx"),
+                    textEncoder = path("text_encoder.int8.onnx"),
+                    vectorEstimator = path("vector_estimator.int8.onnx"),
+                    vocoder = path("vocoder.int8.onnx"),
+                    ttsJson = path("tts.json"),
+                    unicodeIndexer = path("unicode_indexer.bin"),
+                    voiceStyle = path("voice.bin"),
                 ),
                 numThreads = 2,
                 provider = "cpu",
-            ),
+            )
+        }
+        val config = OfflineTtsConfig(
+            model = model,
             // One sentence at a time, so the first words are heard while the rest is still being made.
             maxNumSentences = 1,
         )
-        return OfflineTts(null, config).also { loaded = spec.id to it }
+        return OfflineTts(null, config).also { loaded = spec.key to it }
     }
 
     companion object {
-        const val SAMPLE_RATE = 22050
+        // Fewer steps are faster and audibly worse; five is where the voices sound right.
+        private const val SUPERTONIC_STEPS = 5
         private const val KEEP_MS = 120_000L
     }
 }

@@ -29,7 +29,7 @@ Turn on any part. Voice typing and the recorder share the same speech models, so
 
 • Choose Alyo as the phone's speech engine and every app that talks uses its voice.
 • Select text and pick "Read aloud", or share text to Alyo.
-• Eleven voices in English, German, French and Spanish.
+• Eleven quick voices in English, German, French and Spanish, and ten more natural ones that speak 31 languages.
 
 <b>Offline</b>
 

@@ -59,6 +59,7 @@ import app.alyo.AlyoApp
 import app.alyo.asr.InstallState
 import app.alyo.asr.ModelCatalog
 import app.alyo.asr.ModelSpec
+import app.alyo.asr.Synth
 import app.alyo.asr.works
 import app.alyo.data.Settings
 import app.alyo.tts.Reader
@@ -170,7 +171,16 @@ fun ReadAloudScreen(app: AlyoApp, onBack: () -> Unit, onSettings: () -> Unit) {
             // Voices for the phone's own language first.
             val mine = Locale.getDefault().language
             val ordered = ModelCatalog.voices.sortedBy { if (Locale.forLanguageTag(it.locale).language == mine) 0 else 1 }
-            SheetGroup(ordered.map { voice -> voiceRow(app, voice, states[voice.id] ?: InstallState.Missing, voice.id == chosen.id) })
+            SheetGroup(ordered.filter { it.synth == Synth.PIPER }.map { voice -> voiceRow(app, voice, states[voice.id] ?: InstallState.Missing, chosen) })
+
+            Text("Supertonic voices", style = MaterialTheme.typography.titleSmall, color = colors.primary, modifier = Modifier.padding(start = 12.dp, top = 20.dp, bottom = 4.dp))
+            Text(
+                "More natural, and each speaks 31 languages. One 129 MB download for all ten, under the OpenRAIL-M license. They take about twice as long to start talking as the voices above.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurfaceVariant,
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 10.dp),
+            )
+            SheetGroup(ordered.filter { it.synth == Synth.SUPERTONIC }.map { voice -> voiceRow(app, voice, states[voice.id] ?: InstallState.Missing, chosen) })
 
             Text("Speed", style = MaterialTheme.typography.titleSmall, color = colors.primary, modifier = Modifier.padding(start = 12.dp, top = 20.dp, bottom = 10.dp))
             SheetGroup(
@@ -185,21 +195,27 @@ fun ReadAloudScreen(app: AlyoApp, onBack: () -> Unit, onSettings: () -> Unit) {
     }
 }
 
-/** One voice in the list: tap to choose it (and fetch it if it is not here), bin to remove it. */
-private fun voiceRow(app: AlyoApp, voice: ModelSpec, state: InstallState, selected: Boolean) = SheetRow(
+/**
+ * One voice in the list: tap to choose it (and fetch it if it is not here), bin to remove it.
+ * Voices that share a download go together, so the bin is not offered while one of them is in use.
+ */
+private fun voiceRow(app: AlyoApp, voice: ModelSpec, state: InstallState, chosen: ModelSpec) = SheetRow(
     icon = Icons.Rounded.RecordVoiceOver,
     label = voice.title,
     detail = voice.summary + "\n" + when (state) {
         is InstallState.Downloading -> "Downloading, ${(state.fraction * 100).toInt()}%"
         is InstallState.Failed -> "Download failed. Tap to try again."
-        else -> (if (state.works) "On this phone" else formatBytes(voice.source.downloadBytes)) + "  ·  " + voice.license + if (voice.nonCommercial) " (no commercial use)" else ""
+        // Voices that share a download say its size and license once, above the group.
+        else -> if (voice.store.isNotEmpty()) (if (state.works) "On this phone" else "Not downloaded")
+        else (if (state.works) "On this phone" else formatBytes(voice.source.downloadBytes)) + "  ·  " + voice.license + if (voice.nonCommercial) " (no commercial use)" else ""
     },
     trailing = {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (state.works && !selected) {
-                IconButton(onClick = { app.models.delete(voice) }) { Icon(Icons.Rounded.DeleteOutline, "Remove ${voice.title}", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+            if (state.works && voice.key != chosen.key) {
+                val what = if (voice.store.isEmpty()) voice.title else "all Supertonic voices"
+                IconButton(onClick = { app.models.delete(voice) }) { Icon(Icons.Rounded.DeleteOutline, "Remove $what", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
-            RadioButton(selected = selected, onClick = null)
+            RadioButton(selected = voice.id == chosen.id, onClick = null)
         }
     },
     onClick = {

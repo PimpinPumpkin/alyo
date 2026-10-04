@@ -60,7 +60,8 @@ Voice typing and the recorder use the same speech models, so those are downloade
 - **A voice for the whole phone.** Choose Alyo as the speech engine and screen readers, navigation
   and read-aloud buttons in other apps all use it.
 - **Read any text.** Select it and pick "Read aloud", or share it to Alyo.
-- **Eleven voices** in English, German, French and Spanish, each a 67 MB download.
+- **Eleven quick voices** in English, German, French and Spanish, each a 67 MB download, and
+  **ten Supertonic voices** that sound more natural and speak 31 languages, 129 MB for all ten.
 - **Adjustable speed.**
 
 ## All of it
@@ -164,7 +165,8 @@ on first launch.
 
 - Best uses about 1.1 GB of memory while it is working.
 - With the recorder on and speaker labels left on, add 97 MB for the voice model.
-- Read aloud needs one voice, 67 MB each. It does not need the speech models at all.
+- Read aloud needs one voice: 67 MB each, or 129 MB for the ten Supertonic voices together. It
+  does not need the speech models at all.
 - Summaries need a separate model: Quick (676 MB) or Thorough (1.1 GB). Any other GGUF chat model
   can be imported instead.
 
@@ -241,6 +243,9 @@ so nothing said while a model loads is lost.
 - **Read aloud**: [Piper](https://github.com/OHF-Voice/piper1-gpl) voices, with eSpeak NG turning
   spelling into sounds. Alyo registers as an Android text-to-speech engine, so it works wherever
   the phone speaks. On a Pixel 4a 5G a sentence is ready about six times faster than it is spoken.
+  The [Supertonic 3](https://github.com/supertone-inc/supertonic) voices are one model for all
+  ten voices and every language; on the same phone a sentence is ready about twice as fast as it
+  is spoken.
 
 Each version of the app pins the exact model files it uses by SHA-256. They are fetched from the
 [`models` release](https://github.com/PimpinPumpkin/alyo/releases/tag/models) here, which holds
@@ -255,7 +260,9 @@ unmodified copies, and from the original publisher if that fails.
 
 - Read aloud has no pause or skip yet, and does not highlight the words as it goes.
 - One voice, HFC, was trained on recordings licensed for non-commercial use only. It is labeled
-  where you choose it. The others are free to use for anything.
+  where you choose it. The Supertonic voices come under OpenRAIL-M, which allows any use except a
+  list of harmful ones, so it is not a free software license. The other voices are free to use
+  for anything.
 - Voice typing is English only. The recorder has four languages; adding one needs a good open
   streaming model, and few languages have one.
 - The app's own text is English only.
@@ -320,6 +327,7 @@ GPL-3.0. See [LICENSE](LICENSE).
 | CED tiny, Qwen2.5 | Apache 2.0 |
 | pyannote segmentation 3.0 | MIT |
 | Piper voices | Per voice: public domain, CC0, CC BY 4.0, and one CC BY-NC-SA 4.0 |
+| Supertonic 3 voices | OpenRAIL-M, which allows any use but harmful ones |
 | eSpeak NG data (inside each voice) | GPL 3.0 |
 | [Google Sans Flex](https://fonts.google.com/specimen/Google+Sans+Flex) | OFL 1.1, see [licenses/](licenses/GoogleSansFlex-OFL.txt) |
 | AndroidX, Compose, Media3, Commons Compress | Apache 2.0 |

@@ -76,7 +76,29 @@ data class ModelSpec(
     val license: String = "",
     /** For voices: true when that license forbids commercial use, which also keeps it out of F-Droid's main repository. */
     val nonCommercial: Boolean = false,
-)
+    /** For voices: which engine speaks it. */
+    val synth: Synth = Synth.PIPER,
+    /** For voices that come several to a model: which of them this is. */
+    val speaker: Int = 0,
+    /** For voices that speak more than their own [locale]: the other languages, as two-letter codes. */
+    val languages: List<String> = emptyList(),
+    /**
+     * For models that share one download, the name they share it under. They are installed and
+     * removed together.
+     */
+    val store: String = "",
+) {
+    /** What the files are kept and fetched under: [store] if the download is shared, else [id]. */
+    val key: String get() = store.ifEmpty { id }
+}
+
+/** The engines that turn text into speech. */
+enum class Synth(val sampleRate: Int) {
+    /** One small model per voice. Fast on any phone. */
+    PIPER(22_050),
+    /** One larger model for all its voices and languages. Sounds more natural and takes about twice as long. */
+    SUPERTONIC(44_100),
+}
 
 /** How good the finished transcript is, traded against download size and memory. */
 /**
@@ -368,6 +390,31 @@ object ModelCatalog {
     )
 
     /**
+     * A Supertonic 3 voice. All ten are one download, and each speaks every language the model
+     * knows. The 8-bit model is used: on a phone it is as fast as the full one at a third the size.
+     */
+    private fun supertonic(speaker: Int, title: String, summary: String) = ModelSpec(
+        id = "voice-supertonic-3-${title.lowercase()}",
+        store = "voice-supertonic-3",
+        archive = "sherpa-onnx-supertonic-3-tts-int8-2026-05-11",
+        kind = ModelKind.VOICE,
+        title = "Supertonic $title",
+        summary = summary,
+        encoder = "text_encoder.int8.onnx",
+        locale = "en-US",
+        languages = SUPERTONIC_LANGUAGES,
+        license = "OpenRAIL-M",
+        synth = Synth.SUPERTONIC,
+        speaker = speaker,
+        source = ModelSource.Tarball("$TTS/sherpa-onnx-supertonic-3-tts-int8-2026-05-11.tar.bz2", 128_774_318, tree = true),
+    )
+
+    private val SUPERTONIC_LANGUAGES = listOf(
+        "en", "ko", "ja", "ar", "bg", "cs", "da", "de", "el", "es", "et", "fi", "fr", "hi", "hr", "hu",
+        "id", "it", "lt", "lv", "nl", "pl", "pt", "ro", "ru", "sk", "sl", "sv", "tr", "uk", "vi",
+    )
+
+    /**
      * The voices offered for reading aloud, the default for each language first. Chosen for clear
      * speech at a speed an old phone keeps up with (about six times faster than real time on a
      * Pixel 4a 5G), and, with one labeled exception, for training data anyone may use.
@@ -384,6 +431,18 @@ object ModelCatalog {
         piper("fr_FR-siwis", "Siwis", "Français, female", "fr-FR", 67_207_459, "CC BY 4.0"),
         piper("es_ES-davefx", "Dave", "Español de España, male", "es-ES", 67_184_952, "CC0"),
         piper("es_MX-ald", "Ald", "Español de México, male", "es-MX", 67_196_497, "Unlicense"),
+    ) + listOf(
+        // In the order the model numbers them.
+        supertonic(0, "F1", "Female"),
+        supertonic(1, "F2", "Female"),
+        supertonic(2, "F3", "Female"),
+        supertonic(3, "F4", "Female"),
+        supertonic(4, "F5", "Female"),
+        supertonic(5, "M1", "Male"),
+        supertonic(6, "M2", "Male"),
+        supertonic(7, "M3", "Male"),
+        supertonic(8, "M4", "Male"),
+        supertonic(9, "M5", "Male"),
     )
 
     /** The voice to start with for [locale]: its country's first, else its language's first, else the first of all. */
@@ -409,7 +468,7 @@ object ModelCatalog {
     /** Where [file] of [spec] can be fetched from, in the order to try. */
     fun urls(spec: ModelSpec, file: ModelFile): List<String> = listOf("$MIRROR/${spec.id}.${file.name}", file.url)
 
-    fun urls(spec: ModelSpec, tarball: ModelSource.Tarball): List<String> = listOf("$MIRROR/${spec.id}.tar.bz2", tarball.url)
+    fun urls(spec: ModelSpec, tarball: ModelSource.Tarball): List<String> = listOf("$MIRROR/${spec.key}.tar.bz2", tarball.url)
 
     /** Where the archive for [spec] can be fetched by hand, for importing instead of downloading in the app. */
     fun archiveUrl(spec: ModelSpec): String = "$GH/${spec.archive}.tar.bz2"

@@ -109,7 +109,7 @@ jobs:
         run: |
           mkdir -p app/libs/onnxruntime/arm64-v8a
           gh release download models --repo "${{ github.repository }}" \
-            --pattern 'build.libonnxruntime-1.28.2-alyo3-arm64-v8a.so' \
+            --pattern 'build.libonnxruntime-1.28.2-alyo4-arm64-v8a.so' \
             --output app/libs/onnxruntime/arm64-v8a/libonnxruntime.so || echo "Not available; using the AAR's copy."
 
       - name: Unit tests

@@ -4,11 +4,12 @@
 # twice the size.
 #
 #   scripts/build-onnxruntime.sh                 build with scripts/onnxruntime-ops.config
-#   scripts/build-onnxruntime.sh <model dir>     first regenerate that config from the .onnx files
-#                                                in <model dir>, then build
+#   scripts/build-onnxruntime.sh <model dir>     first add the operators of the .onnx files in
+#                                                <model dir> to that config, then build
 #
-# Regenerate the config whenever a model is added to ModelCatalog.kt or bundled in the APK: put
-# every .onnx the app can load in one directory (all languages, both passes, sounds, speakers).
+# Do that whenever a model is added to ModelCatalog.kt or bundled in the APK: put the new model's
+# .onnx files in a directory and pass it. Operators are only ever added, so the models already
+# listed keep working; to start over, empty the config and pass a directory with every model.
 # A model that needs an operator left out fails to load, so test each one after a rebuild.
 #
 # Needs: ANDROID_HOME with an NDK, python3 with `pip install cmake ninja onnx onnxruntime`.
@@ -38,7 +39,8 @@ if [ -n "${1:-}" ]; then
   python3 - "$OUT/raw.config" "$OUT/ort/required_operators.config" "$CONFIG" <<'PY'
 import collections, sys
 ops = collections.defaultdict(set)
-for path in sys.argv[1:3]:
+# sys.argv[3] is the config as it stands: what is already there stays
+for path in sys.argv[1:4]:
     for line in open(path):
         line = line.strip()
         if line and not line.startswith("#"):
@@ -46,8 +48,8 @@ for path in sys.argv[1:3]:
             ops[(domain, int(opset))] |= set(names.split(","))
 with open(sys.argv[3], "w") as out:
     out.write("# Operators the models Alyo ships or downloads need, as published and after\n")
-    out.write("# ONNX Runtime has optimized them. Regenerate with\n")
-    out.write("# scripts/build-onnxruntime.sh <dir holding every model>\n")
+    out.write("# ONNX Runtime has optimized them. Add a model's with\n")
+    out.write("# scripts/build-onnxruntime.sh <dir holding its .onnx files>\n")
     out.write("# whenever a model is added to ModelCatalog.kt.\n")
     for domain, opset in sorted(ops):
         out.write(f"{domain};{opset};{','.join(sorted(ops[(domain, opset)]))}\n")

@@ -56,14 +56,15 @@ class AlyoTtsService : TextToSpeechService() {
             callback.error(TextToSpeech.ERROR_NOT_INSTALLED_YET)
             return
         }
-        callback.start(VoiceEngine.SAMPLE_RATE, AudioFormat.ENCODING_PCM_16BIT, 1)
+        callback.start(voice.synth.sampleRate, AudioFormat.ENCODING_PCM_16BIT, 1)
         val text = request.charSequenceText?.toString().orEmpty()
         if (text.isNotBlank()) {
             // The request's rate is a percentage of normal; the user's own setting scales it again.
             val speed = request.speechRate / 100f * app.settings.speechRate.value
             val limit = callback.maxBufferSize
             try {
-                app.voices.speak(voice, text, speed) { samples ->
+                val language = request.language?.let { asked -> Locale.getISOLanguages().firstOrNull { Locale(it).isO3Language.equals(asked, ignoreCase = true) } }
+                app.voices.speak(voice, text, speed, language) { samples ->
                     val bytes = ByteArray(samples.size * 2)
                     for (i in samples.indices) {
                         val s = (samples[i] * 32767f).toInt().coerceIn(-32768, 32767)

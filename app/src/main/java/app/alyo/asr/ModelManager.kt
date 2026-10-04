@@ -97,20 +97,21 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
     fun resumeInterrupted() {
         val unfinished = wanted
         ModelCatalog.allModels
-            .filter { it.id in unfinished }
+            .filter { it.key in unfinished }
+            .distinctBy { it.key }
             .forEach(::install)
     }
 
-    fun dir(spec: ModelSpec): File = File(root, spec.id)
+    fun dir(spec: ModelSpec): File = File(root, spec.key)
     fun isInstalled(spec: ModelSpec): Boolean = File(dir(spec), DONE).exists()
     fun state(spec: ModelSpec): InstallState = _states.value[spec.id] ?: InstallState.Missing
 
     @Synchronized
     fun install(spec: ModelSpec) {
-        if (isInstalled(spec) || jobs[spec.id]?.isActive == true) return
-        wanted = wanted + spec.id
+        if (isInstalled(spec) || jobs[spec.key]?.isActive == true) return
+        wanted = wanted + spec.key
         set(spec, InstallState.Downloading(0, spec.source.downloadBytes))
-        jobs[spec.id] = scope.launch(Dispatchers.IO) {
+        jobs[spec.key] = scope.launch(Dispatchers.IO) {
             try {
                 val dir = dir(spec).apply { mkdirs() }
                 when (val source = spec.source) {
@@ -118,7 +119,7 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
                     is ModelSource.Tarball -> downloadTarball(spec, source, dir)
                 }
                 File(dir, DONE).createNewFile()
-                wanted = wanted - spec.id
+                wanted = wanted - spec.key
                 retire(spec)
                 set(spec, InstallState.Installed)
                 optimizeInstalled()
@@ -134,14 +135,14 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
     /** Pauses a download. What has arrived is kept, so [install] carries on from there. */
     @Synchronized
     fun cancel(spec: ModelSpec) {
-        wanted = wanted - spec.id
-        jobs.remove(spec.id)?.cancel()
+        wanted = wanted - spec.key
+        jobs.remove(spec.key)?.cancel()
     }
 
     @Synchronized
     fun delete(spec: ModelSpec) {
-        wanted = wanted - spec.id
-        jobs.remove(spec.id)?.cancel()
+        wanted = wanted - spec.key
+        jobs.remove(spec.key)?.cancel()
         dir(spec).deleteRecursively()
         retire(spec)
         set(spec, InstallState.Missing)
@@ -201,12 +202,12 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
             if (found.kind == ModelKind.VOICE) {
                 if (!File(staging, found.encoder).exists()) throw IOException("The archive is missing files. It may be incomplete.")
                 synchronized(this) {
-                    jobs.remove(found.id)?.cancel()
+                    jobs.remove(found.key)?.cancel()
                     val dir = dir(found).apply { deleteRecursively() }
                     dir.parentFile?.mkdirs()
                     if (!staging.renameTo(dir)) throw IOException("Could not save the voice")
                     File(dir, DONE).createNewFile()
-                    wanted = wanted - found.id
+                    wanted = wanted - found.key
                     set(found, InstallState.Installed)
                 }
                 return found
@@ -220,11 +221,11 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
                 }
             }
             synchronized(this) {
-                jobs.remove(found.id)?.cancel()
+                jobs.remove(found.key)?.cancel()
                 val dir = dir(found).apply { deleteRecursively(); mkdirs() }
                 needed.forEach { if (!File(staging, it).renameTo(File(dir, it))) throw IOException("Could not save $it") }
                 File(dir, DONE).createNewFile()
-                wanted = wanted - found.id
+                wanted = wanted - found.key
                 retire(found)
                 set(found, InstallState.Installed)
             }
@@ -271,7 +272,10 @@ class ModelManager(context: Context, private val scope: CoroutineScope) {
         return spec
     }
 
-    private fun set(spec: ModelSpec, state: InstallState) = _states.update { it + (spec.id to state) }
+    /** Models that share a download are in the same state, so the state is set for all of them. */
+    private fun set(spec: ModelSpec, state: InstallState) = _states.update { states ->
+        states + (spec.id to state) + ModelCatalog.allModels.filter { it.key == spec.key }.associate { it.id to state }
+    }
 
     private suspend fun downloadFiles(spec: ModelSpec, source: ModelSource.Files, dir: File) {
         val total = source.downloadBytes
