@@ -26,7 +26,12 @@ interface Editor {
  * it or not, a capital or not), applies spoken punctuation, and remembers what it inserted so the
  * last sentence can be taken back.
  */
-class Composer(private val editor: Editor, private val spokenPunctuation: Boolean) {
+class Composer(
+    private val editor: Editor,
+    private val spokenPunctuation: Boolean,
+    /** Keep the period the speech model puts at every pause. Off: a pause alone does not end the sentence. */
+    private val pausePeriods: Boolean = true,
+) {
     /**
      * @param inserted exactly what went into the field
      * @param removed a mark deleted from the end of the earlier text to make way for a spoken one
@@ -45,6 +50,14 @@ class Composer(private val editor: Editor, private val spokenPunctuation: Boolea
     /** True right after a sentence with a converted mark went in: backspace puts the words back. */
     private var revertible = false
 
+    /**
+     * A period nobody said, left out when the last sentence went in: where that sentence ended on the
+     * dictation's timeline, and the end of the text as it was then. Going on soon after carries the
+     * sentence on; going on after a long pause puts the period in after all.
+     */
+    private var owedPeriodAtMs = -1
+    private var owedPeriodAfter = ""
+
     /** Set when the field restarted input: it has turned the underlined run into ordinary text. */
     private var detached = false
 
@@ -57,6 +70,7 @@ class Composer(private val editor: Editor, private val spokenPunctuation: Boolea
         context = ""
         revertible = false
         detached = false
+        owedPeriodAtMs = -1
     }
 
     /** The field restarted input on its own (many do after every change). The underline is gone but its text is still there. */
@@ -109,12 +123,31 @@ class Composer(private val editor: Editor, private val spokenPunctuation: Boolea
             editor.deleteBefore(1)
             context = context.dropLast(1)
         }
-        val inserted = fit(spoken.text, lowerFirst = joins)
+        // The period held back at the last pause goes in now if the speaker took a long break,
+        // and only if the text still ends where that sentence left it.
+        var lead = ""
+        val owedAt = owedPeriodAtMs
+        owedPeriodAtMs = -1
+        if (owedAt >= 0 && !startsWithMark && context.endsWith(owedPeriodAfter)) {
+            // a sentence only split because it ran long carries on after a comma, as it does with the period kept
+            if (sentence.continues) lead = ","
+            else if (sentence.words.first().startMs - owedAt >= LONG_PAUSE_MS) lead = "."
+            context += lead
+        }
+        var text = spoken.text
+        var literal = spoken.literal
+        if (!pausePeriods && !spoken.spokenEnd && text.length > 1 && text.endsWith(".") && !text.endsWith("..")) {
+            text = text.dropLast(1)
+            if (literal != null && literal.endsWith(".")) literal = literal.dropLast(1)
+            owedPeriodAtMs = sentence.words.last().endMs
+        }
+        val inserted = lead + fit(text, lowerFirst = joins)
         editor.insert(inserted)
-        history += Entry(inserted, removed, spoken.literal?.let { fit(it, lowerFirst = joins) })
+        if (owedPeriodAtMs >= 0) owedPeriodAfter = (context.dropLast(lead.length) + inserted).takeLast(OWED_CONTEXT)
+        history += Entry(inserted, removed, literal?.let { lead + fit(it, lowerFirst = joins) })
         if (history.size > MAX_HISTORY) history.removeAt(0)
         revertible = spoken.literal != null
-        context = (context + inserted).takeLast(CONTEXT)
+        context = (context.dropLast(lead.length) + inserted).takeLast(CONTEXT)
     }
 
     /** [text] as it should read after [context]: spaced off from it, and capitalized only where a sentence starts. */
@@ -163,6 +196,7 @@ class Composer(private val editor: Editor, private val spokenPunctuation: Boolea
      */
     fun undo(): Boolean {
         revertible = false
+        owedPeriodAtMs = -1
         if (shown.isNotEmpty() || detached) {
             editor.batch {
                 reattach()
@@ -218,6 +252,10 @@ class Composer(private val editor: Editor, private val spokenPunctuation: Boolea
     private companion object {
         const val CONTEXT = 48
         const val MAX_HISTORY = 50
+        const val OWED_CONTEXT = 12
+
+        /** Silence between two sentences, on top of the pause that closed the first, after which the second starts anew. */
+        const val LONG_PAUSE_MS = 3000
         const val MARKS = ".,;:?!"
         const val OPENERS = "([{\"'“‘/@#-"
     }

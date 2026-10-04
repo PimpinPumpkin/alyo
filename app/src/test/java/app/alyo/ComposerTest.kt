@@ -163,4 +163,61 @@ class ComposerTest {
         Composer(field, spokenPunctuation = false).update(sentence("Hello comma world."), "")
         assertEquals("Hello comma world.", field.text)
     }
+
+    private fun sentenceAt(startMs: Int, text: String, continues: Boolean = false): Dictation.Sentence {
+        var at = startMs
+        return Dictation.Sentence(text.split(' ').map { Word(it, at, at + 300).also { at += 350 } }, continues)
+    }
+
+    @Test
+    fun aPauseAloneDoesNotEndTheSentence() {
+        val field = Field()
+        val composer = Composer(field, spokenPunctuation = true, pausePeriods = false)
+        composer.update(sentenceAt(0, "I went to the store."), "")
+        assertEquals("I went to the store", field.text)
+        composer.update(null, "and bought")
+        assertEquals("I went to the store and bought", field.text)
+        composer.update(sentenceAt(3000, "And bought some milk."), "")
+        assertEquals("I went to the store and bought some milk", field.text)
+    }
+
+    @Test
+    fun goingOnAfterALongPauseStartsANewSentence() {
+        val field = Field()
+        val composer = Composer(field, true, pausePeriods = false)
+        composer.update(sentenceAt(0, "I went to the store."), "")
+        composer.update(sentenceAt(9000, "It was closed."), "")
+        assertEquals("I went to the store. It was closed", field.text)
+        assertFalse(composer.undo())
+        assertEquals("I went to the store", field.text)
+    }
+
+    @Test
+    fun aPeriodThatWasSaidStaysAndSoDoOtherMarks() {
+        val field = Field()
+        val composer = Composer(field, true, pausePeriods = false)
+        composer.update(sentenceAt(0, "That is all period"), "")
+        composer.update(sentenceAt(2000, "Are you there?"), "")
+        composer.update(sentenceAt(4000, "Yes."), "")
+        assertEquals("That is all. Are you there? Yes", field.text)
+    }
+
+    @Test
+    fun aLongSentenceSplitInTwoIsJoinedWithAComma() {
+        val field = Field()
+        val composer = Composer(field, true, pausePeriods = false)
+        composer.update(sentenceAt(0, "They ruled for years."), "")
+        composer.update(sentenceAt(1500, "Where it ended.", continues = true), "")
+        assertEquals("They ruled for years, where it ended", field.text)
+    }
+
+    @Test
+    fun aHeldBackPeriodIsForgottenWhenTheTextWasChanged() {
+        val field = Field()
+        val composer = Composer(field, true, pausePeriods = false)
+        composer.update(sentenceAt(0, "See you soon."), "")
+        field.committed += " ok"
+        composer.update(sentenceAt(9000, "Bye."), "")
+        assertEquals("See you soon ok bye", field.text)
+    }
 }

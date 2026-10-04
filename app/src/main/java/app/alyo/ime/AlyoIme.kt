@@ -174,7 +174,7 @@ class AlyoIme : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner, V
             else -> null
         }
         if (problem.value != null) return
-        val composer = Composer(editor, app.settings.spokenPunctuation.value).also { this.composer = it }
+        val composer = Composer(editor, app.settings.spokenPunctuation.value, app.settings.pausePeriods.value).also { this.composer = it }
         var mine: Dictation? = null
         val listener = object : Dictation.Listener {
             override fun onText(final: Dictation.Sentence?, tail: String) = onMain {

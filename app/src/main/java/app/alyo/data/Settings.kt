@@ -158,6 +158,15 @@ class Settings(context: Context) {
         _spokenPunctuation.value = on
     }
 
+    private val _pausePeriods = MutableStateFlow(prefs.getBoolean(PAUSE_PERIODS, false))
+    /** A period at every pause while dictating, as the speech model writes it. Off: only when said, or after a long pause. */
+    val pausePeriods: StateFlow<Boolean> = _pausePeriods
+
+    fun setPausePeriods(on: Boolean) {
+        prefs.edit { putBoolean(PAUSE_PERIODS, on) }
+        _pausePeriods.value = on
+    }
+
     private val _tallPanel = MutableStateFlow(prefs.getBoolean(TALL_PANEL, false))
     /** The voice typing panel is as tall as a keyboard, not a slim bar, so the app does not move when switching to one. */
     val tallPanel: StateFlow<Boolean> = _tallPanel
@@ -307,6 +316,7 @@ class Settings(context: Context) {
         val KEEP_WARM_CHOICES = listOf(KEEP_WARM_ALWAYS, 15, 5, 0)
         private const val STOP_AFTER = "stop_after_seconds"
         private const val SPOKEN_PUNCTUATION = "spoken_punctuation"
+        private const val PAUSE_PERIODS = "pause_periods"
         private const val TALL_PANEL = "tall_panel"
         private const val KEEP_WARM = "keep_warm_minutes"
         val SPEECH_RATES = listOf(0.8f, 1f, 1.2f, 1.5f, 2f)

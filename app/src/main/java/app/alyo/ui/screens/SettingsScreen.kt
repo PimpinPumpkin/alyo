@@ -219,6 +219,7 @@ fun SettingsScreen(app: AlyoApp, onDone: () -> Unit, onLicenses: () -> Unit, onW
     val recorderIcon by app.settings.recorderIcon.collectAsState()
     val stopAfter by app.settings.stopAfterSeconds.collectAsState()
     val spoken by app.settings.spokenPunctuation.collectAsState()
+    val pausePeriods by app.settings.pausePeriods.collectAsState()
     val keepWarm by app.settings.keepWarmMinutes.collectAsState()
     val tallPanel by app.settings.tallPanel.collectAsState()
     val autoTitle by app.settings.autoTitle.collectAsState()
@@ -272,6 +273,13 @@ fun SettingsScreen(app: AlyoApp, onDone: () -> Unit, onLicenses: () -> Unit, onW
                             detail = "Say comma, period, question mark or new line. Backspace right away puts a word back.",
                             trailing = { Switch(checked = spoken, onCheckedChange = null) },
                             onClick = { app.settings.setSpokenPunctuation(!spoken) },
+                        ),
+                        SheetRow(
+                            Icons.Rounded.Notes,
+                            "Period at every pause",
+                            detail = if (pausePeriods) "Every pause ends the sentence" else "A pause alone does not end the sentence. A period goes in when you say it, or when you go on after a long pause.",
+                            trailing = { Switch(checked = pausePeriods, onCheckedChange = null) },
+                            onClick = { app.settings.setPausePeriods(!pausePeriods) },
                         ),
                         SheetRow(
                             Icons.Rounded.Height,
