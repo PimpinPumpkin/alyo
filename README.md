@@ -62,6 +62,7 @@ Voice typing and the recorder use the same speech models, so those are downloade
 - **Read any text.** Select it and pick "Read aloud", or share it to Alyo.
 - **Eleven quick voices** in English, German, French and Spanish, each a 67 MB download, and
   **ten Supertonic voices** that sound more natural and speak 31 languages, 129 MB for all ten.
+  Every voice has a sample you can hear before downloading it.
 - **Adjustable speed.**
 
 ## All of it

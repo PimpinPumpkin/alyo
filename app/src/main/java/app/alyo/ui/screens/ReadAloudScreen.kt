@@ -60,6 +60,9 @@ import app.alyo.asr.InstallState
 import app.alyo.asr.ModelCatalog
 import app.alyo.asr.ModelSpec
 import app.alyo.asr.Synth
+import androidx.compose.material3.TextButton
+import app.alyo.tts.VoicePreview
+import androidx.compose.material3.FilledTonalIconButton
 import app.alyo.asr.works
 import app.alyo.data.Settings
 import app.alyo.tts.Reader
@@ -92,6 +95,9 @@ fun ReadAloudScreen(app: AlyoApp, onBack: () -> Unit, onSettings: () -> Unit) {
     val reader = remember { Reader(context) }
     DisposableEffect(Unit) { onDispose { reader.close() } }
     val speaking by reader.speaking.collectAsState()
+    val preview = remember { VoicePreview(context) }
+    DisposableEffect(Unit) { onDispose { preview.stop() } }
+    val previewing by preview.playing.collectAsState()
 
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
         Column(Modifier.widthIn(max = 640.dp).padding(horizontal = 16.dp)) {
@@ -171,16 +177,32 @@ fun ReadAloudScreen(app: AlyoApp, onBack: () -> Unit, onSettings: () -> Unit) {
             // Voices for the phone's own language first.
             val mine = Locale.getDefault().language
             val ordered = ModelCatalog.voices.sortedBy { if (Locale.forLanguageTag(it.locale).language == mine) 0 else 1 }
-            SheetGroup(ordered.filter { it.synth == Synth.PIPER }.map { voice -> voiceRow(app, voice, states[voice.id] ?: InstallState.Missing, chosen) })
+            SheetGroup(ordered.filter { it.synth == Synth.PIPER }.map { voice -> voiceRow(app, voice, states[voice.id] ?: InstallState.Missing, chosen, previewing == voice.id) { preview.toggle(voice.id) } })
 
+            val supertonic = ordered.filter { it.synth == Synth.SUPERTONIC }
             Text("Supertonic voices", style = MaterialTheme.typography.titleSmall, color = colors.primary, modifier = Modifier.padding(start = 12.dp, top = 20.dp, bottom = 4.dp))
             Text(
                 "More natural, and each speaks 31 languages. One 129 MB download for all ten, under the OpenRAIL-M license. They take about twice as long to start talking as the voices above.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.onSurfaceVariant,
-                modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 10.dp),
+                modifier = Modifier.padding(horizontal = 12.dp),
             )
-            SheetGroup(ordered.filter { it.synth == Synth.SUPERTONIC }.map { voice -> voiceRow(app, voice, states[voice.id] ?: InstallState.Missing, chosen) })
+            // They are one download, so its state is said once here and not on every row.
+            val shared = supertonic.firstOrNull()
+            val sharedState = shared?.let { states[it.id] }
+            when {
+                sharedState is InstallState.Downloading -> "Downloading, ${(sharedState.fraction * 100).toInt()}%"
+                sharedState is InstallState.Failed -> "Download failed. Tap a voice to try again."
+                sharedState?.works == true -> "On this phone."
+                else -> null
+            }?.let { status ->
+                Row(Modifier.padding(start = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(status, style = MaterialTheme.typography.bodyMedium, color = colors.primary, modifier = Modifier.weight(1f).padding(vertical = 6.dp))
+                    if (sharedState?.works == true && shared.key != chosen.key) TextButton(onClick = { app.models.delete(shared) }) { Text("Remove") }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            SheetGroup(supertonic.map { voice -> voiceRow(app, voice, states[voice.id] ?: InstallState.Missing, chosen, previewing == voice.id) { preview.toggle(voice.id) } })
 
             Text("Speed", style = MaterialTheme.typography.titleSmall, color = colors.primary, modifier = Modifier.padding(start = 12.dp, top = 20.dp, bottom = 10.dp))
             SheetGroup(
@@ -196,24 +218,29 @@ fun ReadAloudScreen(app: AlyoApp, onBack: () -> Unit, onSettings: () -> Unit) {
 }
 
 /**
- * One voice in the list: tap to choose it (and fetch it if it is not here), bin to remove it.
- * Voices that share a download go together, so the bin is not offered while one of them is in use.
+ * One voice in the list: the button in front plays a short sample, a tap on the row chooses the
+ * voice (and fetches it if it is not here), the bin removes it. Voices that share a download are
+ * removed together, from above their group.
  */
-private fun voiceRow(app: AlyoApp, voice: ModelSpec, state: InstallState, chosen: ModelSpec) = SheetRow(
+private fun voiceRow(app: AlyoApp, voice: ModelSpec, state: InstallState, chosen: ModelSpec, previewing: Boolean, onPreview: () -> Unit) = SheetRow(
     icon = Icons.Rounded.RecordVoiceOver,
+    leading = {
+        FilledTonalIconButton(onClick = onPreview, modifier = Modifier.size(40.dp)) {
+            Icon(if (previewing) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, if (previewing) "Stop the sample" else "Hear ${voice.title}")
+        }
+    },
     label = voice.title,
-    detail = voice.summary + "\n" + when (state) {
-        is InstallState.Downloading -> "Downloading, ${(state.fraction * 100).toInt()}%"
-        is InstallState.Failed -> "Download failed. Tap to try again."
-        // Voices that share a download say its size and license once, above the group.
-        else -> if (voice.store.isNotEmpty()) (if (state.works) "On this phone" else "Not downloaded")
-        else (if (state.works) "On this phone" else formatBytes(voice.source.downloadBytes)) + "  ·  " + voice.license + if (voice.nonCommercial) " (no commercial use)" else ""
+    detail = when {
+        // Voices that share a download say its size, license and progress once, above the group.
+        voice.store.isNotEmpty() -> voice.summary
+        state is InstallState.Downloading -> voice.summary + "\nDownloading, ${(state.fraction * 100).toInt()}%"
+        state is InstallState.Failed -> voice.summary + "\nDownload failed. Tap to try again."
+        else -> voice.summary + "\n" + (if (state.works) "On this phone" else formatBytes(voice.source.downloadBytes)) + "  ·  " + voice.license + if (voice.nonCommercial) " (no commercial use)" else ""
     },
     trailing = {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (state.works && voice.key != chosen.key) {
-                val what = if (voice.store.isEmpty()) voice.title else "all Supertonic voices"
-                IconButton(onClick = { app.models.delete(voice) }) { Icon(Icons.Rounded.DeleteOutline, "Remove $what", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+            if (state.works && voice.store.isEmpty() && voice.id != chosen.id) {
+                IconButton(onClick = { app.models.delete(voice) }) { Icon(Icons.Rounded.DeleteOutline, "Remove ${voice.title}", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             RadioButton(selected = voice.id == chosen.id, onClick = null)
         }

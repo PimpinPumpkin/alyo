@@ -149,6 +149,8 @@ class SheetRow(
     val danger: Boolean = false,
     val enabled: Boolean = true,
     val trailing: (@Composable () -> Unit)? = null,
+    /** Shown in place of [icon], for a row whose leading mark does something. */
+    val leading: (@Composable () -> Unit)? = null,
     val onClick: () -> Unit,
 )
 
@@ -178,7 +180,7 @@ fun SheetGroup(rows: List<SheetRow>, modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Row(Modifier.padding(horizontal = 20.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(row.icon, null, tint = tint)
+                    row.leading?.invoke() ?: Icon(row.icon, null, tint = tint)
                     Spacer(Modifier.width(20.dp))
                     Column(Modifier.weight(1f)) {
                         Text(row.label, style = MaterialTheme.typography.titleMedium, color = tint, maxLines = 1, overflow = TextOverflow.Ellipsis)
