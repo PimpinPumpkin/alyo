@@ -44,7 +44,7 @@ class VoiceEngine(private val models: ModelManager) {
     }
 
     /**
-     * Speaks [text], handing the audio over a sentence at a time as mono samples at the rate of
+     * Speaks [text], handing the audio over a phrase at a time as mono samples at the rate of
      * the voice's engine ([Synth.sampleRate]). Blocks until it is finished or stopped. [onAudio]
      * returns false to stop early.
      *
@@ -60,21 +60,31 @@ class VoiceEngine(private val models: ModelManager) {
             // A named class, not a lambda: the native side looks up `invoke(float[])` returning
             // Integer by exact signature, and a compiled lambda only has the erased one.
             val sink = object : Function1<FloatArray, Int> {
-                override fun invoke(samples: FloatArray): Int = if (stopped || !onAudio(samples)) 0 else 1
+                override fun invoke(samples: FloatArray): Int {
+                    // A listener that has heard enough ends the phrases still to come as well.
+                    // Supertonic pads each piece with about half a second of silence on both sides.
+                    val audio = if (spec.synth == Synth.SUPERTONIC) Phrases.trimSilence(samples, spec.synth.sampleRate) else samples
+                    if (!stopped && !onAudio(audio)) stopped = true
+                    return if (stopped) 0 else 1
+                }
             }
             val pace = speed.coerceIn(0.3f, 4f)
-            when (spec.synth) {
-                Synth.PIPER -> tts.generateWithCallback(text, 0, pace, sink)
-                Synth.SUPERTONIC -> tts.generateWithConfigAndCallback(
-                    text,
-                    GenerationConfig(
-                        speed = pace,
-                        sid = spec.speaker,
-                        numSteps = SUPERTONIC_STEPS,
-                        extra = mapOf("lang" to (language?.takeIf { it in spec.languages } ?: Locale.forLanguageTag(spec.locale).language)),
-                    ),
-                    sink,
-                )
+            // Made a phrase at a time, so the first words are heard while the rest is still being made.
+            for (phrase in Phrases.split(text)) {
+                if (stopped) break
+                when (spec.synth) {
+                    Synth.PIPER -> tts.generateWithCallback(phrase, 0, pace, sink)
+                    Synth.SUPERTONIC -> tts.generateWithConfigAndCallback(
+                        phrase,
+                        GenerationConfig(
+                            speed = pace,
+                            sid = spec.speaker,
+                            numSteps = SUPERTONIC_STEPS,
+                            extra = mapOf("lang" to (language?.takeIf { it in spec.languages } ?: Locale.forLanguageTag(spec.locale).language)),
+                        ),
+                        sink,
+                    )
+                }
             }
         } finally {
             handler.postDelayed(unload, KEEP_MS)
@@ -113,7 +123,7 @@ class VoiceEngine(private val models: ModelManager) {
         }
         val config = OfflineTtsConfig(
             model = model,
-            // One sentence at a time, so the first words are heard while the rest is still being made.
+            // Should a phrase hold several sentences all the same, they still come one at a time.
             maxNumSentences = 1,
         )
         return OfflineTts(null, config).also { loaded = spec.key to it }
