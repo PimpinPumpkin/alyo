@@ -1,0 +1,80 @@
+# How the English Piper voices should say words they get wrong. One word or name per line, then a tab,
+# then a spelling that reads the way the word sounds. Capitals do not matter. Lines starting
+# with # are notes.
+#
+# Add a word only if a voice really says it wrong, and check your spelling with
+# scripts/pronunciation-check.sh, which shows how the voices read both. Keep it to the common
+# local pronunciation. Corrections and new words are welcome as pull requests or issues.
+
+# Pacific Northwest and Mountain West
+Sequim	squim
+Tulalip	too-laylip
+Stillaguamish	stilla-gwahmish
+Nisqually	niss-kwally
+Coeur d'Alene	kordalane
+Pend Oreille	ponderay
+Kootenai	kootenay
+Tooele	tooilla
+Shoshone	show-showny
+Saguache	sawatch
+
+# Southwest and California
+Tucson	toosonn
+Gila	heela
+Chinle	chin-lee
+Kayenta	kyenta
+Ajo	ahho
+Saguaro	sahwahro
+Ojai	ohigh
+Hueneme	wyneemee
+Suisun	sasoon
+Yreka	why-reeka
+Tehachapi	tuh-hatcha-pee
+Tuolumne	too-olla-me
+
+# Plains and Midwest
+Wichita	witchitaw
+Mackinac	mackinaw
+Keweenaw	keewinaw
+Waukesha	walkishaw
+Oconomowoc	oh-conna-moe-wock
+Menomonee	muh-nommany
+Chequamegon	shuh-wahmigun
+Olentangy	olen-tanjy
+Sault Ste. Marie	soo saint marie
+Sault Sainte Marie	soo saint marie
+
+# South
+Natchitoches	nackitish
+Ouachita	washitaw
+Opelousas	oppa-loosus
+Tchoupitoulas	choppa-toolus
+Kissimmee	kiss-simmy
+
+# Northeast
+Schenectady	skuh-neck-tuh-dee
+Poughkeepsie	puh-kipsy
+Skaneateles	skanny-atlas
+Chautauqua	shuh-tawkwa
+Schuylkill	skoolkill
+Hoboken	hoe-boken
+Monongahela	muh-nonga-heela
+Youghiogheny	yocka-gainy
+Winnipesaukee	winnipa-sawkey
+Kancamagus	kanka-mahgus
+Piscataqua	pis-cattaquaw
+Cochituate	co-chitchoo-it
+Quinsigamond	quin-siggamund
+
+# Hawaii
+Waikiki	why-kee-kee
+Haleakala	hahlay-ahka-lah
+
+# French names an English voice meets in Quebec
+Chemin	shuh-man
+Ouest	west
+Sainte	sant
+Montée	mon-tay
+Côte-des-Neiges	coat day nezh
+Trois-Rivières	twah riv-yair
+Longueuil	longay

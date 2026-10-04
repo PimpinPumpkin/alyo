@@ -1,5 +1,6 @@
 package app.alyo.tts
 
+import android.content.res.AssetManager
 import android.os.Handler
 import android.os.Looper
 import app.alyo.asr.ModelCatalog
@@ -19,7 +20,10 @@ import java.util.Locale
  * Turns text into speech with a Piper or Supertonic voice. One model is held in memory at a
  * time, and for a little while after it was last used, since reading aloud tends to come in runs.
  */
-class VoiceEngine(private val models: ModelManager) {
+class VoiceEngine(private val models: ModelManager, private val assets: AssetManager) {
+    // Read when a language is first spoken, and kept.
+    private val pronunciations = HashMap<String, Pronunciations>()
+
     private var loaded: Pair<String, OfflineTts>? = null
     private val handler = Handler(Looper.getMainLooper())
     private val unload = Runnable { synchronized(this) { loaded?.second?.release(); loaded = null } }
@@ -70,7 +74,11 @@ class VoiceEngine(private val models: ModelManager) {
             }
             val pace = speed.coerceIn(0.3f, 4f)
             // Made a phrase at a time, so the first words are heard while the rest is still being made.
-            for (phrase in Phrases.split(text)) {
+            // The table's spellings are tuned to how the Piper voices read. Supertonic reads by
+            // its own rules: it knows some of these names already and trips over the spellings.
+            val spoken = Locale.forLanguageTag(spec.locale).language
+            val words = if (spec.synth == Synth.PIPER) pronunciations.getOrPut(spoken) { Pronunciations.load(assets, spoken) } else Pronunciations.NONE
+            for (phrase in Phrases.split(words.apply(text))) {
                 if (stopped) break
                 when (spec.synth) {
                     Synth.PIPER -> tts.generateWithCallback(phrase, 0, pace, sink)

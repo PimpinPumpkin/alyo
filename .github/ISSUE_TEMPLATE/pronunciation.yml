@@ -1,0 +1,31 @@
+name: A word said wrong
+description: A place name or other word that a voice mispronounces when reading aloud
+labels: [pronunciation]
+body:
+  - type: input
+    id: word
+    attributes:
+      label: The word or name, spelled as it is written
+      placeholder: Tucson
+    validations:
+      required: true
+  - type: input
+    id: sounds
+    attributes:
+      label: How it should sound
+      description: Spell it the way you would for someone who has never heard it. Where it is, if it is a place, helps too.
+      placeholder: TOO-sahn (Arizona)
+    validations:
+      required: true
+  - type: input
+    id: voice
+    attributes:
+      label: Which voice said it wrong?
+      placeholder: HFC
+    validations:
+      required: true
+  - type: textarea
+    id: heard
+    attributes:
+      label: What did the voice say?
+      description: Optional. Roughly how it came out.
