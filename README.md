@@ -262,15 +262,19 @@ unmodified copies, and from the original publisher if that fails.
 The Piper voices work out how to say a word from its spelling, which goes wrong for names that
 are not said the way they are written: Tucson, Schenectady, Sequim. Alyo keeps a table of such
 words in [`app/src/main/assets/pronunciation/en.tsv`](app/src/main/assets/pronunciation/en.tsv):
-the word, a tab, and a spelling that reads the way the word sounds.
+the word, a tab, and a spelling that reads the way the word sounds. A third column can give the
+exact sounds, stress included, in the notation of eSpeak NG, the part of a Piper voice that
+turns spelling into sounds. Words with exact sounds are built into the dictionary the voices
+read with; words with only a spelling are respelled as the text is read.
 
 To add one, edit that file and send a pull request, or
 [open an issue](https://github.com/PimpinPumpkin/alyo/issues/new?template=pronunciation.yml) with the word and
-how it should sound. `scripts/pronunciation-check.sh` shows how the voices read the word and
-your spelling, so an entry can be checked without a phone. The first entries are place names
-from around the United States and a few French ones from Quebec. They were checked against what
-the voices' text reader produces, not all by ear, so corrections are welcome. The Supertonic
-voices read by their own rules and do not use the table.
+how it should sound. A spelling alone is enough. `scripts/pronunciation-check.sh` shows how the
+voices read the word and your spelling, so an entry can be checked without a phone, and
+`scripts/build-espeak-dict.sh` rebuilds the dictionary after the exact sounds change. The first
+entries are place names from around the United States and a few French ones from Quebec. They
+were checked against what the voices' text reader produces, not all by ear, so corrections are
+welcome. The Supertonic voices read by their own rules and do not use the table.
 
 </details>
 

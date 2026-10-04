@@ -1,80 +1,94 @@
-# How the English Piper voices should say words they get wrong. One word or name per line, then a tab,
-# then a spelling that reads the way the word sounds. Capitals do not matter. Lines starting
+# How the English Piper voices should say words they get wrong. One word or name per line, then a
+# tab, then a spelling that reads the way the word sounds. Capitals do not matter. Lines starting
 # with # are notes.
 #
-# Add a word only if a voice really says it wrong, and check your spelling with
-# scripts/pronunciation-check.sh, which shows how the voices read both. Keep it to the common
-# local pronunciation. Corrections and new words are welcome as pull requests or issues.
+# A third column is optional: the exact sounds, in eSpeak's own notation (' before the stressed
+# vowel, @ for the "a" in "about", S for "sh", and so on). Words that have it are built into the
+# dictionary the voices read with (scripts/build-espeak-dict.sh), which gets the stress right
+# where a respelling cannot. Words without it are respelled when the text is read.
+#
+# Add a word only if a voice really says it wrong, and check it with
+# scripts/pronunciation-check.sh. Keep it to the common local pronunciation. Corrections and
+# new words are welcome as pull requests or issues, and a spelling alone is enough.
 
 # Pacific Northwest and Mountain West
-Sequim	squim
-Tulalip	too-laylip
-Stillaguamish	stilla-gwahmish
-Nisqually	niss-kwally
-Coeur d'Alene	kordalane
-Pend Oreille	ponderay
-Kootenai	kootenay
-Tooele	tooilla
-Shoshone	show-showny
-Saguache	sawatch
+Sequim	squim	skw'Im
+Tulalip	too-laylip	tu:l'eIlIp
+Stillaguamish	stilla-gwahmish	stIl@gw'A:mIS
+Nisqually	niss-kwally	nIskw'O:li
+Coeur d'Alene	kordalane	kO@d@l'eIn
+Pend Oreille	ponderay	p0nd@r'eI
+Kootenai	kootenay	k'u:t@neI
+Tooele	tooilla	tu:'Il@
+Shoshone	show-showny	SoUS'oUni
+Saguache	sawatch	s@w'atS
 
 # Southwest and California
-Tucson	toosonn
-Gila	heela
-Chinle	chin-lee
-Kayenta	kyenta
-Ajo	ahho
-Saguaro	sahwahro
-Ojai	ohigh
-Hueneme	wyneemee
-Suisun	sasoon
-Yreka	why-reeka
-Tehachapi	tuh-hatcha-pee
-Tuolumne	too-olla-me
+Tucson	toosonn	t'u:s0n
+Gila	heela	h'i:l@
+Chinle	chin-lee	tSInl'i:
+Kayenta	kyenta	kaI'Ent@
+Ajo	ahho	'A:hoU
+Saguaro	sahwahro	s@w'A:roU
+Ojai	ohigh	'oUhaI
+Hueneme	wyneemee	waIn'i:mi
+Suisun	sasoon	s@s'u:n
+Yreka	why-reeka	waIr'i:k@
+Tehachapi	tuh-hatcha-pee	t@h'atS@pi
+Tuolumne	too-olla-me	tu:'0l@mi
 
 # Plains and Midwest
-Wichita	witchitaw
-Mackinac	mackinaw
-Keweenaw	keewinaw
-Waukesha	walkishaw
-Oconomowoc	oh-conna-moe-wock
-Menomonee	muh-nommany
-Chequamegon	shuh-wahmigun
-Olentangy	olen-tanjy
+Wichita	witchitaw	w'ItSItO:
+Mackinac	mackinaw	m'akInO:
+Keweenaw	keewinaw	k'i:wInO:
+Waukesha	walkishaw	w'O:kISO:
+Oconomowoc	oh-conna-moe-wock	oUk'0n@m@w0k
+Menomonee	muh-nommany	m@n'0m@ni
+Chequamegon	shuh-wahmigun	S@w'A:mIg@n
+Olentangy	olen-tanjy	,oUl@nt'andZi
 Sault Ste. Marie	soo saint marie
-Sault Sainte Marie	soo saint marie
+Sault Ste Marie	soo saint marie	s,u:seIntm@r'i:
+Sault Sainte Marie	soo saint marie	s,u:seIntm@r'i:
 
 # South
-Natchitoches	nackitish
-Ouachita	washitaw
-Opelousas	oppa-loosus
-Tchoupitoulas	choppa-toolus
-Kissimmee	kiss-simmy
+Natchitoches	nackitish	n'ak@tIS
+Ouachita	washitaw	w'0SItO:
+Opelousas	oppa-loosus	,0p@l'u:s@s
+Tchoupitoulas	choppa-toolus	tS,0pIt'u:l@s
+Kissimmee	kiss-simmy	kIs'Imi
 
 # Northeast
-Schenectady	skuh-neck-tuh-dee
-Poughkeepsie	puh-kipsy
-Skaneateles	skanny-atlas
-Chautauqua	shuh-tawkwa
-Schuylkill	skoolkill
-Hoboken	hoe-boken
-Monongahela	muh-nonga-heela
-Youghiogheny	yocka-gainy
-Winnipesaukee	winnipa-sawkey
-Kancamagus	kanka-mahgus
-Piscataqua	pis-cattaquaw
-Cochituate	co-chitchoo-it
-Quinsigamond	quin-siggamund
+Schenectady	skuh-neck-tuh-dee	sk@n'Ekt@di
+Poughkeepsie	puh-kipsy	p@k'Ipsi
+Skaneateles	skanny-atlas	sk,ani'atl@s
+Chautauqua	shuh-tawkwa	S@t'O:kw@
+Schuylkill	skoolkill	sk'u:lkIl
+Hoboken	hoe-boken	h'oUboUk@n
+Monongahela	muh-nonga-heela	m@n,0Ng@h'i:l@
+Youghiogheny	yocka-gainy	j,0k@g'eIni
+Winnipesaukee	winnipa-sawkey	w,InIp@s'O:ki
+Kancamagus	kanka-mahgus	k,aNk@m'A:g@s
+Piscataqua	pis-cattaquaw	pIsk'at@kwO:
+Cochituate	co-chitchoo-it	koUtS'ItSu:It
+Quinsigamond	quin-siggamund	kwIns'Ig@m@nd
 
 # Hawaii
-Waikiki	why-kee-kee
-Haleakala	hahlay-ahka-lah
+Waikiki	why-kee-kee	w,aIkIk'i:
+Haleakala	hahlay-ahka-lah	h,A:leI,A:k@l'A:
 
 # French names an English voice meets in Quebec
-Chemin	shuh-man
-Ouest	west
-Sainte	sant
-Montée	mon-tay
+Chemin	shuh-man	S@m'an
+Ouest	west	w'Est
+Sainte	sant	s'ant
+Montée	mon-tay	m0nt'eI
 Côte-des-Neiges	coat day nezh
-Trois-Rivières	twah riv-yair
-Longueuil	longay
+Trois-Rivières	twah riv-yair	twA:rIvj'e@
+Longueuil	longay	lONg'eI
+
+# More from around the country
+Mishawaka	mish-a-wahka	m,IS@w'A:k@
+Ocoee	oh-koey	oUk'oUi
+Uintah	you-inta	ju:'Int@
+Ouray	yoo-ray	j'UreI
+Acoma	ackama	'ak@m@
+Taos	touse	t'aUs

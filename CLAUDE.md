@@ -49,6 +49,13 @@ once per clone.
   Then upload the library to the `models` release as `build.libonnxruntime-<version>-alyoN-arm64-v8a.so`
   with N raised by one, and point `app/build.gradle.kts` and `build.yml` at it.
 
+## Pronunciation
+
+`app/src/main/assets/pronunciation/en.tsv` lists words the Piper voices say wrong. After changing
+a third column there, run `scripts/build-espeak-dict.sh <espeak-ng-data of any Piper voice>` and
+commit the `en_dict` and `en_dict.version` it writes. eSpeak loads its data once per process, so
+test a rebuilt dictionary in a fresh one.
+
 ## Building and testing
 
 `./gradlew assembleDebug` with JDK 17 and Android SDK platform 37. Signing reads

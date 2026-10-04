@@ -108,6 +108,9 @@ class VoiceEngine(private val models: ModelManager, private val assets: AssetMan
         // Voices of one model share it, so changing between them loads nothing.
         loaded?.let { (key, tts) -> if (key == spec.key) return tts else tts.release() }
         val dir = models.dir(spec)
+        // Every Piper voice gets it, whatever it speaks: eSpeak reads its data once, from the
+        // first voice loaded, and an English voice loaded later reads with that copy.
+        if (spec.synth == Synth.PIPER) installed().filter { it.synth == Synth.PIPER }.forEach { Pronunciations.install(assets, models.dir(it)) }
         fun path(name: String) = File(dir, name).path
         val model = when (spec.synth) {
             Synth.PIPER -> OfflineTtsModelConfig(
