@@ -129,7 +129,7 @@ class LiveTranscriber(
         // model starts for itself take on the priority of the thread that created it.
         Process.setThreadPriority(LIVE_PRIORITY)
         val recognizer = engine.live(liveSpec)
-        val stream = recognizer.createStream()
+        var stream = recognizer.createStream()
         val out = BufferedOutputStream(FileOutputStream(spool), 64 * 1024)
         val bytes = ByteBuffer.allocate(64 * 1024).order(ByteOrder.LITTLE_ENDIAN)
         val chunkSamples = liveSpec.chunkMs * AudioSpec.ASR_SAMPLE_RATE / 1000L
@@ -147,6 +147,10 @@ class LiveTranscriber(
         var claimed = 0
         var nextId = 0L
         val pauses = PauseFinder()
+        // The audio since the last sentence ended, kept so that a recognizer started afresh can
+        // be given again what the old one had only begun to hear. [recentBase] is where it starts.
+        var recent = FloatArray(AudioSpec.ASR_SAMPLE_RATE * 16)
+        var recentBase = 0L
 
         fun decodeReady() {
             while (recognizer.isReady(stream)) {
@@ -199,18 +203,40 @@ class LiveTranscriber(
                 }
             }
             audioStart = until
+            val drop = (until - recentBase).toInt().coerceIn(0, (fed - recentBase).toInt())
+            if (drop > 0) {
+                System.arraycopy(recent, drop, recent, 0, (fed - recentBase).toInt() - drop)
+                recentBase += drop
+            }
         }
 
-        /** The speaker paused: close the sentence and start the recognizer afresh. */
+        /**
+         * The speaker paused: close the sentence and start the recognizer afresh.
+         *
+         * The recognizer reports a pause late, about a second after it began, and by then the
+         * speaker may be talking again. Ending the sentence where the recognizer happens to be
+         * can cut the next word in two, and a word cut in two is lost to both passes. So the
+         * sentence ends inside the pause, and a fresh recognizer is given the audio from there.
+         */
         fun closeSegment(words: List<Word>) {
-            val end = minOf(consumed, fed)
-            emit(words, end)
+            val heard = minOf(consumed, fed)
+            val lastWord = words.lastOrNull()?.let { msToSample(it.endMs) } ?: audioStart
+            val end = pauses.cutInPause(maxOf(lastWord, audioStart), heard, fed)
+            // Anything the recognizer did get out of the speech after the pause will come again.
+            emit(words.filter { msToSample((it.startMs + it.endMs) / 2) < end }, end)
             _partial.value = emptyList()
-            recognizer.reset(stream)
+            stream.release()
+            stream = recognizer.createStream()
             timeBase = end
+            consumed = end
             claimed = 0
             afterSplit = false
             strayReturned = false
+            val again = (fed - recentBase).toInt()
+            if (again > 0) {
+                stream.acceptWaveform(recent.copyOfRange(0, again), AudioSpec.ASR_SAMPLE_RATE)
+                decodeReady()
+            }
         }
 
         /**
@@ -249,6 +275,9 @@ class LiveTranscriber(
                 for (s in chunk) bytes.putShort((s * 32767f).toInt().coerceIn(-32768, 32767).toShort())
                 out.write(bytes.array(), 0, bytes.position())
                 pauses.add(chunk)
+                val have = (fed - recentBase).toInt()
+                if (have + chunk.size > recent.size) recent = recent.copyOf(maxOf(recent.size * 2, have + chunk.size))
+                System.arraycopy(chunk, 0, recent, have, chunk.size)
 
                 stream.acceptWaveform(chunk, AudioSpec.ASR_SAMPLE_RATE)
                 fed += chunk.size

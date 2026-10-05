@@ -165,7 +165,7 @@ class Dictation(
             // "stopped talking" starts now, with what was captured up to this point.
             val listeningFrom = captured.get()
             if (!stopped.get()) listener.onState(State.LISTENING)
-            val stream = recognizer.createStream()
+            var stream = recognizer.createStream()
             val chunkSamples = liveSpec.chunkMs * SAMPLE_RATE / 1000L
 
             // The audio not yet handed to pass two, and where on the timeline it begins.
@@ -227,6 +227,10 @@ class Dictation(
                         listener.onText(null, tail())
                     }
                     refineQueue.trySend(RefineJob(id, slice(from, to), sampleToMs(from), words, afterSplit))
+                } else if (pauses.soundMs(audioStart, until) >= UNHEARD_SOUND_MS) {
+                    // Pass one made nothing of it, but something was said: a word on its own
+                    // between two pauses is the hardest thing for it. Pass two gets to listen.
+                    refineQueue.trySend(RefineJob(nextId++, slice(audioStart, until), sampleToMs(audioStart), emptyList(), false))
                 }
                 audioStart = until
                 // Everything before this is with pass two now.
@@ -237,18 +241,40 @@ class Dictation(
                 }
             }
 
-            fun reset(end: Long) {
-                recognizer.reset(stream)
-                timeBase = end
+            /**
+             * Starts the recognizer afresh at [from], a point at or before what it has heard. It
+             * is given the audio since then again: a fresh recognizer has forgotten whatever it
+             * was in the middle of.
+             */
+            fun reset(from: Long) {
+                stream.release()
+                stream = recognizer.createStream()
+                timeBase = from
+                consumed = from
                 claimed = 0
                 afterSplit = false
                 lastText = ""
+                val again = slice(from, fed)
+                if (again.isNotEmpty()) {
+                    stream.acceptWaveform(again, SAMPLE_RATE)
+                    decodeReady()
+                }
             }
 
-            /** The speaker paused: close the sentence and start the recognizer afresh. */
+            /**
+             * The speaker paused: close the sentence and start the recognizer afresh.
+             *
+             * The recognizer reports a pause late, about a second after it began, and by then the
+             * speaker may be talking again. Ending the sentence where the recognizer happens to
+             * be can cut the next word in two, and a word cut in two is lost to both passes. So
+             * the sentence ends inside the pause, and the recognizer starts again from there.
+             */
             fun closeSentence(words: List<Word>) {
-                val end = minOf(consumed, fed)
-                emit(words, end)
+                val heard = minOf(consumed, fed)
+                val lastWord = words.lastOrNull()?.let { msToSample(it.endMs) } ?: audioStart
+                val end = pauses.cutInPause(maxOf(lastWord, audioStart), heard, fed)
+                // Anything the recognizer did get out of the speech after the pause will come again.
+                emit(words.filter { msToSample((it.startMs + it.endMs) / 2) < end }, end)
                 reset(end)
             }
 
@@ -384,7 +410,7 @@ class Dictation(
                     if (job.id >= firstLiveId && !cancelled) {
                         waiting.removeAll { it.first == job.id }
                         val continues = job.continues && words.firstOrNull()?.text?.lowercase()?.trim { !it.isLetter() } in continuers
-                        listener.onText(Sentence(words, continues), tail())
+                        if (words.isNotEmpty()) listener.onText(Sentence(words, continues), tail())
                     }
                 }
             }
@@ -412,5 +438,7 @@ class Dictation(
         const val PAUSE_DEPTH = 0.12f
 
         const val FIRST_WORD_GRACE_MS = 2_000
+        // Less sound than this with no words in it is a click or a cough, not something said.
+        const val UNHEARD_SOUND_MS = 300
     }
 }

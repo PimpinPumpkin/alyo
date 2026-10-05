@@ -51,4 +51,65 @@ class PauseFinder(private val frameSamples: Int = 320) {
         val depth = if (median > 0f) (best / window) / median else 1f
         return Pause((bestAt + window / 2).toLong() * frameSamples, depth)
     }
+
+    /** The energy above which a 20 ms frame counts as sound: halfway, as ratios go, between the room's hush and the speech so far. Null while there is too little to tell. */
+    private fun loudness(): Float? {
+        if (frames < 50) return null
+        val sorted = energies.copyOfRange(0, frames).also { it.sort() }
+        val speech = sorted[frames * 9 / 10]
+        // Digital silence, as a file can have, would put the line at nothing: 40 dB under speech is quiet enough.
+        val hush = maxOf(sorted[frames / 10], speech * 1e-4f)
+        return if (speech < hush * 10f) null else kotlin.math.sqrt(hush.toDouble() * speech).toFloat()
+    }
+
+    /**
+     * Where to end a sentence that paused somewhere between [afterSample] and [heardSample]: just
+     * before the sound that follows the pause, or [heardSample] if the pause is still going on
+     * there. Sound up to [fedSample] is looked at, which is past what the recognizer has taken in.
+     *
+     * A recognizer reports a pause late, and by then the next word may be under way or about to
+     * be. Cutting where the recognizer happens to be can cut that word in two; cutting inside the
+     * pause never does.
+     */
+    fun cutInPause(afterSample: Long, heardSample: Long, fedSample: Long): Long {
+        val loud = loudness() ?: return heardSample
+        val first = (afterSample / frameSamples).toInt().coerceAtLeast(0)
+        val heard = (heardSample / frameSamples).toInt().coerceAtMost(frames)
+        val last = (fedSample / frameSamples).toInt().coerceAtMost(frames)
+        // The longest quiet stretch that starts before the recognizer's position.
+        var bestStart = -1
+        var bestEnd = -1
+        var i = first
+        while (i < heard) {
+            if (energies[i] > loud) {
+                i++
+                continue
+            }
+            var end = i
+            while (end < last && energies[end] <= loud) end++
+            if (end - i > bestEnd - bestStart) {
+                bestStart = i
+                bestEnd = end
+            }
+            i = end
+        }
+        // Under 200 ms is a gap between words, not a pause.
+        if (bestEnd - bestStart < 10) return heardSample
+        // Sound picks up again at bestEnd, unless the quiet runs to the end of what has come in.
+        val cut = if (bestEnd < last) bestEnd - LEAD_FRAMES else heard
+        return cut.coerceIn(bestStart, heard).toLong() * frameSamples
+    }
+
+    /** How much sound, in milliseconds, there is between two sample positions. */
+    fun soundMs(fromSample: Long, toSample: Long): Int {
+        val loud = loudness() ?: return 0
+        val first = (fromSample / frameSamples).toInt().coerceAtLeast(0)
+        val last = (toSample / frameSamples).toInt().coerceAtMost(frames)
+        return (first until last).count { energies[it] > loud } * frameSamples / 16
+    }
+
+    private companion object {
+        // 120 ms of the quiet before a word is kept with it: its first sound is often soft.
+        const val LEAD_FRAMES = 6
+    }
 }
