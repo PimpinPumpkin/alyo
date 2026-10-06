@@ -46,6 +46,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.getValue
@@ -60,6 +61,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
@@ -102,6 +104,7 @@ fun DictationPanel(
     onOpenApp: () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
+    if (problem == null) KeepScreenOn()
     Surface(color = colors.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.windowInsetsPadding(WindowInsets.navigationBars), horizontalAlignment = Alignment.CenterHorizontally) {
             when {
@@ -242,6 +245,19 @@ private fun LevelBars(level: () -> Float) {
 }
 
 private val BAR_REACH = floatArrayOf(0.5f, 0.8f, 1f, 0.8f, 0.5f)
+
+/**
+ * Keeps the screen from going dark for as long as this is shown. Someone dictating does not
+ * touch the phone, and the phone takes that for nobody being there.
+ */
+@Composable
+fun KeepScreenOn() {
+    val view = LocalView.current
+    DisposableEffect(view) {
+        view.keepScreenOn = true
+        onDispose { view.keepScreenOn = false }
+    }
+}
 
 /**
  * The shape in the middle. While listening it turns slowly and swells with the voice. While the

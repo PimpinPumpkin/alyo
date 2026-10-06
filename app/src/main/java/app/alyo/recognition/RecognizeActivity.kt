@@ -36,6 +36,7 @@ import app.alyo.AlyoApp
 import app.alyo.MainActivity
 import app.alyo.dictation.Dictation
 import app.alyo.ime.PanelPhase
+import app.alyo.ime.KeepScreenOn
 import app.alyo.ime.VoiceOrb
 import app.alyo.text.SpokenPunctuation
 import app.alyo.ui.theme.AlyoTheme
@@ -85,6 +86,7 @@ class RecognizeActivity : ComponentActivity() {
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                             )
                             if (problem.value == null) {
+                                KeepScreenOn()
                                 VoiceOrb(phase = phase.value, level = { dictation?.level ?: 0f })
                                 Spacer(Modifier.height(12.dp))
                                 Button(onClick = { dictation?.finish() }, enabled = phase.value != PanelPhase.FINISHING, modifier = Modifier.fillMaxWidth().height(56.dp)) {
