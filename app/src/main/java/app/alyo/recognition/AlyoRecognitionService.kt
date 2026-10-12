@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.speech.RecognitionService
 import android.speech.SpeechRecognizer
 import app.alyo.AlyoApp
@@ -18,6 +19,22 @@ import app.alyo.text.SpokenPunctuation
 class AlyoRecognitionService : RecognitionService() {
     private val main = Handler(Looper.getMainLooper())
     private var dictation: Dictation? = null
+
+    // Held while listening. The app that asked for speech (a keyboard, say) shows its own screen,
+    // not one of Alyo's, so there is no window of ours to keep the display awake with, and
+    // someone talking does not touch the phone. The kind of lock is deprecated in favor of that
+    // window flag, which is exactly what is not available here.
+    @Suppress("DEPRECATION")
+    private val screen by lazy {
+        (getSystemService(POWER_SERVICE) as PowerManager)
+            .newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ON_AFTER_RELEASE, "alyo:listening")
+            .apply { setReferenceCounted(false) }
+    }
+
+    private fun keepScreenOn(on: Boolean) {
+        // The limit is only a backstop against a caller that never ends its request.
+        if (on) screen.acquire(SCREEN_LIMIT_MILLIS) else if (screen.isHeld) screen.release()
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -58,13 +75,17 @@ class AlyoRecognitionService : RecognitionService() {
                     Dictation.State.DONE -> {
                         main.removeCallbacksAndMessages(LEVEL_TOKEN)
                         dictation = null
+                        keepScreenOn(false)
                         if (text.isBlank()) callback.error(SpeechRecognizer.ERROR_NO_MATCH)
                         else callback.results(results(text.toString()).apply { putBoolean(EXTRA_SPOKEN_END, spokenEnd) })
                     }
                 }
             }
 
-            override fun onError(message: String) = report { callback.error(SpeechRecognizer.ERROR_AUDIO) }
+            override fun onError(message: String) = report {
+                keepScreenOn(false)
+                callback.error(SpeechRecognizer.ERROR_AUDIO)
+            }
 
             private fun report(block: () -> Unit) {
                 // The caller may have gone away; its callback then throws, which is not this service's problem.
@@ -73,6 +94,7 @@ class AlyoRecognitionService : RecognitionService() {
         }
         val started = app.newDictation(listener, singleUtterance = true) ?: return callback.error(SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE)
         dictation = started
+        keepScreenOn(true)
         started.start()
     }
 
@@ -94,11 +116,13 @@ class AlyoRecognitionService : RecognitionService() {
         main.removeCallbacksAndMessages(LEVEL_TOKEN)
         dictation?.cancel()
         dictation = null
+        keepScreenOn(false)
     }
 
     override fun onDestroy() {
         main.removeCallbacksAndMessages(LEVEL_TOKEN)
         dictation?.cancel()
+        keepScreenOn(false)
         super.onDestroy()
     }
 
@@ -115,6 +139,7 @@ class AlyoRecognitionService : RecognitionService() {
          */
         const val EXTRA_SPOKEN_END = "app.alyo.SPOKEN_END"
         const val LEVEL_INTERVAL_MILLIS = 60L
+        const val SCREEN_LIMIT_MILLIS = 10 * 60_000L
         val LEVEL_TOKEN = Any()
     }
 }
